@@ -13,22 +13,18 @@ import stdlib.keyboards as kb
 from bot.config import config
 from bot.logger import logger
 from stdlib.handlers.blocks import BLOCKS
+from aiogram.fsm.state import StatesGroup, State
 
 router = Router()
 
 
 class States:
-    from aiogram.fsm.state import StatesGroup, State
-
     class States(StatesGroup):
         from aiogram.fsm.state import State
 
         FILLING = State()
         REWORK = State()
         SU_REJECT = State()
-
-
-from aiogram.fsm.state import StatesGroup, State
 
 
 class BotStates(StatesGroup):
@@ -67,12 +63,12 @@ async def cmd_start(message: Message, state: FSMContext):
         return
 
     app_id = await db.get_or_create_app(user_id, username)
+    await db.set_t_start(app_id)  # t_start время старта
     mode = await db.get_user_mode(user_id)
 
     if mode == "free":
         await state.set_state(BotStates.FREE_FORM)
         await state.update_data(app_id=app_id)
-        await db.save_chat_history(app_id, [])
         await message.answer(
             "Вы в режиме <b>Свободного ввода</b>.\n\n"
             "Напишите всю суть вашей заявки в одном или нескольких сообщениях (что произошло, зачем выносим, предлагаемое решение и риски).\n"
@@ -147,12 +143,12 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
 
     # Новый черновик
     app_id = await db.get_or_create_app(user_id, username)
+    await db.set_t_start(app_id)
     mode = await db.get_user_mode(user_id)
 
     if mode == "free":
         await state.set_state(BotStates.FREE_FORM)
         await state.update_data(app_id=app_id)
-        await db.save_chat_history(app_id, [])
         await callback.message.answer(
             "Вы в режиме <b>Свободного ввода</b>.\n\n"
             "Опишите вашу заявку в свободной форме. Я задам вопросы, если что-то будет непонятно.",
@@ -211,56 +207,6 @@ async def handle_block_input(message: Message, state: FSMContext):
         parse_mode="HTML",
         reply_markup=kb.confirm_keyboard(),
     )
-
-
-# ─── Свободный ввод (Free-form) ──────────────────────────────────────────────
-
-
-# @router.message(BotStates.FREE_FORM, F.text)
-# async def handle_free_form_input(message: Message, state: FSMContext):
-#     data = await state.get_data()
-#     app_id = data["app_id"]
-
-#     waiting_msg = await message.answer("⏳ Анализирую ваш текст...")
-
-#     history = await db.get_chat_history(app_id)
-# history.append({"role": "user", "content": message.text.strip()})
-
-# result = await llm.process_free_form_chat(
-#     history, app_id=app_id, user_id=message.from_user.id
-# )
-
-# await waiting_msg.delete()
-
-# if result.get("status") == "incomplete":
-#     reply_text = result.get("reply", "Пожалуйста, уточните детали.")
-#     history.append({"role": "assistant", "content": reply_text})
-#     await db.save_chat_history(app_id, history)
-#     await message.answer(reply_text)
-
-# elif result.get("status") == "complete":
-#     blocks = result.get("blocks", {})
-#     await db.save_all_blocks(app_id, blocks)
-#     await db.save_chat_history(app_id, [])
-
-#     # Переводим пользователя на этап файлов
-#     await state.update_data(current_block="files", mode="input")
-#     await state.set_state(BotStates.FILLING)
-
-#     msg_text = (
-#         "✅ Отлично! Я собрал всю необходимую информацию.\n\n"
-#         "<b>Приложения</b>\n"
-#         "Прикрепите файлы к заявке (если есть) и нажмите <b>Готово</b>. "
-#         "После этого вы сможете проверить и отредактировать каждый блок перед финальной отправкой."
-#     )
-#     await message.answer(msg_text, parse_mode="HTML", reply_markup=kb.files_keyboard())
-# else:
-#     await message.answer(
-#         "Произошла ошибка при анализе текста. Пожалуйста, попробуйте переформулировать."
-#     )
-
-
-# ─── Свободный ввод (Free-form) ──────────────────────────────────────────────
 
 
 @router.message(BotStates.FREE_FORM, F.text)
@@ -441,6 +387,7 @@ async def finalize_and_notify(
         return
 
     await db.update_status(app_id, "pending")
+    await db.set_t_submit(app_id)
     await callback.message.answer_document(
         document=BufferedInputFile(
             pdf_buffer.getvalue(), filename=f"application_{app_id}.pdf"
@@ -498,23 +445,45 @@ async def on_files_done(callback: CallbackQuery, state: FSMContext, bot: Bot):
 # ─── Экран ревью перед отправкой ─────────────────────────────────────────────
 
 
-async def send_review_screen(message: Message | CallbackQuery, app_id: int):
-    app = await db.get_app(app_id)
-    blocks = json.loads(app["blocks"]) if app and app["blocks"] else {}
-    attachments = json.loads(app["attachments"]) if app and app["attachments"] else []
+async def send_review_screen(message_or_callback, app_id: int):
+    # 1. Получаем заявку из базы
+    app_raw = await db.get_app(app_id)
+    blocks = json.loads(app_raw.get("blocks", "{}"))
 
-    summary = "📝 <b>Проверьте вашу заявку перед отправкой:</b>\n\n"
-    for i in range(1, 6):
-        title = BLOCKS[i]["title"]
-        val = blocks.get(str(i), "<i>(не заполнено)</i>")
-        summary += f"<b>{i}. {title}</b>\n{val}\n\n"
+    # 2. ДОБАВЛЯЕМ ЧИСТКУ ФАЙЛОВ ДЛЯ ТЕЛЕГРАМ-БОТА
+    raw_att = app_raw.get("attachments")
+    clean_atts = []
+    if raw_att:
+        # Если это строка из БД, парсим её
+        if isinstance(raw_att, str):
+            try:
+                raw_att = json.loads(raw_att.replace("'", '"'))
+            except:
+                raw_att = []
 
-    summary += f"<b>Приложения:</b> {len(attachments)} файлов"
+        # Вытаскиваем только имена
+        for f in raw_att:
+            if isinstance(f, dict):
+                clean_atts.append(f.get("name") or f.get("file_name") or "Файл")
+            else:
+                clean_atts.append(str(f))
 
-    msg_func = (
-        message.answer if isinstance(message, Message) else message.message.answer
-    )
-    await msg_func(summary, parse_mode="HTML", reply_markup=kb.review_keyboard())
+    # 3. Собираем данные для PDF с ОЧИЩЕННЫМИ файлами
+    pdf_data = {
+        "app_id": app_id,
+        "topic": blocks.get("1", "Без темы"),
+        "description": blocks.get("2", ""),
+        "basis": blocks.get("3", ""),
+        "solution": blocks.get("4", ""),
+        "risks": blocks.get("5", ""),
+        "attachments": clean_atts,  # <--- ПЕРЕДАЕМ ТОЛЬКО СПИСОК ИМЕН
+        "full_name": await db.get_user_full_name(app_raw["user_id"]),
+        "position": await db.get_user_position(app_raw["user_id"]),
+        "date": app_raw["created_at"].strftime("%d.%m.%Y"),
+    }
+
+    # 4. Генерируем красивый PDF
+    pdf_buf = await generate_pdf(pdf_data, user_id=app_raw["user_id"])
 
 
 @router.callback_query(BotStates.REVIEW, F.data.startswith("review_edit_"))

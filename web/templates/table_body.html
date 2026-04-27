@@ -1,0 +1,28 @@
+<div class="contents animate-fade">
+    {% for app in apps %}
+    {% include "row.html" %}
+    {% else %}
+    <tr>
+        <td colspan="6" class="py-32 text-center">
+            <div class="flex flex-col items-center gap-4 opacity-20">
+                <div class="text-4xl">📂</div>
+                <span class="text-[10px] font-black uppercase tracking-[0.5em] text-gray-500">Infrastructure
+                    Empty</span>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+</div>
+
+<script>
+    document.querySelectorAll('button[hx-get]').forEach(btn => {
+        const url = new URL(window.location.href);
+        const currentTab = url.searchParams.get('tab') || 'active';
+        btn.classList.remove('bg-gray-100', 'dark:bg-white/5', 'text-akashi-red', 'shadow-inner');
+        btn.classList.add('text-gray-400');
+        if (btn.getAttribute('hx-get').includes('tab=' + currentTab)) {
+            btn.classList.add('bg-gray-100', 'dark:bg-white/5', 'text-akashi-red', 'shadow-inner');
+            btn.classList.remove('text-gray-400');
+        }
+    });
+</script>

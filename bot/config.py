@@ -8,9 +8,11 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o-mini"
     SUPERUSER_IDS: list[int] = []
-    DB_PATH: str = "./app.db"
 
-    # Langfuse
+    DB_PATH: str = "./app.db"
+    DATABASE_URL: str = ""
+
+    REDIS_URL: str = "redis://localhost:6379/0"
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
@@ -24,7 +26,6 @@ class Settings(BaseSettings):
             return [int(x) for x in v]
         if isinstance(v, (int, float)):
             return [int(v)]
-        # comma-separated string e.g. "123,456"
         return [int(x.strip()) for x in str(v).split(",") if x.strip()]
 
     @property

@@ -1,4 +1,13 @@
-BLOCKS: dict[int, dict] = {
+# stdlib/handlers/blocks.py
+from typing import TypedDict
+
+
+class BlockMeta(TypedDict):
+    title: str
+    question: str
+
+
+BLOCKS: dict[int, BlockMeta] = {
     1: {
         "title": "Тема вопроса",
         "question": (

@@ -1,91 +1,96 @@
 import json
-import aiosqlite
+import asyncpg
 from bot.config import config
 from bot.logger import logger
+from datetime import datetime, timezone
+import random
+import string
+from passlib.context import CryptContext
 
-DB_PATH = config.DB_PATH
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS applications (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id       INTEGER NOT NULL,
-    username      TEXT,
-    status        TEXT    DEFAULT 'draft',
-    blocks        TEXT    DEFAULT '{}',
-    attachments   TEXT    DEFAULT '[]',
-    feedback      TEXT,
-    pdf_file_id   TEXT,
-    chat_history  TEXT    DEFAULT '[]',
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS llm_cache (
-    prompt_hash TEXT PRIMARY KEY,
-    response    TEXT,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS users (
-    user_id     INTEGER PRIMARY KEY,
-    full_name   TEXT,
-    mode        TEXT DEFAULT 'step'
-);
-"""
+_pool: asyncpg.Pool | None = None
 
 
 async def init_db() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.executescript(CREATE_TABLE)
+    global _pool
+    _pool = await asyncpg.create_pool(config.DATABASE_URL, min_size=2, max_size=10)
 
-        # Миграции
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN mode TEXT DEFAULT 'step'")
-        except aiosqlite.OperationalError:
-            pass
+    async with _pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS applications (
+                id            SERIAL PRIMARY KEY,
+                user_id       BIGINT NOT NULL,
+                username      TEXT,
+                status        TEXT    DEFAULT 'draft',
+                blocks        TEXT    DEFAULT '{}',
+                attachments   TEXT    DEFAULT '[]',
+                feedback      TEXT,
+                pdf_file_id   TEXT,
+                chat_history  TEXT    DEFAULT '[]',
+                t_start       TIMESTAMPTZ,
+                t_submit      TIMESTAMPTZ,
+                t_decision    TIMESTAMPTZ,
+                reject_count  INTEGER DEFAULT 0,
+                created_at    TIMESTAMPTZ DEFAULT NOW(),
+                updated_at    TIMESTAMPTZ DEFAULT NOW()
+            );
 
-        try:
-            await db.execute(
-                "ALTER TABLE applications ADD COLUMN chat_history TEXT DEFAULT '[]'"
-            )
-        except aiosqlite.OperationalError:
-            pass
+            CREATE TABLE IF NOT EXISTS users (
+                user_id     BIGINT PRIMARY KEY,
+                full_name   TEXT,
+                position    TEXT,
+                signature_data BYTEA,
+                mode        TEXT DEFAULT 'step',
+                login       TEXT UNIQUE,
+                hashed_password TEXT
+            );
+        """)
+    logger.info("Database initialized: {}", config.DATABASE_URL)
 
-        await db.commit()
-    logger.info("Database initialized: {}", DB_PATH)
+
+async def close_db() -> None:
+    global _pool
+    if _pool:
+        await _pool.close()
+        _pool = None
+
+
+def _pool_conn():
+    if not _pool:
+        raise RuntimeError("DB pool not initialized. Call init_db() first.")
+    return _pool.acquire()
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ─── Applications ─────────────────────────────────────────────────────────────
 
 
 async def get_or_create_app(user_id: int, username: str | None) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT id FROM applications WHERE user_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1",
-            (user_id,),
-        ) as cur:
-            row = await cur.fetchone()
-
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM applications WHERE user_id = $1 AND status = 'draft' ORDER BY id DESC LIMIT 1",
+            user_id,
+        )
         if row:
-            app_id = row["id"]
-            logger.debug("Existing draft app {} for user {}", app_id, user_id)
-            return app_id
+            logger.debug("Existing draft app {} for user {}", row["id"], user_id)
+            return row["id"]
 
-        async with db.execute(
-            "INSERT INTO applications (user_id, username) VALUES (?, ?)",
-            (user_id, username),
-        ) as cur:
-            app_id = cur.lastrowid
-        await db.commit()
-        logger.info("Created new app {} for user {}", app_id, user_id)
-        return app_id
+        row = await conn.fetchrow(
+            "INSERT INTO applications (user_id, username) VALUES ($1, $2) RETURNING id",
+            user_id,
+            username,
+        )
+        logger.info("Created new app {} for user {}", row["id"], user_id)
+        return row["id"]
 
 
 async def get_app(app_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM applications WHERE id = ?", (app_id,)
-        ) as cur:
-            row = await cur.fetchone()
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow("SELECT * FROM applications WHERE id = $1", app_id)
     return dict(row) if row else None
 
 
@@ -93,22 +98,22 @@ async def save_block(app_id: int, block_num: int | str, text: str) -> None:
     app = await get_app(app_id)
     blocks = json.loads(app["blocks"])
     blocks[str(block_num)] = text
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE applications SET blocks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (json.dumps(blocks, ensure_ascii=False), app_id),
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET blocks = $1, updated_at = NOW() WHERE id = $2",
+            json.dumps(blocks, ensure_ascii=False),
+            app_id,
         )
-        await db.commit()
     logger.debug("Saved block {} for app {}", block_num, app_id)
 
 
 async def save_attachments(app_id: int, attachments: list) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE applications SET attachments = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (json.dumps(attachments, ensure_ascii=False), app_id),
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET attachments = $1, updated_at = NOW() WHERE id = $2",
+            json.dumps(attachments, ensure_ascii=False),
+            app_id,
         )
-        await db.commit()
     logger.debug("Saved {} attachments for app {}", len(attachments), app_id)
 
 
@@ -118,97 +123,122 @@ async def update_status(
     feedback: str | None = None,
     pdf_file_id: str | None = None,
 ) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
+    async with _pool_conn() as conn:
+        await conn.execute(
             """UPDATE applications
-               SET status = ?,
-                   feedback = COALESCE(?, feedback),
-                   pdf_file_id = COALESCE(?, pdf_file_id),
-                   updated_at = CURRENT_TIMESTAMP
-               WHERE id = ?""",
-            (status, feedback, pdf_file_id, app_id),
+               SET status = $1,
+                   feedback = COALESCE($2, feedback),
+                   pdf_file_id = COALESCE($3, pdf_file_id),
+                   updated_at = NOW()
+               WHERE id = $4""",
+            status,
+            feedback,
+            pdf_file_id,
+            app_id,
         )
-        await db.commit()
     logger.info("App {} status → {}", app_id, status)
 
 
 async def get_pending_apps() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
             "SELECT * FROM applications WHERE status = 'pending' ORDER BY created_at"
-        ) as cur:
-            rows = await cur.fetchall()
+        )
     return [dict(r) for r in rows]
 
 
 async def get_last_rework_app(user_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM applications WHERE user_id = ? AND status = 'rework' ORDER BY id DESC LIMIT 1",
-            (user_id,),
-        ) as cur:
-            row = await cur.fetchone()
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM applications WHERE user_id = $1 AND status = 'rework' ORDER BY id DESC LIMIT 1",
+            user_id,
+        )
     return dict(row) if row else None
 
 
-async def get_cached_llm_response(prompt_hash: str) -> str | None:
-    """Возвращает кэшированный ответ LLM, если он существует."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT response FROM llm_cache WHERE prompt_hash = ?", (prompt_hash,)
-        ) as cur:
-            row = await cur.fetchone()
-    return row[0] if row else None
-
-
-async def save_llm_response_to_cache(prompt_hash: str, response: str) -> None:
-    """Сохраняет ответ LLM в кэш."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO llm_cache (prompt_hash, response) VALUES (?, ?)",
-            (prompt_hash, response),
+async def save_all_blocks(app_id: int, blocks: dict) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET blocks = $1, updated_at = NOW() WHERE id = $2",
+            json.dumps(blocks, ensure_ascii=False),
+            app_id,
         )
-        await db.commit()
-    logger.debug("Saved LLM response to cache | hash={}", prompt_hash)
+
+
+# ─── Telemetry ────────────────────────────────────────────────────────────────
+
+
+async def set_t_start(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET t_start = $1 WHERE id = $2 AND t_start IS NULL",
+            _now(),
+            app_id,
+        )
+
+
+async def set_t_submit(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET t_submit = $1 WHERE id = $2",
+            _now(),
+            app_id,
+        )
+
+
+async def set_t_decision(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET t_decision = $1 WHERE id = $2",
+            _now(),
+            app_id,
+        )
+
+
+async def increment_reject_count(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET reject_count = reject_count + 1 WHERE id = $1",
+            app_id,
+        )
+
+
+# ─── Users ────────────────────────────────────────────────────────────────────
 
 
 async def set_user_full_name(user_id: int, full_name: str) -> None:
-    """Сохраняет ФИО пользователя."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO users (user_id, full_name) VALUES (?, ?)",
-            (user_id, full_name),
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """INSERT INTO users (user_id, full_name)
+               VALUES ($1, $2)
+               ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name""",
+            user_id,
+            full_name,
         )
-        await db.commit()
 
 
 async def get_user_full_name(user_id: int) -> str | None:
-    """Возвращает ФИО пользователя, если есть."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT full_name FROM users WHERE user_id = ?", (user_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0] if row else None
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT full_name FROM users WHERE user_id = $1", user_id
+        )
+    return row["full_name"] if row else None
 
 
 async def get_user_mode(user_id: int) -> str:
-    """Возвращает режим пользователя ('step' или 'free')."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT mode FROM users WHERE user_id = ?", (user_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0] if row and len(row) > 0 and row[0] else "step"
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow("SELECT mode FROM users WHERE user_id = $1", user_id)
+    return row["mode"] if row and row["mode"] else "step"
 
 
 async def set_user_mode(user_id: int, mode: str) -> None:
-    """Устанавливает режим пользователя."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET mode = ? WHERE user_id = ?", (mode, user_id))
-        await db.commit()
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE users SET mode = $1 WHERE user_id = $2", mode, user_id
+        )
+
+
+# ─── Chat History ─────────────────────────────────────────────────────────────
 
 
 async def get_chat_history(app_id: int) -> list:
@@ -219,19 +249,135 @@ async def get_chat_history(app_id: int) -> list:
 
 
 async def save_chat_history(app_id: int, history: list) -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE applications SET chat_history = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (json.dumps(history, ensure_ascii=False), app_id),
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET chat_history = $1, updated_at = NOW() WHERE id = $2",
+            json.dumps(history, ensure_ascii=False),
+            app_id,
         )
-        await db.commit()
 
 
-async def save_all_blocks(app_id: int, blocks: dict) -> None:
-    """Сохраняет сразу все блоки (используется во free-form режиме)."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE applications SET blocks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (json.dumps(blocks, ensure_ascii=False), app_id),
+async def delete_app(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute("DELETE FROM applications WHERE id = $1", app_id)
+        logger.info("Deleted app {}", app_id)
+
+
+# ─── Positions ────────────────────────────────────────────────────────────────
+
+
+async def get_user_position(user_id: int) -> str | None:
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT position FROM users WHERE user_id = $1", user_id
         )
-        await db.commit()
+    return row["position"] if row and row["position"] else None
+
+
+async def set_user_position(user_id: int, position: str) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """INSERT INTO users (user_id, position)
+               VALUES ($1, $2)
+               ON CONFLICT (user_id) DO UPDATE SET position = EXCLUDED.position""",
+            user_id,
+            position,
+        )
+
+
+# ─── Signatures ───────────────────────────────────────────────────────────────
+
+
+async def get_user_signature(user_id: int) -> bytes | None:
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT signature_data FROM users WHERE user_id = $1", user_id
+        )
+    return row["signature_data"] if row and row["signature_data"] else None
+
+
+async def set_user_signature(user_id: int, signature_bytes: bytes) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """INSERT INTO users (user_id, signature_data)
+               VALUES ($1, $2)
+               ON CONFLICT (user_id) DO UPDATE SET signature_data = EXCLUDED.signature_data""",
+            user_id,
+            signature_bytes,
+        )
+
+
+async def get_daily_stats() -> dict:
+    """Возвращает статистику заявок за последние 24 часа."""
+    query = """
+        SELECT 
+            COUNT(*) FILTER (WHERE status = 'pending') as pending,
+            COUNT(*) FILTER (WHERE status IN ('approved', 'done')) as approved,
+            COUNT(*) FILTER (WHERE status = 'rejected') as rejected,
+            COUNT(*) FILTER (WHERE status = 'rework') as rework
+        FROM applications
+    """
+    # Если твоя таблица называется иначе, замени 'applications' на её имя
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(query)
+
+    return {
+        "pending": row["pending"] or 0,
+        "approved": row["approved"] or 0,
+        "rejected": row["rejected"] or 0,
+        "rework": row["rework"] or 0,
+    }
+
+
+async def generate_web_login_code(user_id: int) -> str:
+    """Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)."""
+    code = "".join(random.choices(string.digits, k=6))
+    async with _pool_conn() as conn:
+        # Сохраняем с префиксом, чтобы не путать со статусами бота
+        await conn.execute(
+            "UPDATE users SET mode = $1 WHERE user_id = $2", f"otp_{code}", user_id
+        )
+    return code
+
+
+async def verify_web_login_code(user_id: int, input_code: str) -> bool:
+    """Проверяет код и сбрасывает его."""
+    async with _pool_conn() as conn:
+        current_mode = await conn.fetchval(
+            "SELECT mode FROM users WHERE user_id = $1", user_id
+        )
+        if current_mode == f"otp_{input_code}":
+            await conn.execute(
+                "UPDATE users SET mode = 'step' WHERE user_id = $1", user_id
+            )
+            return True
+    return False
+
+
+async def get_applications(tab: str = "active") -> list[dict]:
+    async with _pool_conn() as conn:
+        cond = ""
+        if tab == "active":
+            # Пока заявка не одобрена окончательно, она считается активной
+            cond = "WHERE a.status IN ('pending', 'rework', 'draft')"
+        elif tab == "archive":
+            # В архив уходит только то, что полностью согласовано
+            cond = "WHERE a.status IN ('approved', 'done')"
+
+        query = f"""
+            SELECT a.*, u.full_name, u.position
+            FROM applications a
+            LEFT JOIN users u ON a.user_id = u.user_id
+            {cond}
+            ORDER BY a.created_at DESC
+        """
+        rows = await conn.fetch(query)
+    return [dict(r) for r in rows]
+
+
+async def update_user_password(user_id: int, password: str):
+    hashed = pwd_context.hash(password)
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE users SET hashed_password = $1 WHERE user_id = $2", hashed, user_id
+        )

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 2.5cm 2.5cm 2.5cm 3cm;
+  }
+
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #000;
+  }
+
+  .header-block {
+    text-align: right;
+    margin-bottom: 2em;
+    font-size: 11pt;
+  }
+
+  .header-block p {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 13pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 1.5em 0 0.3em;
+    letter-spacing: 1px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 12pt;
+    margin-bottom: 1.8em;
+  }
+
+  .section {
+    margin-bottom: 1.2em;
+  }
+
+  .section-title {
+    font-weight: bold;
+    margin-bottom: 0.3em;
+  }
+
+  .section-body {
+    margin-left: 1em;
+  }
+
+  .attachments ul {
+    margin: 0.3em 0 0 1em;
+    padding: 0;
+    list-style: none;
+  }
+
+  .attachments ul li::before {
+    content: "— ";
+  }
+
+  .footer {
+    margin-top: 2.5em;
+    font-size: 11pt;
+    border-top: 1px solid #000;
+    padding-top: 0.8em;
+  }
+
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.3em;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header-block">
+    <p>Членам Правления</p>
+    <p>ПК «AKASHI Data Center PLC»</p>
+  </div>
+
+  <h1>Служебная записка</h1>
+  <p class="subtitle">по вопросу «{{ topic }}»</p>
+
+  <div class="section">
+    <div class="section-title">1. Краткое описание и суть вопроса:</div>
+    <div class="section-body">{{ description }}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">2. Основание для вынесения:</div>
+    <div class="section-body">{{ basis }}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">3. Предлагаемое решение / варианты решений:</div>
+    <div class="section-body">{{ solution }}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">4. Риски и последствия:</div>
+    <div class="section-body">
+      {% if risks and risks | lower != "не применимо" %}
+        {{ risks }}
+      {% else %}
+        (не применимо)
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section attachments">
+    <div class="section-title">5. Приложения / дополнительные материалы:</div>
+    {% if attachments %}
+      <ul>
+        {% for name in attachments %}
+          <li>{{ name }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="section-body">(приложения не прикреплены)</div>
+    {% endif %}
+  </div>
+
+  <div class="footer">
+    <div class="footer-row">
+      <span>Руководитель подразделения: @{{ username }}</span>
+      <span>Заявка №{{ app_id }}</span>
+    </div>
+    <div class="footer-row">
+      <span>Дата: {{ date }}</span>
+    </div>
+  </div>
+
+</body>
+</html>

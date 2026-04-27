@@ -1,0 +1,6 @@
+app:
+  build: .
+  container_name: akashi
+  restart: always
+  env_file:
+    - .env

@@ -3,7 +3,7 @@ from datetime import datetime
 
 import stdlib.db as db
 import stdlib.keyboards as kb
-from stdlib.services import application_service
+from stdlib.services import application_service, file_service
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, BufferedInputFile
@@ -94,14 +94,38 @@ async def finalize_and_notify(
                 app_id, msg.document.file_id
             )
 
-            # Пересылаем все прикрепленные файлы
+            # Пересылаем приложения: байты из S3 (раньше использовался только Telegram file_id)
             if attachments:
                 await bot.send_message(su_id, "📁 Приложения к заявке:")
                 for att in attachments:
+                    if not isinstance(att, dict):
+                        continue
                     file_name = att.get("name") or att.get("file_name") or "Приложение"
-                    await bot.send_document(
-                        su_id, document=att["file_id"], caption=file_name
-                    )
+                    s3_key = att.get("s3_key")
+                    if s3_key:
+                        body = await file_service.download_attachment(s3_key)
+                        if not body:
+                            logger.warning(
+                                "S3 attachment missing for superuser notify | app_id={} key={}",
+                                app_id,
+                                s3_key,
+                            )
+                            continue
+                        await bot.send_document(
+                            su_id,
+                            document=BufferedInputFile(body, filename=file_name),
+                            caption=file_name,
+                        )
+                    elif att.get("file_id"):
+                        await bot.send_document(
+                            su_id, document=att["file_id"], caption=file_name
+                        )
+                    else:
+                        logger.warning(
+                            "Attachment without s3_key/file_id, skip | app_id={} name={}",
+                            app_id,
+                            file_name,
+                        )
         except Exception as e:
             logger.error(
                 "Failed to notify superuser {} for app {}: {}", su_id, app_id, e

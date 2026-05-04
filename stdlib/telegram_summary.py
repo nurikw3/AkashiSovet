@@ -16,7 +16,7 @@ ATTACHMENTS_FOOTER_HTML = (
 
 INTRO_FREE_FORM_HTML = "✅ Отлично! Я собрал всю необходимую информацию."
 INTRO_STEP_FILLED_HTML = "✅ <b>Отлично! Все разделы заполнены.</b>"
-INTRO_REVIEW_HTML = "📋 <b>Текст заявки для копирования</b>"
+INTRO_REVIEW_HTML = ""
 INTRO_FALLBACK_NO_PDF_HTML = "📝 <b>Проверьте заявку</b> (PDF временно недоступен)."
 
 
@@ -31,7 +31,10 @@ def build_blocks_summary_html(
     Сводка всех блоков: заголовки жирным, текст блока в <pre> для удобного копирования.
     ``attachments_footer=None`` — без приглашения к вложениям (например экран после PDF).
     """
-    parts: list[str] = [intro_html.strip(), ""]
+    parts: list[str] = []
+    intro_stripped = intro_html.strip()
+    if intro_stripped:
+        parts.extend([intro_stripped, ""])
     for idx, b in enumerate(tpl.blocks, start=1):
         val = blocks.get(str(b.id), "")
         parts.append(f"<b>{idx}. {escape(b.title)}</b>")
@@ -74,9 +77,11 @@ def chunk_blocks_summary_html(
     first_chunk = True
 
     while i < len(frags):
-        header = (
-            intro_html.strip() + "\n\n" if first_chunk else "… <i>продолжение</i>\n\n"
-        )
+        if first_chunk:
+            intro_stripped = intro_html.strip()
+            header = (intro_stripped + "\n\n") if intro_stripped else ""
+        else:
+            header = "… <i>продолжение</i>\n\n"
         first_chunk = False
         parts_in_msg: list[str] = []
         len_so_far = len(header)

@@ -38,8 +38,14 @@ async def _get_context(app_id: int, current_block: int, pending: str | None) -> 
     return context_blocks
 
 
-async def _send_confirm(message: Message, state: FSMContext, text: str, intro: str):
-    await state.update_data(mode="confirm", pending_formatted=text)
+async def _send_confirm(
+    message: Message, state: FSMContext, text: str, intro: str, block_id: int
+):
+    await state.update_data(
+        mode="confirm",
+        pending_formatted=text,
+        confirm_dialog_block=block_id,
+    )
 
     # 1. Экранируем ввод пользователя (intro), так как он может содержать спецсимволы
     safe_intro = escape_markdown_v2(intro)
@@ -59,13 +65,13 @@ async def _send_confirm(message: Message, state: FSMContext, text: str, intro: s
         await message.answer(
             final_message,
             parse_mode="MarkdownV2",
-            reply_markup=kb.confirm_keyboard(),
+            reply_markup=kb.confirm_keyboard(block_id),
         )
     except Exception as e:
         logger.error("MarkdownV2 send failed: {}", e)
         await message.answer(
             f"{intro}\n\n{text}\n\nВсё верно?",
-            reply_markup=kb.confirm_keyboard(),
+            reply_markup=kb.confirm_keyboard(block_id),
         )
 
 
@@ -77,9 +83,12 @@ async def handle_block_input(message: Message, state: FSMContext):
     data = await state.get_data()
 
     if data["mode"] == "confirm":
+        bid = data.get("confirm_dialog_block")
+        if not isinstance(bid, int):
+            bid = data["current_block"] if isinstance(data.get("current_block"), int) else 1
         await message.answer(
-            "Используйте кнопки ниже.",
-            reply_markup=kb.confirm_keyboard(),
+            "Используйте кнопки под предыдущим сообщением с вариантом текста.",
+            reply_markup=kb.confirm_keyboard(bid),
         )
         return
 
@@ -120,7 +129,9 @@ async def _handle_format(
         generate=False,
     )
 
-    await _send_confirm(message, state, result.text, result.intro)
+    await _send_confirm(
+        message, state, result.text, result.intro, int(data["current_block"])
+    )
 
 
 async def _handle_delegation(message: Message, state: FSMContext, data: dict):
@@ -149,22 +160,45 @@ async def _handle_delegation(message: Message, state: FSMContext, data: dict):
         )
         return
 
-    await _send_confirm(message, state, result.text, "Предлагаю такой вариант:")
+    await _send_confirm(
+        message, state, result.text, "Предлагаю такой вариант:", int(current_block)
+    )
 
 
 # ── Подтверждение / редактирование ───────────────────────────────────────────
 
 
-@router.callback_query(BotStates.FILLING, F.data == "confirm")
+@router.callback_query(BotStates.FILLING, F.data.startswith("fcb_confirm_"))
 async def on_confirm(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
-    data = await state.get_data()
-    current_block = data["current_block"]
+    try:
+        confirmed_block = int(callback.data.removeprefix("fcb_confirm_"))
+    except ValueError:
+        await callback.answer("Некорректная кнопка.", show_alert=True)
+        return
 
-    # Сохраняем в БД только после подтверждения
-    if pending := data.get("pending_formatted"):
-        await application_service.save_block(data["app_id"], current_block, pending)
-        await state.update_data(pending_formatted=None)
+    data = await state.get_data()
+
+    if not data.get("pending_formatted"):
+        await callback.answer(
+            "Этот шаг уже подтверждён или устарел — смотрите последнее сообщение бота.",
+            show_alert=True,
+        )
+        return
+
+    cdb = data.get("confirm_dialog_block")
+    if cdb is not None and confirmed_block != cdb:
+        await callback.answer(
+            "Эта кнопка не соответствует текущему черновику подтверждения.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    # Сохраняем в БД по номеру блока из кнопки (не из state — он мог уже перейти к следующему)
+    pending = data["pending_formatted"]
+    await application_service.save_block(data["app_id"], confirmed_block, pending)
+    await state.update_data(pending_formatted=None, confirm_dialog_block=None)
 
     # Если пришли из экрана ревью — возвращаемся обратно
     if data.get("returning_to") == "review":
@@ -176,7 +210,7 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
         return
 
     tpl = await get_template()
-    next_id = tpl.get_next_block_id(current_block)
+    next_id = tpl.get_next_block_id(confirmed_block)
 
     if next_id is not None:
         b = tpl.get_block(next_id)
@@ -208,13 +242,22 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
         )
 
 
-@router.callback_query(BotStates.FILLING, F.data == "edit")
+@router.callback_query(BotStates.FILLING, F.data.startswith("fcb_edit_"))
 async def on_edit(callback: CallbackQuery, state: FSMContext):
+    try:
+        edit_block = int(callback.data.removeprefix("fcb_edit_"))
+    except ValueError:
+        await callback.answer("Некорректная кнопка.", show_alert=True)
+        return
+
     await callback.answer()
-    data = await state.get_data()
-    await state.update_data(mode="input")
-    cb = data["current_block"]
-    block_title = await _block_title(cb) if isinstance(cb, int) else str(cb)
+    await state.update_data(
+        mode="input",
+        current_block=edit_block,
+        pending_formatted=None,
+        confirm_dialog_block=None,
+    )
+    block_title = await _block_title(edit_block)
     await callback.message.answer(
         f"Введите исправленный текст для блока «{block_title}»:"
     )

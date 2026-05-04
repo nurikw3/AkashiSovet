@@ -1,4 +1,4 @@
-import stdlib.db as db
+from stdlib.services import application_service
 from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery
 from bot.config import config
@@ -17,28 +17,30 @@ async def on_approve(callback: CallbackQuery, bot: Bot):
         return await callback.answer("Нет доступа.", show_alert=True)
 
     app_id = int(callback.data.split("_")[1])
-    app = await db.get_app(app_id)
+    app = await application_service.get_application(app_id)
 
     if not app:
         return await callback.answer("Заявка не найдена.", show_alert=True)
-    if app["status"] != "pending":
+    if app.status != "pending":
         return await callback.answer("Заявка уже обработана.", show_alert=True)
 
-    await db.update_status(app_id, "approved")
-    await db.set_t_decision(app_id)
+    user_id = app.user_id
+    pdf_file_id = app.pdf_file_id
+
+    await application_service.approve(app_id)
     await callback.answer("✅ Согласовано")
     await callback.message.edit_reply_markup(reply_markup=None)
 
     try:
         await bot.send_document(
-            app["user_id"],
-            document=app["pdf_file_id"],
+            user_id,
+            document=pdf_file_id,
             caption="✅ Ваша заявка согласована Правлением.",
         )
     except Exception as e:
         logger.error(
             "Failed to send approved PDF to user {} for app {}: {}",
-            app["user_id"],
+            user_id,
             app_id,
             e,
         )

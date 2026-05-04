@@ -4,6 +4,7 @@ from datetime import datetime
 
 import stdlib.db as db
 import stdlib.keyboards as kb
+from stdlib.services import application_service
 from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
@@ -17,7 +18,9 @@ router = Router()
 
 
 async def send_review_screen(message: Message | CallbackQuery, app_id: int):
-    app = await db.get_app(app_id)
+    app = await application_service.get_application_record(app_id)
+    if not app:
+        return
     user_id = app["user_id"]
     tpl = await get_template()
 

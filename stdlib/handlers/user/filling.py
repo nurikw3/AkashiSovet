@@ -1,8 +1,6 @@
 # stdlib/handlers/user/filling.py
-import json
-
-import stdlib.db as db
 import stdlib.keyboards as kb
+from stdlib.services import application_service
 import stdlib.llm.formatter as llm
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -24,8 +22,10 @@ async def _block_title(block_id: int) -> str:
 
 
 async def _get_context(app_id: int, current_block: int, pending: str | None) -> dict:
-    app = await db.get_app(app_id)
-    context_blocks = json.loads(app["blocks"]) if app and app["blocks"] else {}
+    app = await application_service.get_application(app_id)
+    if not app:
+        return {}
+    context_blocks = dict(app.blocks)
     if pending:
         context_blocks[str(current_block)] = pending
     return context_blocks
@@ -156,7 +156,7 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
 
     # Сохраняем в БД только после подтверждения
     if pending := data.get("pending_formatted"):
-        await db.save_block(data["app_id"], current_block, pending)
+        await application_service.save_block(data["app_id"], current_block, pending)
         await state.update_data(pending_formatted=None)
 
     # Если пришли из экрана ревью — возвращаемся обратно

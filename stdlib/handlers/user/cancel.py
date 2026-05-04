@@ -1,4 +1,4 @@
-import stdlib.db as db
+from stdlib.services import application_service
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
@@ -13,7 +13,7 @@ async def on_cancel(callback: CallbackQuery, state: FSMContext):
     app_id = data.get("app_id")
 
     if app_id:
-        await db.delete_app(app_id)
+        await application_service.delete_application(app_id)
 
     await state.clear()
     await callback.message.answer(

@@ -1,6 +1,6 @@
 import stdlib.db as db
 import stdlib.keyboards as kb
-from stdlib.services import file_service
+from stdlib.services import application_service, file_service
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -33,9 +33,9 @@ async def cmd_start(message: Message, state: FSMContext):
         return
 
     await state.clear()
-    app_id = await db.get_or_create_app(user_id, username)
-    await db.clear_chat_history(app_id)
-    await db.set_t_start(app_id)
+    app_id = await application_service.get_or_create_draft(user_id, username)
+    await application_service.clear_application_chat_history(app_id)
+    await application_service.mark_application_started(app_id)
     mode = await db.get_user_mode(user_id)
 
     if mode == "free":
@@ -69,9 +69,9 @@ async def cmd_mode(message: Message):
     new_mode = "free" if current_mode == "step" else "step"
     await db.set_user_mode(user_id, new_mode)
 
-    draft_id = await db.get_draft_id_for_user(user_id)
+    draft_id = await application_service.get_draft_application_id_for_user(user_id)
     if draft_id:
-        await db.clear_chat_history(draft_id)
+        await application_service.clear_application_chat_history(draft_id)
 
     mode_name = (
         "Свободный ввод (ИИ сам соберёт заявку)"
@@ -165,9 +165,9 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
     username = callback.from_user.username
 
     await state.clear()
-    app_id = await db.get_or_create_app(user_id, username)
-    await db.reset_draft_content(app_id)
-    await db.set_t_start(app_id)
+    app_id = await application_service.get_or_create_draft(user_id, username)
+    await application_service.reset_draft_for_new_session(app_id)
+    await application_service.mark_application_started(app_id)
     mode = await db.get_user_mode(user_id)
 
     if mode == "free":

@@ -118,3 +118,24 @@ async def append_attachments(
     await db.save_attachments(app_id, [a.model_dump() for a in merged])
     await invalidate_pdf_cache(app_id)
     return merged
+
+
+async def get_application_record(app_id: int) -> dict | None:
+    """Сырая строка из БД (как `db.get_app`): нужна, где важен исходный JSON вложений (Telegram `file_id`)."""
+    return await db.get_app(app_id)
+
+
+async def save_attachments_payload(app_id: int, attachments: list) -> None:
+    """Сохраняет список вложений как в БД (в т.ч. реестр файлов из Telegram до выгрузки в S3)."""
+    await db.save_attachments(app_id, attachments)
+    await invalidate_pdf_cache(app_id)
+
+
+async def clear_application_chat_history(app_id: int) -> None:
+    """Обнуляет историю free-form / LLM по заявке."""
+    await db.clear_chat_history(app_id)
+
+
+async def get_draft_application_id_for_user(user_id: int) -> int | None:
+    """`id` черновика пользователя, если есть."""
+    return await db.get_draft_id_for_user(user_id)

@@ -1,7 +1,7 @@
 import json
 
-import stdlib.db as db
 import stdlib.keyboards as kb
+from stdlib.services import application_service
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
@@ -18,8 +18,11 @@ async def handle_file(message: Message, state: FSMContext):
     if data.get("current_block") != "files":
         return
 
-    app = await db.get_app(data["app_id"])
-    attachments = json.loads(app["attachments"])
+    app = await application_service.get_application_record(data["app_id"])
+    if not app:
+        return
+    raw_att = app.get("attachments")
+    attachments = json.loads(raw_att) if raw_att else []
 
     if message.document:
         attachments.append(
@@ -29,7 +32,7 @@ async def handle_file(message: Message, state: FSMContext):
         name = f"фото_{len(attachments) + 1}.jpg"
         attachments.append({"file_id": message.photo[-1].file_id, "name": name})
 
-    await db.save_attachments(data["app_id"], attachments)
+    await application_service.save_attachments_payload(data["app_id"], attachments)
     logger.info("File attached | app_id={} total={}", data["app_id"], len(attachments))
 
     await message.answer(

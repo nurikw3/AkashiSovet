@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from bot.logger import logger
-import stdlib.db as db
+from stdlib.services import application_service
 
 router = Router()
 
@@ -17,7 +17,7 @@ async def on_cancel_app(callback: CallbackQuery, state: FSMContext):
     # 2. Удаляем черновик из базы данных
     if app_id:
         try:
-            await db.delete_app(app_id)
+            await application_service.delete_application(app_id)
             logger.info("User {} deleted app {}", callback.from_user.id, app_id)
         except Exception as e:
             logger.error("Failed to delete app {} on cancel: {}", app_id, e)

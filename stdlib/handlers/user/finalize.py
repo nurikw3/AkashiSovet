@@ -3,6 +3,7 @@ from datetime import datetime
 
 import stdlib.db as db
 import stdlib.keyboards as kb
+from stdlib.services import application_service
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, BufferedInputFile
@@ -17,8 +18,11 @@ async def finalize_and_notify(
     app_id: int,
     bot: Bot,
 ) -> None:
-    app = await db.get_app(app_id)
-    blocks = json.loads(app.get("blocks", "{}"))
+    app = await application_service.get_application_record(app_id)
+    if not app:
+        await state.clear()
+        return
+    blocks = json.loads(app.get("blocks") or "{}")
 
     raw_att = app.get("attachments")
     try:
@@ -42,17 +46,15 @@ async def finalize_and_notify(
         for su_id in config.SUPERUSER_IDS:
             await bot.send_message(su_id, text_fallback, parse_mode="HTML")
 
-        await db.update_status(app_id, "pending")
-        await db.set_t_submit(app_id)
+        await application_service.submit_to_review(app_id)
         await callback.message.answer(
             "📤 Заявка отправлена (без PDF — техническая ошибка)."
         )
         await state.clear()
         return
 
-    # 2. Обновляем статусы
-    await db.update_status(app_id, "pending")
-    await db.set_t_submit(app_id)
+    # 2. Переводим в pending (время подачи)
+    await application_service.submit_to_review(app_id)
 
     # 3. Достаем данные и формируем красивое имя файла ОДИН раз
     user_id = callback.from_user.id
@@ -88,7 +90,9 @@ async def finalize_and_notify(
             )
 
             # Сохраняем file_id отправленного PDF, чтобы не генерить его заново при скачивании
-            await db.update_status(app_id, "pending", pdf_file_id=msg.document.file_id)
+            await application_service.update_submission_pdf_reference(
+                app_id, msg.document.file_id
+            )
 
             # Пересылаем все прикрепленные файлы
             if attachments:

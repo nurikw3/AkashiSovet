@@ -6,25 +6,36 @@
         Back to Terminal</a>
 
     <div class="flex items-center gap-6 mb-12">
-        <h1 class="text-4xl font-black tracking-tighter">Security</h1>
+        <h1 class="text-4xl font-black tracking-tighter">Security Settings</h1>
         <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
     </div>
 
     <div
         class="bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-[2.5rem] p-12 shadow-2xl">
-        <div class="flex items-center gap-4 mb-6">
+        <div class="flex items-center gap-4 mb-8">
             <div class="w-10 h-10 bg-gray-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-xl">🔐</div>
             <div>
-                <h3 class="font-black text-lg tracking-tight">Вход в панель</h3>
-                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Через одноразовую ссылку из бота</p>
+                <h3 class="font-black text-lg tracking-tight">Постоянный пароль</h3>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Необязательно — можно входить только по OTP из /web</p>
             </div>
         </div>
-        <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-            Используйте команду <b>/web</b> в Telegram-боте: вы получите ссылку с одноразовым токеном (хранится в Redis).
-            Постоянный пароль для веб-входа больше не используется.
+
+        <form hx-post="/settings/password" hx-target="#status" class="space-y-6">
+            <input type="password" name="password" placeholder="Минимум 8 символов" required
+                class="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-4 ring-akashi-red/10 outline-none transition-all">
+
+            <button type="submit"
+                class="w-full bg-akashi-red text-white font-black py-5 rounded-2xl shadow-xl shadow-akashi-red/20 hover:bg-red-600 transition-all uppercase tracking-widest text-xs">
+                Save Secure Password
+            </button>
+            <div id="status" class="text-center"></div>
+        </form>
+
+        <p class="text-[10px] text-gray-400 mt-8 uppercase font-bold tracking-tight">
+            Вход: в боте <b>/web</b> — скопируйте Telegram ID и код на страницу <a href="/login" class="text-akashi-red hover:underline">/login</a>.
         </p>
         {% if success %}
-        <p class="mt-6 text-green-600 dark:text-green-400 text-sm font-bold">{{ success }}</p>
+        <p class="mt-4 text-green-600 dark:text-green-400 text-sm font-bold">{{ success }}</p>
         {% endif %}
     </div>
 </div>

@@ -399,9 +399,12 @@ async def generate_web_login_code(user_id: int) -> str:
     """Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)."""
     code = "".join(random.choices(string.digits, k=6))
     async with _pool_conn() as conn:
-        # Сохраняем с префиксом, чтобы не путать со статусами бота
         await conn.execute(
-            "UPDATE users SET mode = $1 WHERE user_id = $2", f"otp_{code}", user_id
+            """INSERT INTO users (user_id, mode)
+               VALUES ($1, $2)
+               ON CONFLICT (user_id) DO UPDATE SET mode = EXCLUDED.mode""",
+            user_id,
+            f"otp_{code}",
         )
     return code
 

@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+## 🤖 MCP Tools
+- **Context7**: Use when you need up-to-date library docs (aiogram, fastapi, asyncpg, etc.)
+- **Playwright**: Use for browser automation, UI testing of the web panel

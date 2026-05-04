@@ -7,15 +7,17 @@ import json
 from bot.config import config
 from bot.logger import logger
 from stdlib.llm.client import langfuse, openai_client
-from stdlib.llm.prompts import FREE_FORM_SYSTEM, FREE_FORM_TOOLS
+from stdlib.llm.prompts import build_free_form_system, build_free_form_tools
 from stdlib.schemas import (
     AskUser,
     LLMComplete,
     LLMError,
     LLMIncomplete,
     LLMResponse,
-    SubmitMemo,
+    build_submit_memo_model,
+    strip_submit_memo_args,
 )
+from stdlib.template import get_template
 
 
 async def process_free_form_chat(
@@ -23,13 +25,17 @@ async def process_free_form_chat(
     app_id: int | None = None,
     user_id: int | None = None,
 ) -> LLMResponse:
-    messages = [{"role": "system", "content": FREE_FORM_SYSTEM}] + history
+    tpl = await get_template()
+    submit_model = build_submit_memo_model(tpl)
+    system = build_free_form_system(tpl)
+    tools = build_free_form_tools(submit_model)
+    messages = [{"role": "system", "content": system}] + history
 
     async def _call() -> LLMResponse:
         response = await openai_client.chat.completions.create(
             model=config.OPENAI_MODEL,
             messages=messages,
-            tools=FREE_FORM_TOOLS,
+            tools=tools,
             tool_choice="required",
             temperature=0.2,
             max_tokens=800,
@@ -50,19 +56,27 @@ async def process_free_form_chat(
                 logger.warning("Langfuse usage update failed: {}", e)
 
         if not msg.tool_calls:
-            return LLMIncomplete(reply=msg.content or "Пожалуйста, уточните детали.")
+            return LLMIncomplete(
+                status="incomplete",
+                reply=msg.content or "Пожалуйста, уточните детали.",
+            )
 
         tc = msg.tool_calls[0]
         args = json.loads(tc.function.arguments)
         logger.info("Free-form tool='{}' app_id={}", tc.function.name, app_id)
 
         if tc.function.name == "ask_user":
-            return LLMIncomplete(reply=AskUser.model_validate(args).question)
+            return LLMIncomplete(
+                status="incomplete",
+                reply=AskUser.model_validate(args).question,
+            )
 
         if tc.function.name == "submit_memo":
-            return LLMComplete(blocks=SubmitMemo.model_validate(args).to_memo_blocks())
+            clean = strip_submit_memo_args(args)
+            blocks_dict = submit_model.model_validate(clean).model_dump(by_alias=True)
+            return LLMComplete(status="complete", blocks=blocks_dict)
 
-        return LLMIncomplete(reply="Пожалуйста, уточните детали.")
+        return LLMIncomplete(status="incomplete", reply="Пожалуйста, уточните детали.")
 
     try:
         if langfuse:
@@ -81,5 +95,6 @@ async def process_free_form_chat(
     except Exception as e:
         logger.error("Free-form LLM failed: {}", e)
         return LLMError(
-            reply="Произошла ошибка при анализе текста. Пожалуйста, попробуйте ещё раз."
+            status="error",
+            reply="Произошла ошибка при анализе текста. Пожалуйста, попробуйте ещё раз.",
         )

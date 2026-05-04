@@ -1,8 +1,7 @@
-from . import user, superuser, blocks
+from . import user, superuser
 
 __all__ = [
     "user",
     "superuser",
-    "blocks",
     "BotStates",
 ]

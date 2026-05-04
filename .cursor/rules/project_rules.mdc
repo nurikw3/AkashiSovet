@@ -1,0 +1,30 @@
+---
+description: Core development rules for the AkashiSovet project
+globs: **/*.py, **/*.html, **/*.js
+---
+# AkashiSovet Project Rules
+You are an expert Python developer working on the **AkashiSovet** project (a request management system via Telegram and Web).
+## 🏗 Architecture & DRY
+- **Shared Logic**: All business logic, database operations, S3, and external API interactions must reside in the `stdlib/` folder.
+- **No Duplication**: Duplicating logic across `bot/` and `web/` is prohibited. If functionality is needed by both components, extract it into `stdlib/services/` or `stdlib/db.py`.
+- **Models**: Always use Pydantic models from `stdlib/models.py` for data validation and typing.
+## 📊 Dynamic Templates (JSON)
+- **Configuration**: Request block names and their questions must NOT be hardcoded. Always read them from the `settings` table (key `app_template`).
+- **Changes**: When the request structure needs to be modified, propose a data migration or an update to the record in the `settings` table.
+## 🔒 Security & Access
+- **Superuser Only**: The web interface (`web/`) is accessible ONLY to users whose `user_id` is listed in `config.SUPERUSER_IDS`. Always enforce access control in FastAPI routes.
+- **SQL Injection**: Use ONLY parameterized queries with `asyncpg`. Using f-strings to build SQL queries is strictly forbidden.
+- **Secrets**: Never hardcode tokens, passwords, or API keys. Use `bot/config.py` (pydantic-settings) and the `.env` file.
+## 🛠 Tech Stack
+- **Bot**: Aiogram 3.7+. Use Router for modularity.
+- **Web**: FastAPI + Jinja2 + HTMX for dynamic table updates.
+- **DB**: PostgreSQL (`asyncpg`) + Redis (FSM & Cache).
+- **Logging**: Use `loguru` (`from bot.logger import logger`).
+## 📝 Code Style
+- **Type Hinting**: Type annotations are mandatory for all functions and methods.
+- **Docstrings**: Write brief function descriptions in Russian (following the project's existing style).
+- **Asynchronous**: The project is fully async. Avoid blocking calls. Use `run_in_executor` when synchronous code must be executed (e.g., PDF generation).
+## 📂 File Structure
+- `bot/` — Telegram-specific code only (handlers, routers).
+- `web/` — Web-specific code only (fastapi, templates).
+- `stdlib/` — Project core (db, s3, pdf, llm, shared models).

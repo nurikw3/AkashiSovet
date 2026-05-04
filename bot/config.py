@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     REDIS_URL: str = "redis://localhost:6379/0"
+
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"

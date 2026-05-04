@@ -309,6 +309,20 @@ async def save_chat_history(app_id: int, history: list) -> None:
         )
 
 
+async def clear_chat_history(app_id: int) -> None:
+    """Сбрасывает free-form / LLM-историю по заявке (при /start, смене режима)."""
+    await save_chat_history(app_id, [])
+
+
+async def get_draft_id_for_user(user_id: int) -> int | None:
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM applications WHERE user_id = $1 AND status = 'draft' ORDER BY id DESC LIMIT 1",
+            user_id,
+        )
+    return row["id"] if row else None
+
+
 async def delete_app(app_id: int) -> None:
     async with _pool_conn() as conn:
         await conn.execute("DELETE FROM applications WHERE id = $1", app_id)

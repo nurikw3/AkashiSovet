@@ -36,6 +36,11 @@ from stdlib.services.notification_service import (
     notify_user_application_rework,
 )
 from stdlib.template import ApplicationTemplate, get_template, persist_template
+from stdlib.timezone_util import (
+    ensure_app_tz,
+    format_app_datetime,
+    wall_time_astana_to_utc,
+)
 from aiogram.types import BufferedInputFile
 
 _LOGIN_FAIL_MSG = "Неверный Telegram ID или код"
@@ -80,10 +85,15 @@ if _static_dir.is_dir():
 
 templates = Jinja2Templates(directory="web/templates")
 templates.env.filters["datetime"] = lambda v: (
-    v.strftime("%d.%m.%Y %H:%M") if isinstance(v, datetime) else v
+    format_app_datetime(v) if isinstance(v, datetime) else v
 )
 templates.env.filters["datefmt"] = lambda v: (
-    v.strftime("%d.%m.%Y") if isinstance(v, (date, datetime)) else v
+    format_app_datetime(v, "%d.%m.%Y")
+    if isinstance(v, datetime)
+    else (v.strftime("%d.%m.%Y") if isinstance(v, date) else v)
+)
+templates.env.filters["datetime_local"] = lambda v: (
+    ensure_app_tz(v).strftime("%Y-%m-%dT%H:%M") if isinstance(v, datetime) else ""
 )
 templates.env.filters["urlquote"] = lambda v: quote(str(v or ""), safe="")
 
@@ -579,23 +589,28 @@ def _meeting_form_err_prefix(form) -> str:
 
 
 def _parse_meeting_schedule(form) -> datetime | None:
-    """Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)."""
+    """Парсит `scheduled_at` (datetime-local) или дату + 10:00 как локальное время Астаны → UTC."""
+    naive: datetime | None = None
     raw_at = form.get("scheduled_at")
     if raw_at and str(raw_at).strip():
         s = str(raw_at).strip()
         for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"):
             try:
-                return datetime.strptime(s, fmt)
+                naive = datetime.strptime(s, fmt)
+                break
             except ValueError:
                 continue
-    raw_date = form.get("scheduled_date")
-    if raw_date and str(raw_date).strip():
-        try:
-            d = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
-            return datetime.combine(d, time(10, 0))
-        except ValueError:
-            pass
-    return None
+    if naive is None:
+        raw_date = form.get("scheduled_date")
+        if raw_date and str(raw_date).strip():
+            try:
+                d = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
+                naive = datetime.combine(d, time(10, 0))
+            except ValueError:
+                pass
+    if naive is None:
+        return None
+    return wall_time_astana_to_utc(naive)
 
 
 @app.post("/meetings")

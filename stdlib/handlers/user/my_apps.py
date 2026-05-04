@@ -16,6 +16,7 @@ from stdlib.handlers.states import BotStates
 from stdlib.template import get_template
 from bot.logger import logger
 from stdlib.services import application_service
+from stdlib.timezone_util import format_app_datetime
 
 router = Router()
 ITEMS_PER_PAGE = 5
@@ -60,9 +61,9 @@ def _format_card(app: dict) -> str:
 
     created = app.get("created_at")
     date_str = (
-        created.strftime("%d.%m %H:%M")
-        if hasattr(created, "strftime")
-        else str(created)[:16]
+        format_app_datetime(created, "%d.%m %H:%M")
+        if created is not None
+        else ""
     )
     return f"<b>#{app_id}</b> | {topic}\n📅 {date_str} | {_status_label(app.get('status'))}"
 
@@ -180,11 +181,7 @@ async def cb_view(callback: CallbackQuery, state: FSMContext):
 
     status = app.status
     created = app.created_at
-    date_str = (
-        created.strftime("%d.%m.%Y %H:%M")
-        if hasattr(created, "strftime")
-        else str(created)
-    )
+    date_str = format_app_datetime(created, "%d.%m.%Y %H:%M") if created else ""
 
     txt = (
         f"📄 <b>Заявка #{app_id}</b>\n"

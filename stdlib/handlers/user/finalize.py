@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 
 import stdlib.db as db
 import stdlib.keyboards as kb
@@ -10,6 +9,7 @@ from aiogram.types import CallbackQuery, BufferedInputFile
 from bot.config import config
 from bot.logger import logger
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.timezone_util import now_app
 
 
 async def finalize_and_notify(
@@ -60,7 +60,7 @@ async def finalize_and_notify(
     user_id = callback.from_user.id
     full_name = await db.get_user_full_name(user_id)
     position = await db.get_user_position(user_id)
-    created_at = app.get("created_at", datetime.now())
+    created_at = app.get("created_at") or now_app()
 
     custom_filename = generate_pdf_filename(full_name, position, created_at)
 

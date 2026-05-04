@@ -39,6 +39,7 @@ from stdlib.template import (
     PDF_TEMPLATE_REVISION_KEY,
     get_template,
 )
+from stdlib.timezone_util import ensure_app_tz, format_app_date_only
 import stdlib.redis_client as redis_client_module
 
 ASSETS_DIR = Path(__file__).parent / "assets"
@@ -527,7 +528,7 @@ def generate_pdf_filename(
     """Генерирует стандартизированное имя для PDF-файла."""
     safe_name = (full_name or "Сотрудник").replace(" ", "_")
     safe_pos = (position or "Должность").replace(" ", "_")
-    time_str = dt.strftime("%H-%M_%d-%m-%Y")
+    time_str = ensure_app_tz(dt).strftime("%H-%M_%d-%m-%Y")
 
     return f"{time_str}_{safe_name}_{safe_pos}.pdf"
 
@@ -608,7 +609,7 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
         "attachments": clean_atts,
         "full_name": full_name,
         "position": position,
-        "date": app_raw["created_at"].strftime("%d.%m.%Y"),
+        "date": format_app_date_only(app_raw["created_at"]),
     }
 
     buf = await generate_pdf(pdf_data, user_id=u_id, tpl=tpl, blocks_map=blocks)

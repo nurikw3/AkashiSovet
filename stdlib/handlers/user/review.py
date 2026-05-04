@@ -1,6 +1,5 @@
 # stdlib/handlers/user/review.py
 import json
-from datetime import datetime
 
 import stdlib.db as db
 import stdlib.keyboards as kb
@@ -11,6 +10,7 @@ from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.timezone_util import now_app
 from stdlib.telegram_summary import INTRO_FALLBACK_NO_PDF_HTML, chunk_blocks_summary_html
 from stdlib.template import get_template
 
@@ -35,7 +35,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         # Достаем данные для правильного имени файла
         full_name = await db.get_user_full_name(user_id)
         position = await db.get_user_position(user_id)
-        created_at = app.get("created_at", datetime.now())
+        created_at = app.get("created_at") or now_app()
 
         custom_filename = generate_pdf_filename(full_name, position, created_at)
 

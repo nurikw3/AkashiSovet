@@ -1,12 +1,11 @@
 """
 Точка входа Telegram-бота AKASHI Data Center PLC.
-Включает: AIogram 3.7+, Redis FSM (Manual Client), PostgreSQL, APScheduler (Астана UTC+6)
+Включает: AIogram 3.7+, Redis FSM (Manual Client), PostgreSQL, APScheduler (Казахстан UTC+5)
 """
 
 import asyncio
 import os
 
-import pytz
 import redis.asyncio as redis
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
@@ -21,6 +20,7 @@ from bot.logger import logger, setup_logging, InterceptHandler
 import stdlib.db as db
 from stdlib import resources
 from stdlib.handlers import user, superuser
+from stdlib.timezone_util import APP_TIMEZONE
 
 # ─── Настройка логирования ────────────────────────────────────────────────────
 os.makedirs("logs", exist_ok=True)
@@ -29,7 +29,6 @@ InterceptHandler.install()
 
 # ─── Планировщик и Таймзона ───────────────────────────────────────────────────
 scheduler = AsyncIOScheduler()
-ASTANA_TZ = pytz.timezone("Asia/Almaty")
 
 
 async def send_daily_report(bot: Bot) -> None:
@@ -98,7 +97,7 @@ async def main() -> None:
         trigger="cron",
         hour=10,
         minute=0,
-        timezone=ASTANA_TZ,
+        timezone=APP_TIMEZONE,
         args=[bot],
         id="daily_report_job",
         replace_existing=True,

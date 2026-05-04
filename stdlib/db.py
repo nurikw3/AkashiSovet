@@ -516,7 +516,7 @@ async def insert_meeting(scheduled_at: datetime, created_by: int) -> dict:
         row = await conn.fetchrow(
             """
             INSERT INTO meetings (scheduled_at, created_by)
-            VALUES ($1::timestamp, $2)
+            VALUES ($1::timestamptz, $2)
             RETURNING id, scheduled_at, created_by, created_at, application_ids
             """,
             scheduled_at,
@@ -575,7 +575,7 @@ async def update_meeting_scheduled_at(meeting_id: int, scheduled_at: datetime) -
         row = await conn.fetchrow(
             """
             UPDATE meetings
-            SET scheduled_at = $2::timestamp
+            SET scheduled_at = $2::timestamptz
             WHERE id = $1
             RETURNING id
             """,

@@ -228,8 +228,11 @@ async def template_editor_new_row(
 
 @app.delete("/settings/template/ui-row")
 async def template_editor_row_delete_ui(admin_id=Depends(get_admin)):
-    """Только удаление строки в форме (без записи в БД)."""
-    return Response(status_code=204)
+    """Только удаление строки в форме (без записи в БД).
+
+    HTMX по умолчанию не делает swap при 204; для очистки цели нужен 200 и пустое тело.
+    """
+    return Response(status_code=200, content="")
 
 
 @app.post("/settings/template/save", response_class=HTMLResponse)

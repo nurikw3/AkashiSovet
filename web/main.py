@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from datetime import date, datetime, time
 from aiogram import Bot
+from io import BytesIO
 from urllib.parse import quote, urlencode
 from bot.logger import logger
 from passlib.context import CryptContext
@@ -69,6 +70,7 @@ templates.env.filters["datetime"] = lambda v: (
 templates.env.filters["datefmt"] = lambda v: (
     v.strftime("%d.%m.%Y") if isinstance(v, (date, datetime)) else v
 )
+templates.env.filters["urlquote"] = lambda v: quote(str(v or ""), safe="")
 # --- AUTH HELPERS ---
 
 
@@ -404,6 +406,37 @@ async def reject_app(
     return await _render_row(request, app_id)
 
 
+@app.get("/download_tg_attachment")
+async def download_tg_attachment(
+    request: Request,
+    file_id: str,
+    name: str | None = None,
+    admin_id=Depends(get_admin),
+):
+    """Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3)."""
+    if not file_id or not file_id.strip():
+        raise HTTPException(status_code=400, detail="Пустой file_id")
+    bot: Bot = request.app.state.tg_bot
+    try:
+        tg_file = await bot.get_file(file_id.strip())
+    except Exception as e:
+        logger.warning("Telegram get_file failed | file_id prefix={} err={}", file_id[:16], e)
+        raise HTTPException(
+            status_code=404,
+            detail="Файл недоступен (истёк срок хранения в Telegram или неверный идентификатор).",
+        ) from e
+    if not tg_file.file_path:
+        raise HTTPException(status_code=404, detail="Нет пути к файлу в Telegram")
+    buf = BytesIO()
+    await bot.download_file(tg_file.file_path, destination=buf)
+    buf.seek(0)
+    fname = (name or "attachment").strip() or "attachment"
+    headers = {"Content-Disposition": f"attachment; filename*=utf-8''{quote(fname)}"}
+    return StreamingResponse(
+        buf, media_type="application/octet-stream", headers=headers
+    )
+
+
 @app.get("/download/{app_id}")
 async def download_report(app_id: int, admin_id=Depends(get_admin)):
     app_row = await application_service.get_application(app_id)
@@ -449,7 +482,12 @@ async def download_file(s3_key: str, admin_id=Depends(get_admin)):
 def _parse_app(a: dict) -> dict:
     m = Application.model_validate(a)
     parsed = [
-        {"s3_key": att.s3_key, "file_name": att.name} for att in m.attachments
+        {
+            "s3_key": att.s3_key,
+            "file_id": att.file_id,
+            "file_name": att.name,
+        }
+        for att in m.attachments
     ]
     out = {**a}
     out["topic"] = m.blocks.get("1", "Без темы")

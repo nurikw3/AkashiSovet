@@ -14,10 +14,11 @@ ApplicationStatus = Literal["draft", "pending", "approved", "rework"]
 
 
 class ApplicationAttachment(BaseModel):
-    """Элемент списка вложений заявки (как в БД / S3)."""
+    """Элемент списка вложений: S3 (после выгрузки) или Telegram file_id (как в боте)."""
 
-    s3_key: str
     name: str
+    s3_key: str | None = None
+    file_id: str | None = None
 
 
 class ChatMessage(BaseModel):
@@ -78,10 +79,25 @@ class Application(BaseModel):
             return []
         out: list[dict[str, Any]] = []
         for item in raw:
-            if isinstance(item, dict) and "s3_key" in item and "name" in item:
-                out.append(item)
+            if isinstance(item, dict):
+                name = (item.get("name") or item.get("file_name") or "Файл").strip() or "Файл"
+                s3_key = item.get("s3_key")
+                if s3_key == "":
+                    s3_key = None
+                file_id = item.get("file_id")
+                if isinstance(file_id, str) and not file_id.strip():
+                    file_id = None
+                if s3_key or file_id:
+                    out.append(
+                        {"name": name, "s3_key": s3_key, "file_id": file_id}
+                    )
+                else:
+                    # Только имя (старые данные / перечень в PDF)
+                    out.append({"name": name, "s3_key": None, "file_id": None})
             elif isinstance(item, str):
-                out.append({"s3_key": "", "name": item})
+                s = str(item).strip()
+                if s:
+                    out.append({"name": s, "s3_key": None, "file_id": None})
         return out
 
     @field_validator("chat_history", mode="before")

@@ -65,11 +65,26 @@
                 <span>📄</span> PDF
             </a>
             {% for f in app.parsed_attachments %}
+            {% if f.s3_key %}
             <a href="/download_attachment/{{ f.s3_key }}" target="_blank"
                 class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors max-w-[120px]">
                 <span>📎</span>
                 <span class="truncate">{{ f.file_name }}</span>
             </a>
+            {% elif f.file_id %}
+            <a href="/download_tg_attachment?file_id={{ f.file_id | urlquote }}&name={{ f.file_name | urlquote }}"
+                target="_blank"
+                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors max-w-[120px]">
+                <span>📎</span>
+                <span class="truncate">{{ f.file_name }}</span>
+            </a>
+            {% else %}
+            <span
+                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 max-w-[120px]">
+                <span>📎</span>
+                <span class="truncate" title="Нет файла, только имя в списке">{{ f.file_name }}</span>
+            </span>
+            {% endif %}
             {% endfor %}
         </div>
     </td>

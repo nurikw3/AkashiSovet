@@ -42,10 +42,20 @@
                     📄 PDF отчёт
                 </a>
                 {% for f in app.parsed_attachments %}
+                {% if f.s3_key %}
                 <a href="/download_attachment/{{ f.s3_key }}" target="_blank"
                    class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red truncate">
                     📎 {{ f.file_name }}
                 </a>
+                {% elif f.file_id %}
+                <a href="/download_tg_attachment?file_id={{ f.file_id | urlquote }}&name={{ f.file_name | urlquote }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red truncate">
+                    📎 {{ f.file_name }}
+                </a>
+                {% else %}
+                <span class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 truncate" title="Нет файла, только имя в списке">📎 {{ f.file_name }}</span>
+                {% endif %}
                 {% endfor %}
                 {% if not app.parsed_attachments %}
                 <p class="text-xs text-gray-500">Вложений нет</p>

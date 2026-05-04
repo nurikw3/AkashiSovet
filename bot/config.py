@@ -14,6 +14,11 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Веб-панель: базовый URL без завершающего «/» (для ссылок из бота /web)
+    WEB_PUBLIC_URL: str = ""
+    WEB_AUTH_TOKEN_TTL_SECONDS: int = 300
+    ADMIN_SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 8
+
     S3_ENDPOINT_URL: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""

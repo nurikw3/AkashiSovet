@@ -23,6 +23,8 @@ services:
       S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
       S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
       S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
+      # Публичный URL панели для одноразовых ссылок из бота (/web); с хоста: http://localhost:8000
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,6 +48,7 @@ services:
       S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
       S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
       S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
     volumes:
       - data:/app/data
     depends_on:

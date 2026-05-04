@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response, Query
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
@@ -13,26 +13,19 @@ from aiogram import Bot
 from io import BytesIO
 from urllib.parse import quote, urlencode
 from bot.logger import logger
-from passlib.context import CryptContext
-
 import stdlib.db as db
 import stdlib.keyboards as kb
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from bot.config import config
-import bcrypt
-
 from stdlib import resources
 from stdlib.models import Application
-from stdlib.services import application_service, file_service, meeting_service
+from stdlib.services import application_service, file_service, meeting_service, web_auth_service
 from stdlib.services.notification_service import (
     notify_user_application_approved,
     notify_user_application_rework,
 )
 from stdlib.template import ApplicationTemplate, get_template, persist_template
 from aiogram.types import BufferedInputFile
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def _template_validation_message(e: ValidationError) -> str:
     parts: list[str] = []
@@ -81,14 +74,6 @@ async def get_admin(request: Request):
     return int(admin_id)
 
 
-async def _get_hashed_password(user_id: int) -> str | None:
-    async with db._pool_conn() as conn:
-        row = await conn.fetchrow(
-            "SELECT hashed_password FROM users WHERE user_id = $1", user_id
-        )
-    return row["hashed_password"] if row else None
-
-
 @app.exception_handler(401)
 async def auth_handler(request, exc):
     return RedirectResponse(url="/login")
@@ -102,54 +87,40 @@ async def login_page(request: Request):
     admin_id = request.cookies.get("admin_session")
     if admin_id and int(admin_id) in config.SUPERUSER_IDS:
         return RedirectResponse(url="/", status_code=302)
+    err = request.query_params.get("error")
     return templates.TemplateResponse(
-        request=request, name="login.html", context={"error": None}
+        request=request, name="login.html", context={"error": err}
     )
 
 
-@app.post("/login", response_class=HTMLResponse)
-async def login(
-    request: Request,
-    tg_id: int = Form(...),
-    code: str = Form(...),
+@app.get("/auth")
+async def auth_by_token(
+    token: str | None = Query(None),
 ):
-    if tg_id not in config.SUPERUSER_IDS:
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={"error": "Пользователь не найден"},
+    """Одноразовый вход по ссылке из бота (/web)."""
+    if not token:
+        return RedirectResponse(
+            url="/login?error=" + quote("Ссылка без токена"),
+            status_code=302,
         )
-
-    hashed = await _get_hashed_password(tg_id)
-
-    if hashed:
-        if not bcrypt.checkpw(code.encode(), hashed.encode()):
-            otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
-            if not otp_ok:
-                return templates.TemplateResponse(
-                    request=request,
-                    name="login.html",
-                    context={"error": "Неверный пароль или код"},
-                )
-    else:
-        otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
-        if not otp_ok:
-            return templates.TemplateResponse(
-                request=request,
-                name="login.html",
-                context={"error": "Неверный код. Получите новый через /web в боте"},
-            )
-
-    response = RedirectResponse(
-        url="/settings" if not hashed else "/",
-        status_code=302,
-    )
+    user_id = await web_auth_service.consume_login_token(token)
+    if user_id is None:
+        return RedirectResponse(
+            url="/login?error=" + quote("Ссылка недействительна или истекла"),
+            status_code=302,
+        )
+    if user_id not in config.SUPERUSER_IDS:
+        return RedirectResponse(
+            url="/login?error=" + quote("Доступ запрещён"),
+            status_code=302,
+        )
+    response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(
         key="admin_session",
-        value=str(tg_id),
+        value=str(user_id),
         httponly=True,
         samesite="lax",
-        max_age=60 * 60 * 8,
+        max_age=config.ADMIN_SESSION_MAX_AGE_SECONDS,
     )
     return response
 
@@ -166,35 +137,10 @@ async def logout():
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, admin_id=Depends(get_admin)):
-    hashed = await _get_hashed_password(admin_id)
     return templates.TemplateResponse(
         request=request,
         name="settings.html",
-        context={
-            "has_password": bool(hashed),
-            "success": request.query_params.get("success"),
-            "error": None,
-        },
-    )
-
-
-@app.post("/settings/password", response_class=HTMLResponse)
-async def set_password(
-    request: Request,
-    password: str = Form(...),
-    admin_id=Depends(get_admin),
-):
-    if len(password) < 8:
-        return HTMLResponse(
-            '<p class="text-akashi-red text-[10px] font-black text-center uppercase tracking-widest">'
-            "⚠ Минимум 8 символов</p>"
-        )
-
-    await db.update_user_password(admin_id, password)
-    logger.info(f"Password updated for admin {admin_id}")
-    return HTMLResponse(
-        '<p class="text-green-500 text-[10px] font-black text-center uppercase tracking-widest">'
-        "✓ Password saved — use it on next login</p>"
+        context={"success": request.query_params.get("success")},
     )
 
 

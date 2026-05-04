@@ -8,7 +8,7 @@
             <div class="w-3 h-3 bg-white rounded-full"></div>
         </div>
         <h2 class="text-2xl font-black uppercase tracking-[0.3em] dark:text-white">Access Portal</h2>
-        <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-3 font-bold">Secure Infrastructure Login</p>
+        <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-3 font-bold text-center">Вход только через Telegram</p>
     </div>
 
     {% if error %}
@@ -17,25 +17,14 @@
     </div>
     {% endif %}
 
-    <form action="/login" method="post" class="flex flex-col gap-8">
-        <div class="space-y-3">
-            <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-2">Telegram ID</label>
-            <input type="text" name="tg_id" inputmode="numeric" pattern="[0-9]*" placeholder="000000000" required
-                class="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-4 ring-akashi-red/10 outline-none transition-all dark:text-white font-mono tracking-widest">
-        </div>
-
-        <div class="space-y-3">
-            <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-2">Code / Password</label>
-            <input type="password" name="code" placeholder="••••••" required
-                class="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-4 ring-akashi-red/10 outline-none transition-all dark:text-white font-mono tracking-[0.5em] text-center">
-            <p class="text-[9px] text-gray-400 text-center font-bold mt-4 tracking-tight">Введите <span
-                    class="text-akashi-red">/web</span> в боте для получения кода</p>
-        </div>
-
-        <button type="submit"
-            class="bg-akashi-red hover:bg-red-600 text-white font-black py-5 rounded-2xl uppercase tracking-[0.3em] transition-all text-xs shadow-xl shadow-akashi-red/30 active:scale-95">
-            Authenticate
-        </button>
-    </form>
+    <div class="space-y-6 text-center">
+        <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+            Откройте бота и выполните команду <span class="text-akashi-red font-black">/web</span>.
+            Вам придёт <b>одноразовая ссылка</b> для входа в панель (без пароля и кода).
+        </p>
+        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-tight">
+            Нужны переменные <code class="font-mono text-gray-500">WEB_PUBLIC_URL</code> и работающий Redis.
+        </p>
+    </div>
 </div>
 {% endblock %}

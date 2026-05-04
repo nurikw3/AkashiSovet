@@ -1,5 +1,6 @@
 import stdlib.db as db
 import stdlib.keyboards as kb
+from stdlib.services import file_service
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -31,7 +32,9 @@ async def cmd_start(message: Message, state: FSMContext):
         )
         return
 
+    await state.clear()
     app_id = await db.get_or_create_app(user_id, username)
+    await db.clear_chat_history(app_id)
     await db.set_t_start(app_id)
     mode = await db.get_user_mode(user_id)
 
@@ -65,6 +68,10 @@ async def cmd_mode(message: Message):
     current_mode = await db.get_user_mode(user_id)
     new_mode = "free" if current_mode == "step" else "step"
     await db.set_user_mode(user_id, new_mode)
+
+    draft_id = await db.get_draft_id_for_user(user_id)
+    if draft_id:
+        await db.clear_chat_history(draft_id)
 
     mode_name = (
         "Свободный ввод (ИИ сам соберёт заявку)"
@@ -133,8 +140,9 @@ async def save_signature(message: Message, state: FSMContext):
     file = await message.bot.download(photo)
     img_bytes = file.read()
 
-    # Сохраняем сырые байты (Telegram сам сжимает в JPG/PNG, ReportLab их понимает)
-    await db.set_user_signature(message.from_user.id, img_bytes)
+    # Загружаем в S3, в БД — только ключ (generate_pdf скачивает изображение по ключу)
+    key = await file_service.upload_signature_image(message.from_user.id, img_bytes)
+    await db.set_user_signature(message.from_user.id, key)
 
     await state.clear()
     await message.answer(
@@ -156,7 +164,9 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     username = callback.from_user.username
 
+    await state.clear()
     app_id = await db.get_or_create_app(user_id, username)
+    await db.reset_draft_content(app_id)
     await db.set_t_start(app_id)
     mode = await db.get_user_mode(user_id)
 

@@ -31,6 +31,7 @@ from datetime import datetime
 
 from bot.logger import logger
 import stdlib.db as db
+import stdlib.s3 as s3
 from stdlib.template import ApplicationTemplate, get_template
 
 ASSETS_DIR = Path(__file__).parent / "assets"
@@ -222,6 +223,28 @@ def draw_last_page(canvas, doc):
     canvas.restoreState()
 
 
+async def _resolve_user_signature_bytes(user_id: int) -> bytes | None:
+    """Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные."""
+    ref = await db.get_user_signature(user_id)
+    if not ref:
+        return None
+    if isinstance(ref, (bytes, bytearray)):
+        return bytes(ref)
+    if not isinstance(ref, str):
+        return None
+    if ref.startswith("signatures/"):
+        try:
+            data = await s3.download_bytes(ref, s3.BUCKET_SIGNATURES)
+            return data if data else None
+        except RuntimeError:
+            logger.warning("PDF: S3 не настроен — подпись из объектного хранилища недоступна")
+            return None
+        except Exception as e:
+            logger.warning("PDF: не удалось скачать подпись из S3: {}", e)
+            return None
+    return None
+
+
 class _LastPageCanvas(Canvas):
     """Обычный Canvas, подпись теперь рисуется в самом тексте."""
 
@@ -262,10 +285,10 @@ async def generate_pdf(
         if not data:
             data = {}
 
-        signature_bytes = None
+        signature_bytes: bytes | None = None
         if user_id:
             try:
-                signature_bytes = await db.get_user_signature(user_id)
+                signature_bytes = await _resolve_user_signature_bytes(user_id)
             except Exception:
                 signature_bytes = None
 

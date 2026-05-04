@@ -71,6 +71,9 @@
                 sortableInstance.destroy();
                 sortableInstance = null;
             }
+            /* Только ручка `.js-drag-handle` начинает drag — input/textarea не трогаем.
+               Раньше были filter + preventOnFilter: из‑за preventDefault клики в полях
+               не давали фокус, текст не набирался. */
             sortableInstance = Sortable.create(el, {
                 animation: 180,
                 easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
@@ -82,8 +85,6 @@
                 fallbackOnBody: true,
                 swapThreshold: 0.65,
                 invertSwap: true,
-                filter: 'input, textarea, select, button',
-                preventOnFilter: true,
             });
         }
 

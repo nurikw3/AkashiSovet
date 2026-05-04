@@ -429,31 +429,30 @@ async def get_application_status_counts() -> dict[str, int]:
     }
 
 
-async def get_applications(tab: str = "active", status: str | None = None) -> list[dict]:
-    if tab == "active":
-        cond = "WHERE a.status IN ('pending', 'rework', 'draft')"
-    elif tab == "archive":
-        cond = "WHERE a.status = 'approved'"
-    else:
-        cond = "WHERE FALSE"
-
-    params: list[str] = []
-    if status in ("pending", "approved", "rework"):
-        cond += " AND a.status = $1"
-        params.append(status)
-
-    query = f"""
-        SELECT a.*, u.full_name, u.position
-        FROM applications a
-        LEFT JOIN users u ON a.user_id = u.user_id
-        {cond}
-        ORDER BY a.created_at DESC
-    """
+async def get_applications(status: str | None = None) -> list[dict]:
+    """Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх."""
+    allowed = frozenset({"draft", "pending", "rework", "approved"})
     async with _pool_conn() as conn:
-        if params:
-            rows = await conn.fetch(query, params[0])
+        if status in allowed:
+            rows = await conn.fetch(
+                """
+                SELECT a.*, u.full_name, u.position
+                FROM applications a
+                LEFT JOIN users u ON a.user_id = u.user_id
+                WHERE a.status = $1
+                ORDER BY a.created_at DESC
+                """,
+                status,
+            )
         else:
-            rows = await conn.fetch(query)
+            rows = await conn.fetch(
+                """
+                SELECT a.*, u.full_name, u.position
+                FROM applications a
+                LEFT JOIN users u ON a.user_id = u.user_id
+                ORDER BY a.created_at DESC
+                """
+            )
     return [dict(r) for r in rows]
 
 

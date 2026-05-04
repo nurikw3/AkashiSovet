@@ -7,9 +7,9 @@ from stdlib.models import Application, ApplicationAttachment
 from stdlib.pdf import invalidate_pdf_cache
 
 
-async def list_applications(tab: str = "active", status: str | None = None) -> list[dict]:
-    """Список заявок для веб-таблицы (как `db.get_applications`)."""
-    return await db.get_applications(tab, status)
+async def list_applications(status: str | None = None) -> list[dict]:
+    """Список заявок для веб-таблицы (опционально один статус: draft/pending/rework/approved)."""
+    return await db.get_applications(status)
 
 
 async def get_status_counts() -> dict[str, int]:

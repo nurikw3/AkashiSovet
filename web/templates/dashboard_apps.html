@@ -1,0 +1,97 @@
+{# Фрагмент дашборда: фильтры, заголовок, корзина заседаний, таблица. Подменяется целиком по HTMX. #}
+<!-- Быстрый фильтр по статусу -->
+<div class="flex flex-wrap items-center gap-2 mb-6">
+    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mr-2">Filter</span>
+    <a href="/"
+       hx-get="/"
+       hx-target="#dashboard-apps"
+       hx-push-url="/"
+       class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+              {% if not status_filter %}bg-white dark:bg-akashi-dark shadow border border-gray-200 dark:border-white/10 text-akashi-red{% else %}bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+        All
+    </a>
+    <a href="/?status=draft"
+       hx-get="/?status=draft"
+       hx-target="#dashboard-apps"
+       hx-push-url="/?status=draft"
+       class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+              {% if status_filter == 'draft' %}bg-white dark:bg-akashi-dark shadow border border-gray-200 dark:border-white/10 text-akashi-red{% else %}bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+        Draft
+    </a>
+    <a href="/?status=pending"
+       hx-get="/?status=pending"
+       hx-target="#dashboard-apps"
+       hx-push-url="/?status=pending"
+       class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+              {% if status_filter == 'pending' %}bg-white dark:bg-akashi-dark shadow border border-gray-200 dark:border-white/10 text-akashi-red{% else %}bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+        Pending
+    </a>
+    <a href="/?status=rework"
+       hx-get="/?status=rework"
+       hx-target="#dashboard-apps"
+       hx-push-url="/?status=rework"
+       class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+              {% if status_filter == 'rework' %}bg-white dark:bg-akashi-dark shadow border border-gray-200 dark:border-white/10 text-akashi-red{% else %}bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+        Rework
+    </a>
+    <a href="/?status=approved"
+       hx-get="/?status=approved"
+       hx-target="#dashboard-apps"
+       hx-push-url="/?status=approved"
+       class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+              {% if status_filter == 'approved' %}bg-white dark:bg-akashi-dark shadow border border-gray-200 dark:border-white/10 text-akashi-red{% else %}bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+        Approved
+    </a>
+</div>
+
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-black tracking-tighter dark:text-white">Applications</h1>
+        <p id="apps-visible-meta" class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+            {{ apps|length }} {{ 'запись' if apps|length == 1 else 'записей' }}
+        </p>
+    </div>
+</div>
+
+{% if meeting_basket %}
+<div class="mb-6 flex flex-wrap items-end gap-4 p-5 rounded-2xl bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 shadow-sm">
+    <form id="meeting-create-form" method="post" action="/meetings" class="flex flex-wrap items-end gap-4 flex-1 min-w-[240px]">
+        <div>
+            <label for="meeting-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата заседания</label>
+            <input id="meeting-date" type="date" name="scheduled_date" required
+                   class="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+        </div>
+        <button type="submit"
+                class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/25 hover:opacity-95 active:scale-[0.98] transition-all">
+            Add to Meeting
+        </button>
+    </form>
+    <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold max-w-xs leading-relaxed">
+        Отметьте согласованные заявки и выберите дату
+    </p>
+</div>
+{% endif %}
+
+<div class="bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-xl">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-100 dark:border-white/5">
+                    {% if meeting_basket %}
+                    <th class="text-center px-3 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-11"></th>
+                    {% endif %}
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-14">#</th>
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Applicant</th>
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Topic</th>
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Status</th>
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Date</th>
+                    <th class="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Files</th>
+                    <th class="text-right px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="app-table-body">
+                {% include "tbody_rows.html" %}
+            </tbody>
+        </table>
+    </div>
+</div>

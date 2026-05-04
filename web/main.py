@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from datetime import date, datetime
 from aiogram import Bot
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from bot.logger import logger
 from passlib.context import CryptContext
 
@@ -324,24 +324,39 @@ async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admi
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
-    tab: str = "active",
     status: str | None = None,
     admin_id=Depends(get_admin),
 ):
-    status_filter = status if status in ("pending", "approved", "rework") else None
-    raw_apps = await application_service.list_applications(tab, status_filter)
+    # Старые ссылки ?tab=active&status=… / ?tab=archive → без tab
+    if "tab" in request.query_params:
+        tab_val = request.query_params.get("tab")
+        st = request.query_params.get("status")
+        q: dict[str, str] = {}
+        if st in ("draft", "pending", "rework", "approved"):
+            q["status"] = st
+        elif tab_val == "archive":
+            q["status"] = "approved"
+        me = request.query_params.get("meeting_err")
+        if me:
+            q["meeting_err"] = me
+        dest = "/" + ("?" + urlencode(q) if q else "")
+        return RedirectResponse(url=dest, status_code=302)
+
+    status_filter = (
+        status if status in ("draft", "pending", "rework", "approved") else None
+    )
+    raw_apps = await application_service.list_applications(status_filter)
     parsed_apps = [_parse_app(a) for a in raw_apps]
     counts = await application_service.get_status_counts()
-    meeting_basket = tab == "archive"
+    meeting_basket = status_filter == "approved"
     ctx = {
         "request": request,
         "apps": parsed_apps,
-        "tab": tab,
         "status_filter": status_filter,
         "counts": counts,
         "meeting_basket": meeting_basket,
     }
-    tpl = "table_body.html" if "hx-request" in request.headers else "index.html"
+    tpl = "dashboard_apps.html" if "hx-request" in request.headers else "index.html"
     return templates.TemplateResponse(request=request, name=tpl, context=ctx)
 
 
@@ -462,14 +477,14 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
     raw_date = form.get("scheduled_date")
     if not raw_date or not str(raw_date).strip():
         return RedirectResponse(
-            url=f"/?tab=archive&meeting_err={quote('Укажите дату заседания')}",
+            url=f"/?status=approved&meeting_err={quote('Укажите дату заседания')}",
             status_code=303,
         )
     try:
         scheduled = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
     except ValueError:
         return RedirectResponse(
-            url=f"/?tab=archive&meeting_err={quote('Некорректная дата')}",
+            url=f"/?status=approved&meeting_err={quote('Некорректная дата')}",
             status_code=303,
         )
     raw_ids = form.getlist("app_id")
@@ -485,7 +500,7 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
         )
     except ValueError as e:
         return RedirectResponse(
-            url=f"/?tab=archive&meeting_err={quote(str(e))}",
+            url=f"/?status=approved&meeting_err={quote(str(e))}",
             status_code=303,
         )
     logger.info("meeting created by admin {} date {}", admin_id, scheduled)

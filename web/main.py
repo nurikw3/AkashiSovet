@@ -1,8 +1,10 @@
 import html
 from contextlib import asynccontextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
@@ -55,6 +57,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+_static_dir = Path(__file__).resolve().parent / "static"
+if _static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
 templates = Jinja2Templates(directory="web/templates")
 templates.env.filters["datetime"] = lambda v: (
     v.strftime("%d.%m.%Y %H:%M") if isinstance(v, datetime) else v

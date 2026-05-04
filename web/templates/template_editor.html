@@ -1,69 +1,89 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="max-w-3xl animate-fade">
-    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+<style>
+    .sortable-ghost {
+        opacity: 0.35 !important;
+        background: rgba(227, 58, 53, 0.06) !important;
+    }
+    .sortable-chosen {
+        box-shadow: 0 0 0 2px rgba(227, 58, 53, 0.35);
+    }
+</style>
+
+<div class="w-full min-w-0 max-w-none animate-fade">
+    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
         <a href="/settings" class="hover:text-akashi-red transition-colors">← Settings</a>
     </p>
 
-    <div class="flex items-center gap-4 mb-8">
-        <h1 class="text-2xl sm:text-3xl font-black tracking-tighter dark:text-white">Шаблон заявки</h1>
+    <div class="flex items-center gap-3 mb-3">
+        <h1 class="text-xl sm:text-2xl font-black tracking-tighter dark:text-white">Шаблон заявки</h1>
         <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
     </div>
 
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-        Перетаскивайте блоки за ручку слева. Порядок строк = порядок шагов в заявке.
-        ID скрыт от случайного редактирования; чтобы выставить всем подряд <span class="font-mono">1, 2, 3…</span> по текущему порядку — кнопка ниже (осторожно: старые заявки ссылаются на прежние ID).
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-snug max-w-4xl">
+        Тяните блок за <strong>три полоски</strong> слева. Порядок карточек = порядок шагов.
+        ID правятся кнопкой «Пронумеровать» (осторожно с уже поданными заявками).
     </p>
 
     <form id="template-form"
           hx-post="/settings/template/save"
           hx-target="#save-status"
-          class="space-y-4">
-        <div id="block-rows" class="space-y-0">
+          class="space-y-2">
+        <div id="block-rows">
             {% for block in blocks %}
                 {% include "template_block_row.html" %}
             {% endfor %}
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 pt-2">
+        <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-white/10 mt-2">
             <button type="button"
                     id="template-add-row"
-                    class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-akashi-red/35 transition-colors">
+                    class="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-akashi-red/35 transition-colors">
                 Добавить блок
             </button>
             <button type="button"
                     id="template-renumber-ids"
-                    class="px-5 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200/90 hover:bg-amber-500/20 transition-colors">
+                    class="px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200/90 hover:bg-amber-500/20 transition-colors">
                 Пронумеровать ID 1…n
             </button>
             <button type="submit"
-                    class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/20 hover:opacity-95 transition-all">
+                    class="px-5 py-2 rounded-lg bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-akashi-red/20 hover:opacity-95 transition-all">
                 Сохранить шаблон
             </button>
         </div>
 
-        <div id="save-status" class="text-center min-h-[1.25rem]"></div>
+        <div id="save-status" class="text-center min-h-[1.25rem] text-xs"></div>
     </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="/static/vendor/sortable.min.js"></script>
 <script>
     (function () {
         var sortableInstance = null;
 
         function initBlockRowsSortable() {
             var el = document.getElementById('block-rows');
-            if (!el) return;
+            if (!el || typeof Sortable === 'undefined') {
+                return;
+            }
             if (sortableInstance) {
                 sortableInstance.destroy();
                 sortableInstance = null;
             }
             sortableInstance = Sortable.create(el, {
-                animation: 150,
+                animation: 180,
+                easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
                 handle: '.js-drag-handle',
-                ghostClass: 'opacity-60',
-                chosenClass: 'ring-2 ring-akashi-red/25 rounded-2xl'
+                draggable: '.template-block-row',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                forceFallback: true,
+                fallbackOnBody: true,
+                swapThreshold: 0.65,
+                invertSwap: true,
+                filter: 'input, textarea, select, button',
+                preventOnFilter: true,
             });
         }
 
@@ -79,8 +99,8 @@
             var rows = document.querySelectorAll('#block-rows .template-block-row');
             if (!rows.length) return;
             if (!confirm(
-                'Перенумеровать все блоки подряд: 1, 2, 3 … по текущему порядку строк?\n\n' +
-                'Если в базе уже есть заявки, они хранят ответы по старым ID — меняйте нумерацию только осознанно.'
+                'Перенумеровать все блоки подряд: 1, 2, 3 … по текущему порядку?\n\n' +
+                'Старые заявки ссылаются на прежние ID — меняйте только если понимаете последствия.'
             )) return;
             rows.forEach(function (row, i) {
                 var n = String(i + 1);
@@ -91,14 +111,23 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
+        function boot() {
             initBlockRowsSortable();
-        });
+            syncBlockIdLabels();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            boot();
+        }
 
         document.body.addEventListener('htmx:afterSwap', function (evt) {
             if (evt.detail.target && evt.detail.target.id === 'block-rows') {
-                initBlockRowsSortable();
-                syncBlockIdLabels();
+                requestAnimationFrame(function () {
+                    initBlockRowsSortable();
+                    syncBlockIdLabels();
+                });
             }
         });
 
@@ -108,8 +137,10 @@
             var url = (xhr && xhr.responseURL) ? xhr.responseURL : '';
             if (url.indexOf('/settings/template/new-row') !== -1 ||
                 url.indexOf('/settings/template/ui-row') !== -1) {
-                initBlockRowsSortable();
-                syncBlockIdLabels();
+                requestAnimationFrame(function () {
+                    initBlockRowsSortable();
+                    syncBlockIdLabels();
+                });
             }
         });
 

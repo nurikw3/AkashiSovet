@@ -1,20 +1,24 @@
-<div class="template-block-row js-template-block rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark p-5 mb-3 shadow-sm">
+<div class="template-block-row js-template-block rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark p-3 sm:p-4 mb-2 shadow-sm">
     <input type="hidden" name="block_id" value="{{ block.id }}" class="js-block-id-input" autocomplete="off" />
 
-    <div class="flex justify-between items-start gap-3 mb-4">
+    <div class="flex justify-between items-start gap-2 mb-3">
         <div class="flex items-start gap-2 min-w-0">
-            <button type="button"
-                    class="js-drag-handle mt-0.5 shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-akashi-red hover:bg-gray-100 dark:hover:bg-white/10 cursor-grab active:cursor-grabbing select-none"
-                    title="Перетащить блок"
-                    aria-label="Перетащить блок">
-                <span class="text-lg leading-none tracking-tighter" aria-hidden="true">⠿</span>
-            </button>
-            <div>
+            <!-- не button: Sortable игнорирует drag с «filter: button» в типичных конфигах; span + touch-none -->
+            <span
+                class="js-drag-handle mt-0.5 shrink-0 inline-flex flex-col justify-center gap-0.5 py-2 px-1.5 rounded-lg text-gray-400 hover:text-akashi-red hover:bg-gray-100 dark:hover:bg-white/10 cursor-grab active:cursor-grabbing select-none touch-none"
+                role="button"
+                tabindex="0"
+                title="Удерживайте и тяните вверх/вниз"
+                aria-label="Перетащить блок">
+                <span class="h-0.5 w-4 rounded-sm bg-current opacity-60" aria-hidden="true"></span>
+                <span class="h-0.5 w-4 rounded-sm bg-current opacity-60" aria-hidden="true"></span>
+                <span class="h-0.5 w-4 rounded-sm bg-current opacity-60" aria-hidden="true"></span>
+            </span>
+            <div class="min-w-0">
                 <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-0.5">Блок</span>
-                <p class="text-[11px] text-gray-500 dark:text-gray-400">
-                    Внутренний ID:
-                    <span class="js-block-id-label font-mono font-bold text-gray-800 dark:text-gray-200">{{ block.id }}</span>
-                    <span class="text-gray-400 dark:text-gray-500">· массово: «Пронумеровать ID»</span>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
+                    ID <span class="js-block-id-label font-mono font-bold text-gray-800 dark:text-gray-200">{{ block.id }}</span>
+                    <span class="text-gray-400 dark:text-gray-500 hidden sm:inline"> · «Пронумеровать ID» внизу</span>
                 </p>
             </div>
         </div>
@@ -27,20 +31,20 @@
         </button>
     </div>
 
-    <div class="mb-4">
-        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Заголовок (title)</label>
+    <div class="mb-3">
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Заголовок (title)</label>
         <input type="text" name="block_title" required value="{{ block.title }}"
                class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
     </div>
 
-    <div class="mb-4">
-        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Вопрос (question)</label>
-        <textarea name="block_question" rows="4" required
+    <div class="mb-3">
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Вопрос (question)</label>
+        <textarea name="block_question" rows="3" required
                   class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25 resize-y">{{ block.question }}</textarea>
     </div>
 
     <div>
-        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Описание для LLM (необязательно)</label>
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Описание для LLM (необязательно)</label>
         <textarea name="block_desc" rows="2"
                   class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25 resize-y"
                   placeholder="Контекст для модели…">{{ block.description_for_llm or '' }}</textarea>

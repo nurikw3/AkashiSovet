@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from datetime import date, datetime
+from datetime import date, datetime, time
 from aiogram import Bot
 from urllib.parse import quote, urlencode
 from bot.logger import logger
@@ -60,10 +60,8 @@ templates.env.filters["datetime"] = lambda v: (
     v.strftime("%d.%m.%Y %H:%M") if isinstance(v, datetime) else v
 )
 templates.env.filters["datefmt"] = lambda v: (
-    v.strftime("%d.%m.%Y") if isinstance(v, date) else v
+    v.strftime("%d.%m.%Y") if isinstance(v, (date, datetime)) else v
 )
-
-
 # --- AUTH HELPERS ---
 
 
@@ -470,21 +468,42 @@ async def _render_row(request, app_id):
 # --- MEETINGS ---
 
 
+def _meeting_form_err_prefix(form) -> str:
+    """Куда редиректить ошибку валидации: страница списка заседаний или дашборд approved."""
+    if (form.get("meeting_form_source") or "").strip() == "meetings":
+        return "/meetings?meeting_err="
+    return "/?status=approved&meeting_err="
+
+
+def _parse_meeting_schedule(form) -> datetime | None:
+    """Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)."""
+    raw_at = form.get("scheduled_at")
+    if raw_at and str(raw_at).strip():
+        s = str(raw_at).strip()
+        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+    raw_date = form.get("scheduled_date")
+    if raw_date and str(raw_date).strip():
+        try:
+            d = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
+            return datetime.combine(d, time(10, 0))
+        except ValueError:
+            pass
+    return None
+
+
 @app.post("/meetings")
 async def meetings_create(request: Request, admin_id=Depends(get_admin)):
     """Создаёт заседание и прикрепляет отмеченные согласованные заявки."""
     form = await request.form()
-    raw_date = form.get("scheduled_date")
-    if not raw_date or not str(raw_date).strip():
+    err_base = _meeting_form_err_prefix(form)
+    scheduled = _parse_meeting_schedule(form)
+    if not scheduled:
         return RedirectResponse(
-            url=f"/?status=approved&meeting_err={quote('Укажите дату заседания')}",
-            status_code=303,
-        )
-    try:
-        scheduled = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
-    except ValueError:
-        return RedirectResponse(
-            url=f"/?status=approved&meeting_err={quote('Некорректная дата')}",
+            url=f"{err_base}{quote('Укажите дату и время заседания')}",
             status_code=303,
         )
     raw_ids = form.getlist("app_id")
@@ -503,7 +522,7 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
             )
     except ValueError as e:
         return RedirectResponse(
-            url=f"/?status=approved&meeting_err={quote(str(e))}",
+            url=f"{err_base}{quote(str(e))}",
             status_code=303,
         )
     except Exception as e:
@@ -512,7 +531,7 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
             url=f"/meetings?meeting_err={quote(str(e))}",
             status_code=303,
         )
-    logger.info("meeting created by admin {} date {}", admin_id, scheduled)
+    logger.info("meeting created by admin {} at {}", admin_id, scheduled)
     return RedirectResponse(url="/meetings?created=1", status_code=303)
 
 

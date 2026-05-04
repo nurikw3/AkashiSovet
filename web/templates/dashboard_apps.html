@@ -56,9 +56,10 @@
 {% if meeting_basket %}
 <div class="mb-6 flex flex-wrap items-end gap-4 p-5 rounded-2xl bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 shadow-sm">
     <form id="meeting-create-form" method="post" action="/meetings" class="flex flex-wrap items-end gap-4 flex-1 min-w-[240px]">
+        <input type="hidden" name="meeting_form_source" value="dashboard" />
         <div>
-            <label for="meeting-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата заседания</label>
-            <input id="meeting-date" type="date" name="scheduled_date" required
+            <label for="meeting-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата и время</label>
+            <input id="meeting-date" type="datetime-local" name="scheduled_at" required
                    class="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
         </div>
         <button type="submit"
@@ -67,7 +68,7 @@
         </button>
     </form>
     <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold max-w-xs leading-relaxed">
-        Отметьте согласованные заявки и выберите дату
+        Отметьте согласованные заявки и укажите дату и время
     </p>
 </div>
 {% endif %}

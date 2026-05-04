@@ -34,9 +34,10 @@
         <h2 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-5">Новое заседание</h2>
         <div class="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10">
             <form method="post" action="/meetings" class="flex flex-wrap items-end gap-4 flex-1">
-                <div class="min-w-[200px]">
-                    <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата</label>
-                    <input id="meetings-page-date" type="date" name="scheduled_date" required
+                <input type="hidden" name="meeting_form_source" value="meetings" />
+                <div class="min-w-[220px]">
+                    <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата и время</label>
+                    <input id="meetings-page-date" type="datetime-local" name="scheduled_at" required
                            class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
                 </div>
                 <button type="submit"
@@ -45,7 +46,7 @@
                 </button>
             </form>
             <p class="text-[10px] text-gray-400 leading-relaxed lg:max-w-md lg:border-l lg:border-gray-100 lg:dark:border-white/10 lg:pl-8">
-                Только дата в календаре. С заявками — через
+                Дата и время заседания. С заявками — через
                 <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Approved</a>
                 и «Add to Meeting».
             </p>
@@ -64,7 +65,7 @@
                 <a href="/meetings/{{ m.id }}"
                    class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm hover:border-akashi-red/35 hover:shadow-md transition-all">
                     <div class="min-w-0">
-                        <p class="text-xl font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
+                        <p class="text-xl font-black dark:text-white">{{ m.scheduled_at | datetime }}</p>
                         <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
                             #{{ m.id }} · {{ m.application_ids|length }} заявок
                         </p>
@@ -93,7 +94,7 @@
                 <a href="/meetings/{{ m.id }}"
                    class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-akashi-dark/90 px-5 py-4 opacity-95 hover:opacity-100 hover:border-white/20 transition-all">
                     <div class="min-w-0">
-                        <p class="text-lg font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
+                        <p class="text-lg font-black dark:text-white">{{ m.scheduled_at | datetime }}</p>
                         <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
                             #{{ m.id }} · {{ m.application_ids|length }} заявок
                         </p>

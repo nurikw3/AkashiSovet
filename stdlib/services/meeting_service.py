@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
 
 import stdlib.db as db
 from stdlib.models import Meeting
 
 
-async def create_meeting(scheduled_date: date, created_by: int) -> Meeting:
-    """Создаёт заседание на указанную дату; инициатор — Telegram user_id суперпользователя."""
-    row = await db.insert_meeting(scheduled_date, created_by)
+async def create_meeting(scheduled_at: datetime, created_by: int) -> Meeting:
+    """Создаёт заседание на указанные дату и время; инициатор — Telegram user_id суперпользователя."""
+    row = await db.insert_meeting(scheduled_at, created_by)
     return Meeting.model_validate(row)
 
 
 async def get_upcoming() -> list[Meeting]:
-    """Предстоящие заседания (`scheduled_date >= CURRENT_DATE`), по дате по возрастанию."""
+    """Предстоящие заседания (`scheduled_at >= now`), по времени по возрастанию."""
     rows = await db.list_meetings_upcoming()
     return [Meeting.model_validate(r) for r in rows]
 
@@ -45,7 +45,7 @@ async def delete_meeting(meeting_id: int) -> bool:
 
 
 async def create_meeting_with_applications(
-    scheduled_date: date,
+    scheduled_at: datetime,
     created_by: int,
     application_ids: list[int],
 ) -> Meeting:
@@ -62,7 +62,7 @@ async def create_meeting_with_applications(
             raise ValueError(
                 "В заседание можно добавить только согласованные заявки (approved)"
             )
-    meeting = await create_meeting(scheduled_date, created_by)
+    meeting = await create_meeting(scheduled_at, created_by)
     await add_applications(meeting.id, ids)
     updated = await get_by_id(meeting.id)
     if not updated:

@@ -489,16 +489,16 @@ async def get_applications_by_ids(ids: list[int]) -> list[dict]:
 # ─── Meetings (таблица `meetings`) ───────────────────────────────────────────
 
 
-async def insert_meeting(scheduled_date: date, created_by: int) -> dict:
+async def insert_meeting(scheduled_at: datetime, created_by: int) -> dict:
     """Создаёт заседание; возвращает строку как dict (RETURNING *)."""
     async with _pool_conn() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO meetings (scheduled_date, created_by)
-            VALUES ($1::date, $2)
-            RETURNING id, scheduled_date, created_by, created_at, application_ids
+            INSERT INTO meetings (scheduled_at, created_by)
+            VALUES ($1::timestamp, $2)
+            RETURNING id, scheduled_at, created_by, created_at, application_ids
             """,
-            scheduled_date,
+            scheduled_at,
             created_by,
         )
     if not row:
@@ -507,14 +507,14 @@ async def insert_meeting(scheduled_date: date, created_by: int) -> dict:
 
 
 async def list_meetings_upcoming() -> list[dict]:
-    """Заседания с датой >= сегодня (по календарю БД), ближайшие первыми."""
+    """Заседания в будущем (или «сейчас»), ближайшие первыми."""
     async with _pool_conn() as conn:
         rows = await conn.fetch(
             """
-            SELECT id, scheduled_date, created_by, created_at, application_ids
+            SELECT id, scheduled_at, created_by, created_at, application_ids
             FROM meetings
-            WHERE scheduled_date >= CURRENT_DATE
-            ORDER BY scheduled_date ASC, id ASC
+            WHERE scheduled_at >= NOW()
+            ORDER BY scheduled_at ASC, id ASC
             """
         )
     return [dict(r) for r in rows]
@@ -525,10 +525,10 @@ async def list_meetings_past() -> list[dict]:
     async with _pool_conn() as conn:
         rows = await conn.fetch(
             """
-            SELECT id, scheduled_date, created_by, created_at, application_ids
+            SELECT id, scheduled_at, created_by, created_at, application_ids
             FROM meetings
-            WHERE scheduled_date < CURRENT_DATE
-            ORDER BY scheduled_date DESC, id DESC
+            WHERE scheduled_at < NOW()
+            ORDER BY scheduled_at DESC, id DESC
             """
         )
     return [dict(r) for r in rows]
@@ -539,13 +539,29 @@ async def get_meeting_by_id(meeting_id: int) -> dict | None:
     async with _pool_conn() as conn:
         row = await conn.fetchrow(
             """
-            SELECT id, scheduled_date, created_by, created_at, application_ids
+            SELECT id, scheduled_at, created_by, created_at, application_ids
             FROM meetings
             WHERE id = $1
             """,
             meeting_id,
         )
     return dict(row) if row else None
+
+
+async def update_meeting_scheduled_at(meeting_id: int, scheduled_at: datetime) -> bool:
+    """Обновляет дату/время заседания. Возвращает True, если строка была найдена."""
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE meetings
+            SET scheduled_at = $2::timestamp
+            WHERE id = $1
+            RETURNING id
+            """,
+            meeting_id,
+            scheduled_at,
+        )
+    return row is not None
 
 
 async def delete_meeting_by_id(meeting_id: int) -> bool:

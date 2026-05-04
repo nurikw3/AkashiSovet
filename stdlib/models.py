@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -125,7 +125,7 @@ class Meeting(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    scheduled_date: date
+    scheduled_at: datetime
     created_by: int = Field(description="Telegram user_id инициатора")
     created_at: datetime
     application_ids: list[int] = Field(default_factory=list)

@@ -17,7 +17,7 @@
                 <div class="min-w-0 flex-1">
                     <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Заседание</p>
                     <h1 class="text-4xl sm:text-5xl font-black tracking-tighter text-akashi-red dark:text-white leading-[1.05]">
-                        {{ meeting.scheduled_date | datefmt }}
+                        {{ meeting.scheduled_at | datetime }}
                     </h1>
                     <dl class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-gray-500 dark:text-gray-400">
                         <div class="flex gap-2">

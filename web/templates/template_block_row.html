@@ -1,0 +1,37 @@
+<div class="template-block-row rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark p-5 mb-3 shadow-sm">
+    <div class="flex justify-between items-start gap-3 mb-4">
+        <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Блок</span>
+        <button type="button"
+                class="text-[10px] font-black uppercase tracking-widest text-red-500/70 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
+                hx-delete="/settings/template/ui-row"
+                hx-target="closest .template-block-row"
+                hx-swap="outerHTML swap:200ms">
+            Удалить
+        </button>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">ID блока</label>
+        <input type="number" name="block_id" min="1" step="1" required value="{{ block.id }}"
+               class="w-full max-w-[120px] rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm font-mono dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Заголовок (title)</label>
+        <input type="text" name="block_title" required value="{{ block.title }}"
+               class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Вопрос (question)</label>
+        <textarea name="block_question" rows="4" required
+                  class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25 resize-y">{{ block.question }}</textarea>
+    </div>
+
+    <div>
+        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Описание для LLM (необязательно)</label>
+        <textarea name="block_desc" rows="2"
+                  class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25 resize-y"
+                  placeholder="Контекст для модели…">{{ block.description_for_llm or '' }}</textarea>
+    </div>
+</div>

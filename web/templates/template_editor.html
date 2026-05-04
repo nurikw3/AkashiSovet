@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-3xl animate-fade">
+    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+        <a href="/settings" class="hover:text-akashi-red transition-colors">← Settings</a>
+    </p>
+
+    <div class="flex items-center gap-4 mb-8">
+        <h1 class="text-2xl sm:text-3xl font-black tracking-tighter dark:text-white">Шаблон заявки</h1>
+        <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
+    </div>
+
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
+        Блоки определяют поля заявки в боте и текст для LLM. ID должны быть уникальными и положительными.
+    </p>
+
+    <form id="template-form"
+          hx-post="/settings/template/save"
+          hx-target="#save-status"
+          class="space-y-4">
+        <div id="block-rows" class="space-y-0">
+            {% for block in blocks %}
+                {% include "template_block_row.html" %}
+            {% endfor %}
+        </div>
+
+        <div class="flex flex-wrap gap-3 pt-2">
+            <button type="button"
+                    id="template-add-row"
+                    class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-akashi-red/35 transition-colors">
+                Добавить блок
+            </button>
+            <button type="submit"
+                    class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/20 hover:opacity-95 transition-all">
+                Сохранить шаблон
+            </button>
+        </div>
+
+        <div id="save-status" class="text-center min-h-[1.25rem]"></div>
+    </form>
+</div>
+
+<script>
+    document.getElementById('template-add-row').addEventListener('click', function () {
+        var inputs = document.querySelectorAll('#block-rows input[name="block_id"]');
+        var next = 1;
+        if (inputs.length) {
+            var max = 0;
+            inputs.forEach(function (el) {
+                var v = parseInt(el.value, 10);
+                if (!isNaN(v) && v > max) max = v;
+            });
+            next = max + 1;
+        }
+        htmx.ajax('GET', '/settings/template/new-row?next_id=' + next, {
+            target: '#block-rows',
+            swap: 'beforeend'
+        });
+    });
+</script>
+
+{% endblock %}

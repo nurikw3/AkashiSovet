@@ -1,4 +1,6 @@
-# Образ приложения один на web+bot: иначе Compose собирает два идентичных образа.
+# Образ приложения один на web+bot: сборка только у web (иначе два параллельных build
+# пишут в один тег akashisovet:app и BuildKit падает с «already exists»).
+# Первый запуск: docker compose up --build  (или: docker compose build web && docker compose up)
 # Для правок шаблонов/Python без пересборки: docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
 
 services:
@@ -28,10 +30,10 @@ services:
         condition: service_healthy
     command: uv run uvicorn web.main:app --host 0.0.0.0 --port 8000
 
-  # --- ТЕЛЕГРАМ БОТ ---
+  # --- ТЕЛЕГРАМ БОТ (тот же образ, что и web; без отдельного build — см. комментарий выше) ---
   bot:
-    build: .
     image: akashisovet:app
+    pull_policy: never
     container_name: akashi_bot
     restart: unless-stopped
     env_file:

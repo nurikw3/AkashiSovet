@@ -1,0 +1,31 @@
+# Подключать при разработке: исходники с хоста + hot-reload веба (шаблоны и Python).
+# Запуск: docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
+# Бот перезапускайте сами при смене кода бота; веб подхватывает web/ и stdlib/ без пересборки.
+
+services:
+  web:
+    volumes:
+      - ./web:/app/web
+      - ./stdlib:/app/stdlib
+    command:
+      - uv
+      - run
+      - uvicorn
+      - web.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/web
+      - --reload-dir
+      - /app/stdlib
+      - --reload-include
+      - "*.html"
+
+  bot:
+    volumes:
+      - data:/app/data
+      - ./bot:/app/bot
+      - ./stdlib:/app/stdlib

@@ -1,7 +1,11 @@
+# Образ приложения один на web+bot: иначе Compose собирает два идентичных образа.
+# Для правок шаблонов/Python без пересборки: docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
+
 services:
   # --- ВЕБ-ИНТЕРФЕЙС (FASTAPI) ---
   web:
     build: .
+    image: akashisovet:app
     container_name: akashi_web
     restart: unless-stopped
     ports:
@@ -9,22 +13,37 @@ services:
     env_file:
       - .env
     environment:
-      # Пароль подтягивается динамически из переменной окружения
       DATABASE_URL: postgresql://akashi:${POSTGRES_PASSWORD}@postgres:5432/akashi
+      # MinIO config
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
+      S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
+      S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     command: uv run uvicorn web.main:app --host 0.0.0.0 --port 8000
 
   # --- ТЕЛЕГРАМ БОТ ---
   bot:
     build: .
+    image: akashisovet:app
     container_name: akashi_bot
     restart: unless-stopped
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://akashi:${POSTGRES_PASSWORD}@postgres:5432/akashi
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
+      S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
+      S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
     volumes:
       - data:/app/data
     depends_on:
@@ -32,6 +51,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      minio:
+        condition: service_healthy
     command: uv run python -m bot.bot
 
   # --- БАЗА ДАННЫХ ---
@@ -63,6 +84,26 @@ services:
     ports:
       - "6379:6379"
 
+  # --- S3 ХРАНИЛИЩЕ (MINIO) ---
+  minio:
+    image: minio/minio:latest
+    container_name: akashi_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # API endpoint
+      - "9001:9001" # Web UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # --- МОНИТОРИНГ ---
   grafana:
     image: grafana/grafana:latest
@@ -80,3 +121,4 @@ volumes:
   pgdata:
   grafana_data:
   redis_data:
+  minio_data:

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from stdlib.template import ApplicationTemplate, BlockDefinition
 
-ApplicationStatus = Literal["draft", "pending", "approved", "rework", "done"]
+ApplicationStatus = Literal["draft", "pending", "approved", "rework"]
 
 
 class ApplicationAttachment(BaseModel):

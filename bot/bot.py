@@ -19,7 +19,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bot.config import config
 from bot.logger import logger, setup_logging, InterceptHandler
 import stdlib.db as db
-from stdlib.redis_client import init_redis, close_redis
+from stdlib import resources
 from stdlib.handlers import user, superuser
 
 # ─── Настройка логирования ────────────────────────────────────────────────────
@@ -39,10 +39,10 @@ async def send_daily_report(bot: Bot) -> None:
 
         text = (
             "📊 <b>Ежедневный отчет по заявкам</b>\n\n"
-            "🕒 За последние 24 часа:\n"
-            f"✅ Одобрено: <b>{stats.get('approved', 0)}</b>\n"
+            "🕒 Текущие суммы по статусам:\n"
+            f"✅ Согласовано: <b>{stats.get('approved', 0)}</b>\n"
             f"⏳ В ожидании: <b>{stats.get('pending', 0)}</b>\n"
-            f"❌ Отклонено: <b>{stats.get('rejected', 0)}</b>\n"
+            f"✎ Черновики: <b>{stats.get('draft', 0)}</b>\n"
             f"🔁 На доработке: <b>{stats.get('rework', 0)}</b>\n\n"
             "Не забудь проверить заявки в ожидании! 👀"
         )
@@ -79,8 +79,7 @@ async def main() -> None:
     dp.include_router(superuser.router)
 
     # ─── Инициализация сервисов ───────────────────────────────────────────────
-    await db.init_db()
-    await init_redis()
+    await resources.init_resources()
 
     # ─── Настройка Планировщика (ТЕСТОВЫЙ РЕЖИМ: каждые 5 секунд) ─────────────
     # ПОМНИ: Верни 'cron' перед продакшеном!
@@ -118,8 +117,7 @@ async def main() -> None:
         logger.info("🛑 Shutting down...")
         scheduler.shutdown(wait=False)
         await dp.storage.close()
-        await db.close_db()
-        await close_redis()
+        await resources.shutdown_resources()
         await bot.session.close()
         logger.info("✅ Bot stopped gracefully.")
 

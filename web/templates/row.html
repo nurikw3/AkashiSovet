@@ -4,7 +4,7 @@
 
     {% if meeting_basket %}
     <td class="px-3 py-4 w-11 align-middle">
-        {% if app.status in ['approved', 'done'] %}
+        {% if app.status == 'approved' %}
         <input type="checkbox" name="app_id" value="{{ app.id }}" form="meeting-create-form"
                class="w-4 h-4 rounded border-gray-300 dark:border-white/20 bg-white dark:bg-black/40 text-akashi-red focus:ring-akashi-red/30" />
         {% endif %}
@@ -40,7 +40,6 @@
         <span class="status-badge status-{{ app.status }}">
             {% if app.status == 'pending' %}⏳
             {% elif app.status == 'approved' %}✓
-            {% elif app.status == 'done' %}✓✓
             {% elif app.status == 'rework' %}↩
             {% elif app.status == 'draft' %}✎
             {% endif %}
@@ -107,8 +106,8 @@
             </form>
         </div>
 
-        {% elif app.status in ['approved', 'done'] %}
-        <span class="text-[9px] font-black uppercase tracking-widest text-green-500">✓ Done</span>
+        {% elif app.status == 'approved' %}
+        <span class="text-[9px] font-black uppercase tracking-widest text-green-500">✓ Approved</span>
 
         {% elif app.status == 'rework' %}
         <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red">↩ Rework</span>

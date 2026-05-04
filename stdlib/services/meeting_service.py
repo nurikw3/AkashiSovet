@@ -44,7 +44,7 @@ async def create_meeting_with_applications(
     created_by: int,
     application_ids: list[int],
 ) -> Meeting:
-    """Создаёт заседание и прикрепляет заявки (только status approved или done)."""
+    """Создаёт заседание и прикрепляет заявки (только status approved)."""
     if not application_ids:
         raise ValueError("Выберите хотя бы одну заявку")
     ids = list(dict.fromkeys(int(x) for x in application_ids))
@@ -53,9 +53,9 @@ async def create_meeting_with_applications(
         st = status_map.get(aid)
         if st is None:
             raise ValueError(f"Заявка {aid} не найдена")
-        if st not in ("approved", "done"):
+        if st != "approved":
             raise ValueError(
-                "В заседание можно добавить только согласованные заявки (approved / done)"
+                "В заседание можно добавить только согласованные заявки (approved)"
             )
     meeting = await create_meeting(scheduled_date, created_by)
     await add_applications(meeting.id, ids)

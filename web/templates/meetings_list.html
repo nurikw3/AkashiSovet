@@ -8,6 +8,12 @@
     </div>
     {% endif %}
 
+    {% if meeting_err %}
+    <div class="mb-6 px-5 py-4 rounded-2xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
+        {{ meeting_err }}
+    </div>
+    {% endif %}
+
     <div class="flex items-start justify-between mb-10 gap-6 flex-wrap">
         <div>
             <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
@@ -19,6 +25,27 @@
             </p>
         </div>
     </div>
+
+    <section class="mb-10 p-6 rounded-2xl bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 shadow-sm">
+        <h2 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Новое заседание</h2>
+        <form method="post" action="/meetings" class="flex flex-wrap items-end gap-4">
+            <div>
+                <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата</label>
+                <input id="meetings-page-date" type="date" name="scheduled_date" required
+                       class="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+            </div>
+            <button type="submit"
+                    class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/25 hover:opacity-95 active:scale-[0.98] transition-all">
+                Создать заседание
+            </button>
+        </form>
+        <p class="text-[10px] text-gray-400 mt-4 leading-relaxed max-w-xl">
+            Здесь — только дата (заседание без списка заявок). Чтобы создать заседание
+            <span class="text-gray-500 dark:text-gray-500">сразу с заявками</span>, откройте
+            <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Applications → Approved</a>,
+            отметьте строки, выберите дату и нажмите «Add to Meeting».
+        </p>
+    </section>
 
     <section class="mb-12">
         <h2 class="text-lg font-black dark:text-white mb-4 flex items-center gap-2">

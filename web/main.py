@@ -495,12 +495,21 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
         except (TypeError, ValueError):
             continue
     try:
-        await meeting_service.create_meeting_with_applications(
-            scheduled, admin_id, app_ids
-        )
+        if not app_ids:
+            await meeting_service.create_meeting(scheduled, admin_id)
+        else:
+            await meeting_service.create_meeting_with_applications(
+                scheduled, admin_id, app_ids
+            )
     except ValueError as e:
         return RedirectResponse(
             url=f"/?status=approved&meeting_err={quote(str(e))}",
+            status_code=303,
+        )
+    except Exception as e:
+        logger.exception("meetings_create failed")
+        return RedirectResponse(
+            url=f"/meetings?meeting_err={quote(str(e))}",
             status_code=303,
         )
     logger.info("meeting created by admin {} date {}", admin_id, scheduled)
@@ -509,7 +518,9 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
 
 @app.get("/meetings", response_class=HTMLResponse)
 async def meetings_list(
-    request: Request, admin_id=Depends(get_admin), created: str | None = None
+    request: Request,
+    admin_id=Depends(get_admin),
+    created: str | None = None,
 ):
     upcoming = await meeting_service.get_upcoming()
     past = await meeting_service.get_past()
@@ -521,6 +532,7 @@ async def meetings_list(
             "upcoming": upcoming,
             "past": past,
             "created_ok": created == "1",
+            "meeting_err": request.query_params.get("meeting_err"),
         },
     )
 

@@ -11,11 +11,7 @@ from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
-from stdlib.telegram_summary import (
-    INTRO_FALLBACK_NO_PDF_HTML,
-    INTRO_REVIEW_HTML,
-    chunk_blocks_summary_html,
-)
+from stdlib.telegram_summary import INTRO_FALLBACK_NO_PDF_HTML, chunk_blocks_summary_html
 from stdlib.template import get_template
 
 router = Router()
@@ -55,20 +51,9 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
                 pdf_buf.getvalue(),
                 filename=custom_filename,
             ),
-            caption="📝 Проверьте PDF и текст ниже перед отправкой.",
+            caption="📝 Проверьте PDF перед отправкой заявки.",
             reply_markup=kb.review_keyboard(tpl),
         )
-        app_model = await application_service.get_application(app_id)
-        if app_model:
-            for idx, html in enumerate(
-                chunk_blocks_summary_html(
-                    tpl,
-                    app_model.blocks,
-                    INTRO_REVIEW_HTML,
-                    attachments_footer=None,
-                )
-            ):
-                await send_fn(html, parse_mode="HTML")
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 
     except Exception as e:

@@ -40,7 +40,7 @@ async def init_db() -> None:
                 user_id     BIGINT PRIMARY KEY,
                 full_name   TEXT,
                 position    TEXT,
-                signature_data BYTEA,
+                signature_data TEXT,
                 mode        TEXT DEFAULT 'step',
                 login       TEXT UNIQUE,
                 hashed_password TEXT
@@ -56,6 +56,13 @@ async def close_db() -> None:
         _pool = None
 
 
+def get_pool() -> asyncpg.Pool:
+    """Публичный доступ к пулу (инициализация через `stdlib.resources.init_resources`)."""
+    if not _pool:
+        raise RuntimeError("DB pool not initialized. Call init_db() first.")
+    return _pool
+
+
 def _pool_conn():
     if not _pool:
         raise RuntimeError("DB pool not initialized. Call init_db() first.")
@@ -64,6 +71,33 @@ def _pool_conn():
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# ─── Settings ────────────────────────────────────────────────────────────────
+
+
+async def get_setting(key: str):
+    """Возвращает JSONB-значение из таблицы `settings` или None, если ключа нет."""
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow("SELECT value FROM settings WHERE key = $1", key)
+    if not row:
+        return None
+    return row["value"]
+
+
+async def upsert_setting(key: str, value: dict | list) -> None:
+    """Вставка или обновление JSONB по ключу."""
+    payload = json.dumps(value, ensure_ascii=False)
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """
+            INSERT INTO settings (key, value)
+            VALUES ($1, $2::jsonb)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """,
+            key,
+            payload,
+        )
 
 
 # ─── Applications ─────────────────────────────────────────────────────────────
@@ -86,6 +120,24 @@ async def get_or_create_app(user_id: int, username: str | None) -> int:
         )
         logger.info("Created new app {} for user {}", row["id"], user_id)
         return row["id"]
+
+
+async def reset_draft_content(app_id: int) -> None:
+    """
+    Сбрасывает блоки, вложения и free-form чат у черновика.
+    Нужен при новом /start, чтобы не тянуть контекст прошлой сессии (другой режим / free-form).
+    """
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """UPDATE applications
+               SET blocks = '{}',
+                   attachments = '[]',
+                   chat_history = '[]',
+                   updated_at = NOW()
+               WHERE id = $1 AND status = 'draft'""",
+            app_id,
+        )
+    logger.debug("reset_draft_content app_id={}", app_id)
 
 
 async def get_app(app_id: int) -> dict | None:
@@ -288,23 +340,24 @@ async def set_user_position(user_id: int, position: str) -> None:
 # ─── Signatures ───────────────────────────────────────────────────────────────
 
 
-async def get_user_signature(user_id: int) -> bytes | None:
-    async with _pool_conn() as conn:
-        row = await conn.fetchrow(
-            "SELECT signature_data FROM users WHERE user_id = $1", user_id
-        )
-    return row["signature_data"] if row and row["signature_data"] else None
-
-
-async def set_user_signature(user_id: int, signature_bytes: bytes) -> None:
+async def set_user_signature(user_id: int, s3_key: str) -> None:  # ← принимаем str
     async with _pool_conn() as conn:
         await conn.execute(
             """INSERT INTO users (user_id, signature_data)
                VALUES ($1, $2)
                ON CONFLICT (user_id) DO UPDATE SET signature_data = EXCLUDED.signature_data""",
             user_id,
-            signature_bytes,
+            s3_key,  # ← сохраняем ключ строкой
         )
+
+
+# Функция get_user_signature:
+async def get_user_signature(user_id: int) -> str | None:  # ← возвращаем str
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT signature_data FROM users WHERE user_id = $1", user_id
+        )
+    return row["signature_data"] if row and row["signature_data"] else None
 
 
 async def get_daily_stats() -> dict:
@@ -354,30 +407,76 @@ async def verify_web_login_code(user_id: int, input_code: str) -> bool:
     return False
 
 
-async def get_applications(tab: str = "active") -> list[dict]:
+async def get_application_status_counts() -> dict[str, int]:
+    """Агрегаты по заявкам: pending, approved, rework и всего строк (для виджетов панели)."""
     async with _pool_conn() as conn:
-        cond = ""
-        if tab == "active":
-            # Пока заявка не одобрена окончательно, она считается активной
-            cond = "WHERE a.status IN ('pending', 'rework', 'draft')"
-        elif tab == "archive":
-            # В архив уходит только то, что полностью согласовано
-            cond = "WHERE a.status IN ('approved', 'done')"
+        row = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'pending')::int  AS pending,
+                COUNT(*) FILTER (WHERE status = 'approved')::int AS approved,
+                COUNT(*) FILTER (WHERE status = 'rework')::int   AS rework,
+                COUNT(*)::int                                   AS total
+            FROM applications
+            """
+        )
+    if row is None:
+        return {"pending": 0, "approved": 0, "rework": 0, "total": 0}
+    return {
+        "pending": row["pending"],
+        "approved": row["approved"],
+        "rework": row["rework"],
+        "total": row["total"],
+    }
 
-        query = f"""
-            SELECT a.*, u.full_name, u.position
-            FROM applications a
-            LEFT JOIN users u ON a.user_id = u.user_id
-            {cond}
-            ORDER BY a.created_at DESC
-        """
-        rows = await conn.fetch(query)
+
+async def get_applications(tab: str = "active", status: str | None = None) -> list[dict]:
+    if tab == "active":
+        cond = "WHERE a.status IN ('pending', 'rework', 'draft')"
+    elif tab == "archive":
+        cond = "WHERE a.status IN ('approved', 'done')"
+    else:
+        cond = "WHERE FALSE"
+
+    params: list[str] = []
+    if status in ("pending", "approved", "rework"):
+        cond += " AND a.status = $1"
+        params.append(status)
+
+    query = f"""
+        SELECT a.*, u.full_name, u.position
+        FROM applications a
+        LEFT JOIN users u ON a.user_id = u.user_id
+        {cond}
+        ORDER BY a.created_at DESC
+    """
+    async with _pool_conn() as conn:
+        if params:
+            rows = await conn.fetch(query, params[0])
+        else:
+            rows = await conn.fetch(query)
     return [dict(r) for r in rows]
 
 
+import bcrypt
+
+
 async def update_user_password(user_id: int, password: str):
-    hashed = pwd_context.hash(password)
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     async with _pool_conn() as conn:
         await conn.execute(
             "UPDATE users SET hashed_password = $1 WHERE user_id = $2", hashed, user_id
         )
+
+
+async def get_user_apps(user_id: int) -> list[dict]:
+    """Возвращает заявки пользователя как список dict."""
+    query = """
+        SELECT id, blocks, status, created_at 
+        FROM applications 
+        WHERE user_id = $1 
+        ORDER BY created_at DESC
+    """
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(query, user_id)
+    return [dict(row) for row in rows]  # 🔥 Конвертируем Record → dict

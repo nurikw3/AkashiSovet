@@ -1,0 +1,18 @@
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm">
+        <p class="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-1">Pending</p>
+        <p class="text-3xl font-black tracking-tighter dark:text-white">{{ counts.pending }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm">
+        <p class="text-[9px] font-black uppercase tracking-widest text-green-600 dark:text-green-400 mb-1">Approved</p>
+        <p class="text-3xl font-black tracking-tighter dark:text-white">{{ counts.approved }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm">
+        <p class="text-[9px] font-black uppercase tracking-widest text-akashi-red mb-1">Rework</p>
+        <p class="text-3xl font-black tracking-tighter dark:text-white">{{ counts.rework }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm">
+        <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Total</p>
+        <p class="text-3xl font-black tracking-tighter dark:text-white">{{ counts.total }}</p>
+    </div>
+</div>

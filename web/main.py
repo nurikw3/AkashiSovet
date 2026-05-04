@@ -1,29 +1,56 @@
-import json
+import html
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
+from types import SimpleNamespace
+
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
+from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from pathlib import Path
 from datetime import datetime
 from aiogram import Bot
-from urllib.parse import quote  # Нужно для кириллицы в названиях файлов
+from urllib.parse import quote
 from bot.logger import logger
+from passlib.context import CryptContext
 
 import stdlib.db as db
 import stdlib.keyboards as kb
-from stdlib.pdf import (
-    get_app_pdf_buffer,
-    generate_pdf_filename,
-)  # Импортируем обе функции
+from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from bot.config import config
+import bcrypt
+
+from stdlib import resources
+from stdlib.models import Application
+from stdlib.services import application_service, file_service
+from stdlib.services.notification_service import (
+    notify_user_application_approved,
+    notify_user_application_rework,
+)
+from stdlib.template import ApplicationTemplate, get_template, persist_template
+from aiogram.types import BufferedInputFile
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _template_validation_message(e: ValidationError) -> str:
+    parts: list[str] = []
+    for err in e.errors():
+        m = err.get("msg") or "ошибка валидации"
+        if m.startswith("Value error, "):
+            m = m[len("Value error, ") :]
+        loc = err.get("loc") or ()
+        if len(loc) >= 2 and loc[0] == "blocks" and isinstance(loc[1], int):
+            parts.append(f"Блок {loc[1] + 1}: {m}")
+        else:
+            parts.append(m)
+    return "; ".join(parts) if parts else str(e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db.init_db()
+    await resources.init_resources()
     app.state.tg_bot = Bot(token=config.BOT_TOKEN)
     yield
-    await db.close_db()
+    await resources.shutdown_resources()
     await app.state.tg_bot.session.close()
 
 
@@ -34,6 +61,9 @@ templates.env.filters["datetime"] = lambda v: (
 )
 
 
+# --- AUTH HELPERS ---
+
+
 async def get_admin(request: Request):
     admin_id = request.cookies.get("admin_session")
     if not admin_id or int(admin_id) not in config.SUPERUSER_IDS:
@@ -41,52 +71,286 @@ async def get_admin(request: Request):
     return int(admin_id)
 
 
+async def _get_hashed_password(user_id: int) -> str | None:
+    async with db._pool_conn() as conn:
+        row = await conn.fetchrow(
+            "SELECT hashed_password FROM users WHERE user_id = $1", user_id
+        )
+    return row["hashed_password"] if row else None
+
+
 @app.exception_handler(401)
 async def auth_handler(request, exc):
     return RedirectResponse(url="/login")
 
 
-# --- РОУТЫ ---
+# --- LOGIN / LOGOUT ---
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    admin_id = request.cookies.get("admin_session")
+    if admin_id and int(admin_id) in config.SUPERUSER_IDS:
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(
+        request=request, name="login.html", context={"error": None}
+    )
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(
+    request: Request,
+    tg_id: int = Form(...),
+    code: str = Form(...),
+):
+    if tg_id not in config.SUPERUSER_IDS:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={"error": "Пользователь не найден"},
+        )
+
+    hashed = await _get_hashed_password(tg_id)
+
+    if hashed:
+        if not bcrypt.checkpw(code.encode(), hashed.encode()):
+            otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
+            if not otp_ok:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="login.html",
+                    context={"error": "Неверный пароль или код"},
+                )
+    else:
+        otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
+        if not otp_ok:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={"error": "Неверный код. Получите новый через /web в боте"},
+            )
+
+    response = RedirectResponse(
+        url="/settings" if not hashed else "/",
+        status_code=302,
+    )
+    response.set_cookie(
+        key="admin_session",
+        value=str(tg_id),
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 8,
+    )
+    return response
+
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=302)
+    response.delete_cookie("admin_session")
+    return response
+
+
+# --- SETTINGS ---
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, admin_id=Depends(get_admin)):
+    hashed = await _get_hashed_password(admin_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="settings.html",
+        context={
+            "has_password": bool(hashed),
+            "success": request.query_params.get("success"),
+            "error": None,
+        },
+    )
+
+
+@app.post("/settings/password", response_class=HTMLResponse)
+async def set_password(
+    request: Request,
+    password: str = Form(...),
+    admin_id=Depends(get_admin),
+):
+    if len(password) < 8:
+        return HTMLResponse(
+            '<p class="text-akashi-red text-[10px] font-black text-center uppercase tracking-widest">'
+            "⚠ Минимум 8 символов</p>"
+        )
+
+    await db.update_user_password(admin_id, password)
+    logger.info(f"Password updated for admin {admin_id}")
+    return HTMLResponse(
+        '<p class="text-green-500 text-[10px] font-black text-center uppercase tracking-widest">'
+        "✓ Password saved — use it on next login</p>"
+    )
+
+
+# --- Шаблон заявки (БД + Redis) ---
+
+
+@app.get("/settings/template", response_class=HTMLResponse)
+async def template_editor_page(request: Request, admin_id=Depends(get_admin)):
+    try:
+        tpl = await get_template()
+    except RuntimeError as e:
+        return templates.TemplateResponse(
+            request=request,
+            name="template_editor_error.html",
+            context={"message": str(e)},
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="template_editor.html",
+        context={"blocks": tpl.blocks},
+    )
+
+
+@app.get("/settings/template/new-row", response_class=HTMLResponse)
+async def template_editor_new_row(
+    request: Request, next_id: int, admin_id=Depends(get_admin)
+):
+    block = SimpleNamespace(
+        id=next_id,
+        title="",
+        question="",
+        description_for_llm=None,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="template_block_row.html",
+        context={"block": block},
+    )
+
+
+@app.delete("/settings/template/ui-row")
+async def template_editor_row_delete_ui(admin_id=Depends(get_admin)):
+    """Только удаление строки в форме (без записи в БД)."""
+    return Response(status_code=204)
+
+
+@app.post("/settings/template/save", response_class=HTMLResponse)
+async def template_editor_save(
+    admin_id=Depends(get_admin),
+    block_id: list[str] = Form(...),
+    block_title: list[str] = Form(...),
+    block_question: list[str] = Form(...),
+    block_desc: list[str] | None = Form(None),
+):
+    n = len(block_id)
+    if n == 0:
+        return HTMLResponse(
+            '<p class="text-akashi-red text-[10px] font-black">Нужен хотя бы один блок</p>',
+            status_code=400,
+        )
+    if len(block_title) != n or len(block_question) != n:
+        return HTMLResponse(
+            '<p class="text-akashi-red text-[10px] font-black">Несогласованные поля формы</p>',
+            status_code=400,
+        )
+    desc_list = block_desc or []
+    while len(desc_list) < n:
+        desc_list.append("")
+
+    rows: list[dict] = []
+    for i in range(n):
+        d = (desc_list[i] or "").strip()
+        try:
+            bid = int(block_id[i])
+        except ValueError:
+            return HTMLResponse(
+                '<p class="text-akashi-red text-[10px] font-black">Некорректный ID блока</p>',
+                status_code=400,
+            )
+        if bid <= 0:
+            return HTMLResponse(
+                '<p class="text-akashi-red text-[10px] font-black">'
+                "ID блока должен быть положительным числом</p>",
+                status_code=400,
+            )
+        rows.append(
+            {
+                "id": bid,
+                "title": (block_title[i] or "").strip(),
+                "question": (block_question[i] or "").strip(),
+                "description_for_llm": d or None,
+            }
+        )
+
+    try:
+        app_tpl = ApplicationTemplate.model_validate({"blocks": rows})
+    except ValidationError as e:
+        msg = _template_validation_message(e)
+        return HTMLResponse(
+            f'<p class="text-akashi-red text-[10px] font-black">'
+            f"{html.escape(msg)}</p>",
+            status_code=400,
+        )
+
+    try:
+        await persist_template(app_tpl)
+    except Exception as e:
+        logger.exception("template save failed")
+        return HTMLResponse(
+            f'<p class="text-akashi-red text-[10px] font-black">Ошибка БД: {e}</p>',
+            status_code=500,
+        )
+
+    logger.info("app_template updated by admin {}", admin_id)
+    return HTMLResponse(
+        '<p class="text-green-500 text-[10px] font-black">✓ Шаблон сохранён, кэш Redis сброшен</p>'
+    )
+
+
+# --- DASHBOARD ---
+
+
+@app.get("/partials/counters", response_class=HTMLResponse)
+async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admin)):
+    """Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)."""
+    counts = await application_service.get_status_counts()
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard_counters.html",
+        context={"request": request, "counts": counts},
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, tab: str = "active", admin_id=Depends(get_admin)):
-    raw_apps = await db.get_applications(tab)
+async def dashboard(
+    request: Request,
+    tab: str = "active",
+    status: str | None = None,
+    admin_id=Depends(get_admin),
+):
+    status_filter = status if status in ("pending", "approved", "rework") else None
+    raw_apps = await application_service.list_applications(tab, status_filter)
     parsed_apps = [_parse_app(a) for a in raw_apps]
+    counts = await application_service.get_status_counts()
+    ctx = {
+        "request": request,
+        "apps": parsed_apps,
+        "tab": tab,
+        "status_filter": status_filter,
+        "counts": counts,
+    }
     tpl = "table_body.html" if "hx-request" in request.headers else "index.html"
-    return templates.TemplateResponse(
-        request=request,
-        name=tpl,
-        context={"request": request, "apps": parsed_apps, "tab": tab},
-    )
+    return templates.TemplateResponse(request=request, name=tpl, context=ctx)
 
 
 @app.post("/approve/{app_id}")
 async def approve_app(request: Request, app_id: int, admin_id=Depends(get_admin)):
-    # 1. Обновляем статус в БД
-    await db.update_status(app_id, "approved")
-    await db.set_t_decision(app_id)
+    row = await application_service.approve(app_id)
+    if row and row.user_id:
+        await notify_user_application_approved(
+            request.app.state.tg_bot,
+            row.user_id,
+            app_id,
+            pdf_file_id=None,
+        )
 
-    # 2. Получаем данные заявки, чтобы узнать user_id
-    app_data = await db.get_app(app_id)
-
-    if app_data and app_data.get("user_id"):
-        try:
-            # 3. Отправляем радостную весть юзеру в ТГ
-            await app.state.tg_bot.send_message(
-                app_data["user_id"],
-                f"✅ <b>Ваша заявка #{app_id} успешно согласована!</b>\n\n"
-                f"Документ передан в дальнейшую работу.",
-                parse_mode="HTML",
-            )
-            logger.info(f"Approve notification sent to user for app {app_id}")
-        except Exception as e:
-            # Обернули в try/except, чтобы сайт не упал, если юзер вдруг заблокировал бота
-            logger.error(
-                f"Ошибка отправки уведомления об апруве для заявки {app_id}: {e}"
-            )
-
-    # 4. Обновляем табличку на сайте
     return await _render_row(request, app_id)
 
 
@@ -97,120 +361,83 @@ async def reject_app(
     feedback: str = Form(...),
     admin_id=Depends(get_admin),
 ):
-    """Обработка Рework (Отправка на доработку)"""
-    await db.update_status(app_id, "rework", feedback=feedback)
-    await db.set_t_decision(app_id)
-    await db.increment_reject_count(app_id)
-
-    app_data = await db.get_app(app_id)
-    try:
-        await app.state.tg_bot.send_message(
-            app_data["user_id"],
-            f"❌ <b>Заявка #{app_id} возвращена на доработку.</b>\n\n"
-            f"<b>Замечания:</b>\n{feedback}\n\n"
-            "<i>Используйте кнопки ниже для редактирования:</i>",
-            parse_mode="HTML",
-            reply_markup=kb.rework_keyboard(),
+    row = await application_service.send_for_rework(app_id, feedback)
+    if row:
+        tpl = await get_template()
+        await notify_user_application_rework(
+            request.app.state.tg_bot,
+            row.user_id,
+            app_id,
+            feedback,
+            reply_markup=kb.rework_keyboard(tpl),
+            web_wording=True,
         )
-    except Exception as e:
-        logger.error(f"Ошибка отправки в ТГ: {e}")
 
     return await _render_row(request, app_id)
 
 
 @app.get("/download/{app_id}")
 async def download_report(app_id: int, admin_id=Depends(get_admin)):
-    """Скачивание сгенерированного PDF"""
-    app_raw = await db.get_app(app_id)
-    if not app_raw:
+    app_row = await application_service.get_application(app_id)
+    if not app_row:
         raise HTTPException(status_code=404)
 
-    # 1. Генерируем буфер PDF (там внутри уже чистятся файлы)
     pdf_buf = await get_app_pdf_buffer(app_id)
-
-    # 2. Достаем данные для правильного имени файла
-    u_id = app_raw["user_id"]
+    u_id = app_row.user_id
     full_name = await db.get_user_full_name(u_id)
     position = await db.get_user_position(u_id)
+    custom_filename = generate_pdf_filename(full_name, position, app_row.created_at)
 
-    # Формируем имя через нашу общую функцию
-    custom_filename = generate_pdf_filename(full_name, position, app_raw["created_at"])
-
-    # 3. Отдаем браузеру с правильным заголовком
     headers = {
-        # inline - пытается открыть в браузере. Если хочешь чтобы всегда скачивалось, замени на attachment
         "Content-Disposition": f"inline; filename*=utf-8''{quote(custom_filename)}"
     }
-
     return StreamingResponse(pdf_buf, media_type="application/pdf", headers=headers)
 
 
-@app.get("/download_attachment/{file_id:path}")
-async def download_file(file_id: str, admin_id=Depends(get_admin)):
-    try:
-        bot: Bot = app.state.tg_bot
-        file = await bot.get_file(file_id)
-        file_url = (
-            f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{file.file_path}"
-        )
-        return RedirectResponse(url=file_url)
-    except Exception as e:
-        logger.error(f"Ошибка при получении файла {file_id}: {e}")
-        raise HTTPException(
-            status_code=400, detail="Не удалось получить файл из Telegram"
-        )
+@app.get("/download_attachment/{s3_key:path}")
+async def download_file(s3_key: str, admin_id=Depends(get_admin)):
+    # 1. Валидация ключа
+    if not s3_key or s3_key.strip() == "":
+        raise HTTPException(status_code=400, detail="Пустой S3-ключ")
+
+    buf = await file_service.download_attachment_bytesio(s3_key)
+    if not buf:
+        logger.error("File not found in S3: key={}", s3_key)
+        raise HTTPException(status_code=404, detail="Файл не найден в хранилище")
+
+    # 3. Определяем имя файла
+    filename = s3_key.split("/")[-1]
+
+    # 4. Отдаём с правильными заголовками
+    headers = {"Content-Disposition": f"attachment; filename*=utf-8''{quote(filename)}"}
+    return StreamingResponse(
+        buf, media_type="application/octet-stream", headers=headers
+    )
 
 
-# --- Вспомогательные функции (Internal) ---
+# --- Internal ---
 
 
-def _clean_attachments(att):
-    """Безопасно превращает строку из БД в нормальный список словарей."""
-    if not att:
-        return []
-    if isinstance(att, list):
-        return att
-    if isinstance(att, str):
-        if att.strip() in ("[]", "", "None"):
-            return []
-        try:
-            return json.loads(att.replace("'", '"'))
-        except Exception as e:
-            logger.error(f"Ошибка парсинга аттачментов: {e}")
-            return []
-    return []
-
-
-def _parse_app(a):
-    """Подготавливает данные заявки для row.html"""
-    try:
-        b = json.loads(a.get("blocks", "{}"))
-    except:
-        b = {}
-
-    a["topic"] = b.get("1", "Без темы")
-    a["display_name"] = a.get("full_name") or a.get("username") or f"ID: {a['user_id']}"
-
-    raw_files = _clean_attachments(a.get("attachments"))
-
-    a["parsed_attachments"] = []
-    for f in raw_files:
-        if isinstance(f, dict):
-            a["parsed_attachments"].append(
-                {
-                    "file_id": f.get("file_id"),
-                    "file_name": f.get("name") or f.get("file_name") or "Файл",
-                }
-            )
-
-    return a
+def _parse_app(a: dict) -> dict:
+    m = Application.model_validate(a)
+    parsed = [
+        {"s3_key": att.s3_key, "file_name": att.name} for att in m.attachments
+    ]
+    out = {**a}
+    out["topic"] = m.blocks.get("1", "Без темы")
+    out["display_name"] = m.full_name or m.username or f"ID: {m.user_id}"
+    out["parsed_attachments"] = parsed
+    return out
 
 
 async def _render_row(request, app_id):
-    a = await db.get_app(app_id)
-    a["full_name"] = await db.get_user_full_name(a["user_id"])
+    app = await application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404)
+    row = app.model_dump()
+    row["full_name"] = await db.get_user_full_name(app.user_id)
     return templates.TemplateResponse(
         request=request,
         name="row.html",
-        context={"request": request, "app": _parse_app(a)},
+        context={"request": request, "app": _parse_app(row)},
     )

@@ -1,0 +1,120 @@
+"""Операции с заявкой: создание черновика, смена статуса, отправка на согласование, доработка."""
+
+from __future__ import annotations
+
+import stdlib.db as db
+from stdlib.models import Application, ApplicationAttachment
+from stdlib.pdf import invalidate_pdf_cache
+
+
+async def list_applications(tab: str = "active", status: str | None = None) -> list[dict]:
+    """Список заявок для веб-таблицы (как `db.get_applications`)."""
+    return await db.get_applications(tab, status)
+
+
+async def get_status_counts() -> dict[str, int]:
+    """Счётчики по статусам для дашборда (pending / approved / rework / total)."""
+    return await db.get_application_status_counts()
+
+
+async def list_user_applications(user_id: int) -> list[dict]:
+    """Заявки пользователя (как `db.get_user_apps`)."""
+    return await db.get_user_apps(user_id)
+
+
+async def delete_application(app_id: int) -> None:
+    await db.delete_app(app_id)
+
+
+async def mark_application_started(app_id: int) -> None:
+    await db.set_t_start(app_id)
+
+
+async def reset_draft_for_new_session(app_id: int) -> None:
+    """Чистый черновик для нового /start или «Начать заново» (без контекста старого режима)."""
+    await db.reset_draft_content(app_id)
+    await invalidate_pdf_cache(app_id)
+
+
+async def save_block(app_id: int, block_num: int | str, text: str) -> None:
+    await db.save_block(app_id, block_num, text)
+    await invalidate_pdf_cache(app_id)
+
+
+async def save_all_blocks(app_id: int, blocks: dict) -> None:
+    await db.save_all_blocks(app_id, blocks)
+    await invalidate_pdf_cache(app_id)
+
+
+async def get_chat_history(app_id: int) -> list:
+    return await db.get_chat_history(app_id)
+
+
+async def save_chat_history(app_id: int, history: list) -> None:
+    await db.save_chat_history(app_id, history)
+
+
+async def get_last_rework_application(user_id: int) -> Application | None:
+    raw = await db.get_last_rework_app(user_id)
+    if not raw:
+        return None
+    return Application.model_validate(raw)
+
+
+async def invalidate_application_pdf_cache(app_id: int) -> None:
+    await invalidate_pdf_cache(app_id)
+
+
+async def get_application(app_id: int) -> Application | None:
+    """Возвращает заявку как `Application` или `None`."""
+    raw = await db.get_app(app_id)
+    if not raw:
+        return None
+    return Application.model_validate(raw)
+
+
+async def get_or_create_draft(user_id: int, username: str | None) -> int:
+    """Находит черновик пользователя или создаёт новый; возвращает `id`."""
+    return await db.get_or_create_app(user_id, username)
+
+
+async def submit_to_review(
+    app_id: int, *, pdf_file_id: str | None = None
+) -> None:
+    """Переводит заявку в `pending`, фиксирует время подачи."""
+    await db.update_status(app_id, "pending", pdf_file_id=pdf_file_id)
+    await db.set_t_submit(app_id)
+
+
+async def update_submission_pdf_reference(app_id: int, pdf_file_id: str) -> None:
+    """Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в Telegram)."""
+    await db.update_status(app_id, "pending", pdf_file_id=pdf_file_id)
+
+
+async def approve(app_id: int) -> Application | None:
+    """Согласование заявки."""
+    await db.update_status(app_id, "approved")
+    await db.set_t_decision(app_id)
+    return await get_application(app_id)
+
+
+async def send_for_rework(app_id: int, feedback: str) -> Application | None:
+    """Возврат на доработку с комментарием."""
+    await db.update_status(app_id, "rework", feedback=feedback)
+    await db.set_t_decision(app_id)
+    await db.increment_reject_count(app_id)
+    await invalidate_pdf_cache(app_id)
+    return await get_application(app_id)
+
+
+async def append_attachments(
+    app_id: int, new: ApplicationAttachment
+) -> list[ApplicationAttachment]:
+    """Добавляет вложение к заявке и сохраняет в БД."""
+    app = await get_application(app_id)
+    if not app:
+        raise ValueError(f"application {app_id} not found")
+    merged = [*app.attachments, new]
+    await db.save_attachments(app_id, [a.model_dump() for a in merged])
+    await invalidate_pdf_cache(app_id)
+    return merged

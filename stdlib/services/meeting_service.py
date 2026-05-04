@@ -39,6 +39,11 @@ async def get_by_id(meeting_id: int) -> Meeting | None:
     return Meeting.model_validate(row)
 
 
+async def delete_meeting(meeting_id: int) -> bool:
+    """Удаляет заседание; True если запись существовала и удалена."""
+    return await db.delete_meeting_by_id(meeting_id)
+
+
 async def create_meeting_with_applications(
     scheduled_date: date,
     created_by: int,

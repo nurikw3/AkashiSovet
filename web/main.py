@@ -521,6 +521,7 @@ async def meetings_list(
     request: Request,
     admin_id=Depends(get_admin),
     created: str | None = None,
+    deleted: str | None = None,
 ):
     upcoming = await meeting_service.get_upcoming()
     past = await meeting_service.get_past()
@@ -532,6 +533,7 @@ async def meetings_list(
             "upcoming": upcoming,
             "past": past,
             "created_ok": created == "1",
+            "deleted_ok": deleted == "1",
             "meeting_err": request.query_params.get("meeting_err"),
         },
     )
@@ -551,6 +553,16 @@ async def meeting_detail_page(
         name="meeting_detail.html",
         context={"request": request, "meeting": meeting, "apps": apps},
     )
+
+
+@app.post("/meetings/{meeting_id}/delete")
+async def meeting_delete(meeting_id: int, admin_id=Depends(get_admin)):
+    """Удаление заседания (только суперпользователь)."""
+    deleted = await meeting_service.delete_meeting(meeting_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Заседание не найдено")
+    logger.info("meeting {} deleted by admin {}", meeting_id, admin_id)
+    return RedirectResponse(url="/meetings?deleted=1", status_code=303)
 
 
 @app.get("/applications/{app_id}", response_class=HTMLResponse)

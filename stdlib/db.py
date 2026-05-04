@@ -548,6 +548,15 @@ async def get_meeting_by_id(meeting_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+async def delete_meeting_by_id(meeting_id: int) -> bool:
+    """Удаляет заседание по id. Возвращает True, если строка была удалена."""
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "DELETE FROM meetings WHERE id = $1 RETURNING id", meeting_id
+        )
+    return row is not None
+
+
 def _parse_application_ids_jsonb(v) -> list[int]:
     if v is None:
         return []

@@ -8,6 +8,12 @@
     </div>
     {% endif %}
 
+    {% if deleted_ok %}
+    <div class="mb-6 px-5 py-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
+        ✓ Заседание удалено
+    </div>
+    {% endif %}
+
     {% if meeting_err %}
     <div class="mb-6 px-5 py-4 rounded-2xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
         {{ meeting_err }}

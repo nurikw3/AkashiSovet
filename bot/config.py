@@ -11,6 +11,9 @@ class Settings(BaseSettings):
 
     DB_PATH: str = "./app.db"
     DATABASE_URL: str = ""
+    # asyncpg: поднимайте max_size под ожидаемый параллелизм; max_connections в Postgres ≥ max + запас
+    DB_POOL_MIN_SIZE: int = 2
+    DB_POOL_MAX_SIZE: int = 30
 
     REDIS_URL: str = "redis://localhost:6379/0"
 

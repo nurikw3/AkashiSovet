@@ -2,6 +2,8 @@
 PDF-генерация служебной записки через ReportLab с фоном из шаблона.
 """
 
+import asyncio
+import hashlib
 import re
 import io
 import json
@@ -32,7 +34,12 @@ from datetime import datetime
 from bot.logger import logger
 import stdlib.db as db
 import stdlib.s3 as s3
-from stdlib.template import ApplicationTemplate, get_template
+from stdlib.template import (
+    ApplicationTemplate,
+    PDF_TEMPLATE_REVISION_KEY,
+    get_template,
+)
+import stdlib.redis_client as redis_client_module
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
@@ -69,6 +76,50 @@ if not _font_registered:
 
 LOGO_PATH = ASSETS_DIR / "image1.png"
 FOOTER_PATH = ASSETS_DIR / "image2.png"
+
+# Redis хранит SHA256-токен версии PDF; байты лежат в S3 по `pdf_key(user_id, app_id)`.
+PDF_CACHE_KEY_FMT = "pdf_cache:{app_id}"
+PDF_CACHE_TTL_SEC = 7 * 24 * 3600
+
+
+def _pdf_cache_token(
+    app_raw: dict,
+    full_name: str | None,
+    position: str | None,
+    sig_ref: str | None,
+    tpl: ApplicationTemplate,
+    template_revision: str,
+) -> str:
+    blocks = app_raw.get("blocks") or ""
+    attachments = app_raw.get("attachments") or ""
+    updated_at = str(app_raw.get("updated_at") or "")
+    tpl_json = json.dumps(
+        [b.model_dump(mode="json") for b in tpl.blocks],
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    parts = [
+        updated_at,
+        str(blocks),
+        str(attachments),
+        full_name or "",
+        position or "",
+        sig_ref or "",
+        tpl_json,
+        template_revision,
+    ]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+async def _get_pdf_template_revision() -> str:
+    r = redis_client_module.redis_client
+    if not r:
+        return "0"
+    try:
+        v = await r.get(PDF_TEMPLATE_REVISION_KEY)
+        return v if v is not None else "0"
+    except Exception:
+        return "0"
 
 
 # ─── Стили ───────────────────────────────────────────────────────────────────
@@ -296,6 +347,143 @@ class _LastPageCanvas(Canvas):
 
 
 # ─── Генерация ────────────────────────────────────────────────────────────────
+def _generate_pdf_sync(
+    data: dict,
+    tpl: ApplicationTemplate | None,
+    blocks_map: dict[str, str] | None,
+    signature_bytes: bytes | None,
+) -> BytesIO:
+    """Синхронная сборка PDF (ReportLab). Вызывать через ``asyncio.to_thread``."""
+    if not data:
+        data = {}
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=3 * cm,
+        rightMargin=2.5 * cm,
+        topMargin=4.5 * cm,
+        bottomMargin=3.5 * cm,
+    )
+
+    s = _styles()
+    story = []
+
+    # ── Шапка ──
+    story.append(Paragraph("Членам Правления", s["header"]))
+    story.append(Paragraph("ПК «AKASHI Data Center PLC»", s["header"]))
+
+    # ── Заголовок ──
+    story.append(Paragraph("СЛУЖЕБНАЯ ЗАПИСКА", s["title"]))
+    if tpl is not None and blocks_map is not None and tpl.blocks:
+        topic = blocks_map.get(str(tpl.blocks[0].id), "") or "Без темы"
+    else:
+        topic = data.get("topic") or ""
+    topic = _normalize_pdf_user_text(topic)
+    story.append(Paragraph(f"по вопросу «{topic}»", s["subtitle"]))
+
+    # ── Текстовые блоки ──
+    if tpl is not None and blocks_map is not None:
+        for sec_idx, block in enumerate(tpl.blocks[1:], start=1):
+            raw = blocks_map.get(str(block.id), "")
+            body = _normalize_risk_placeholder(block.title, raw)
+            _append_section_paragraphs(story, f"{sec_idx}. {block.title}:", body, s)
+        attach_num = len(tpl.blocks)
+    else:
+        risks_raw = data.get("risks") or ""
+        risks_text = (
+            "(не применимо)"
+            if risks_raw.lower().strip() == "не применимо"
+            else risks_raw
+        )
+        sections = [
+            ("1. Краткое описание и суть вопроса:", data.get("description") or ""),
+            ("2. Основание для вынесения:", data.get("basis") or ""),
+            (
+                "3. Предлагаемое решение / варианты решений:",
+                data.get("solution") or "",
+            ),
+            ("4. Риски и последствия (если актуально):", risks_text),
+        ]
+        for sec_title, body in sections:
+            _append_section_paragraphs(story, sec_title, body, s)
+        attach_num = 5
+
+    # ── Приложения ──
+    story.append(
+        Paragraph(
+            f"{attach_num}. Приложения / дополнительные материалы:",
+            s["section_title"],
+        )
+    )
+
+    attachments = _parse_attachments_field(data.get("attachments"))
+
+    if attachments and isinstance(attachments, list) and len(attachments) > 0:
+        items = [
+            ListItem(Paragraph(_normalize_pdf_user_text(str(name)), s["body"]))
+            for name in attachments
+            if str(name).strip()
+        ]
+        if items:
+            story.append(
+                ListFlowable(items, bulletType="bullet", start="•", leftIndent=15)
+            )
+        else:
+            story.append(Paragraph("(приложения не прикреплены)", s["body"]))
+    else:
+        story.append(Paragraph("(приложения не прикреплены)", s["body"]))
+
+    # ── Подвал (подпись) ──
+    story.append(PageBreak())
+    story.append(Spacer(1, 40))
+
+    username = _normalize_pdf_user_text(
+        str(
+            data.get("full_name")
+            or data.get("fio")
+            or data.get("username")
+            or data.get("name")
+            or "Неизвестно"
+        )
+    )
+    position = _normalize_pdf_user_text(
+        str(data.get("position") or "Руководитель подразделения")
+    )
+    date = str(data.get("date") or "__.__.____")
+
+    story.append(Paragraph(f"<b>{position}:</b>", s["body"]))
+
+    # Небольшой отступ после должности
+    story.append(Spacer(1, 5))
+
+    if signature_bytes:
+        try:
+            sig_stream = io.BytesIO(signature_bytes)
+            # Ограничиваем размер картинки
+            sig_img = RLImage(sig_stream, width=4 * cm, height=2 * cm)
+            sig_img.hAlign = "LEFT"
+            story.append(sig_img)
+
+            # 🔥 МАГИЯ: Отрицательный отступ! Подтягиваем линию ВВЕРХ под картинку
+            story.append(Spacer(1, -1 * cm))
+        except Exception as e:
+            logger.warning("PDF: Ошибка вставки картинки подписи: {}", e)
+            story.append(Spacer(1, 1.5 * cm))
+    else:
+        story.append(Spacer(1, 1.5 * cm))
+
+    story.append(Paragraph(f"________________ /{username}/", s["body"]))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"<b>Дата:</b> {date}", s["body"]))
+
+    doc.build(story, canvasmaker=_LastPageCanvas)
+
+    buffer.seek(0)
+    return buffer
+
+
 async def generate_pdf(
     data: dict,
     user_id: int | None = None,
@@ -319,132 +507,9 @@ async def generate_pdf(
             except Exception:
                 signature_bytes = None
 
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            leftMargin=3 * cm,
-            rightMargin=2.5 * cm,
-            topMargin=4.5 * cm,
-            bottomMargin=3.5 * cm,
+        buffer = await asyncio.to_thread(
+            _generate_pdf_sync, data, tpl, blocks_map, signature_bytes
         )
-
-        s = _styles()
-        story = []
-
-        # ── Шапка ──
-        story.append(Paragraph("Членам Правления", s["header"]))
-        story.append(Paragraph("ПК «AKASHI Data Center PLC»", s["header"]))
-
-        # ── Заголовок ──
-        story.append(Paragraph("СЛУЖЕБНАЯ ЗАПИСКА", s["title"]))
-        if tpl is not None and blocks_map is not None and tpl.blocks:
-            topic = blocks_map.get(str(tpl.blocks[0].id), "") or "Без темы"
-        else:
-            topic = data.get("topic") or ""
-        topic = _normalize_pdf_user_text(topic)
-        story.append(Paragraph(f"по вопросу «{topic}»", s["subtitle"]))
-
-        # ── Текстовые блоки ──
-        if tpl is not None and blocks_map is not None:
-            for sec_idx, block in enumerate(tpl.blocks[1:], start=1):
-                raw = blocks_map.get(str(block.id), "")
-                body = _normalize_risk_placeholder(block.title, raw)
-                _append_section_paragraphs(
-                    story, f"{sec_idx}. {block.title}:", body, s
-                )
-            attach_num = len(tpl.blocks)
-        else:
-            risks_raw = data.get("risks") or ""
-            risks_text = (
-                "(не применимо)"
-                if risks_raw.lower().strip() == "не применимо"
-                else risks_raw
-            )
-            sections = [
-                ("1. Краткое описание и суть вопроса:", data.get("description") or ""),
-                ("2. Основание для вынесения:", data.get("basis") or ""),
-                (
-                    "3. Предлагаемое решение / варианты решений:",
-                    data.get("solution") or "",
-                ),
-                ("4. Риски и последствия (если актуально):", risks_text),
-            ]
-            for sec_title, body in sections:
-                _append_section_paragraphs(story, sec_title, body, s)
-            attach_num = 5
-
-        # ── Приложения ──
-        story.append(
-            Paragraph(
-                f"{attach_num}. Приложения / дополнительные материалы:",
-                s["section_title"],
-            )
-        )
-
-        attachments = _parse_attachments_field(data.get("attachments"))
-
-        if attachments and isinstance(attachments, list) and len(attachments) > 0:
-            items = [
-                ListItem(Paragraph(_normalize_pdf_user_text(str(name)), s["body"]))
-                for name in attachments
-                if str(name).strip()
-            ]
-            if items:
-                story.append(
-                    ListFlowable(items, bulletType="bullet", start="•", leftIndent=15)
-                )
-            else:
-                story.append(Paragraph("(приложения не прикреплены)", s["body"]))
-        else:
-            story.append(Paragraph("(приложения не прикреплены)", s["body"]))
-
-        # ── Подвал (подпись) ──
-        story.append(PageBreak())
-        story.append(Spacer(1, 40))
-
-        username = _normalize_pdf_user_text(
-            str(
-                data.get("full_name")
-                or data.get("fio")
-                or data.get("username")
-                or data.get("name")
-                or "Неизвестно"
-            )
-        )
-        position = _normalize_pdf_user_text(
-            str(data.get("position") or "Руководитель подразделения")
-        )
-        date = str(data.get("date") or "__.__.____")
-
-        story.append(Paragraph(f"<b>{position}:</b>", s["body"]))
-
-        # Небольшой отступ после должности
-        story.append(Spacer(1, 5))
-
-        if signature_bytes:
-            try:
-                sig_stream = io.BytesIO(signature_bytes)
-                # Ограничиваем размер картинки
-                sig_img = RLImage(sig_stream, width=4 * cm, height=2 * cm)
-                sig_img.hAlign = "LEFT"
-                story.append(sig_img)
-
-                # 🔥 МАГИЯ: Отрицательный отступ! Подтягиваем линию ВВЕРХ под картинку
-                story.append(Spacer(1, -1 * cm))
-            except Exception as e:
-                logger.warning("PDF: Ошибка вставки картинки подписи: {}", e)
-                story.append(Spacer(1, 1.5 * cm))
-        else:
-            story.append(Spacer(1, 1.5 * cm))
-
-        story.append(Paragraph(f"________________ /{username}/", s["body"]))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(f"<b>Дата:</b> {date}", s["body"]))
-
-        doc.build(story, canvasmaker=_LastPageCanvas)
-
-        buffer.seek(0)
         logger.info("PDF generated successfully for app_id={}", data.get("app_id"))
         return buffer
 
@@ -468,12 +533,24 @@ def generate_pdf_filename(
 
 
 async def invalidate_pdf_cache(app_id: int) -> None:
-    """Инвалидирует кэш PDF для заявки после изменения данных.
+    """Сбрасывает Redis-токен и удаляет объект PDF в S3 для заявки."""
+    r = redis_client_module.redis_client
+    cache_key = PDF_CACHE_KEY_FMT.format(app_id=app_id)
+    if r:
+        try:
+            await r.delete(cache_key)
+        except Exception as e:
+            logger.warning("invalidate_pdf_cache redis delete app_id={}: {}", app_id, e)
 
-    Сейчас `get_app_pdf_buffer` всегда генерирует PDF заново; при появлении
-    Redis-кэша для PDF добавьте сюда удаление ключей.
-    """
-    _ = app_id
+    row = await db.get_app(app_id)
+    if not row or not s3.is_s3_configured():
+        return
+    uid = row["user_id"]
+    key = s3.pdf_key(uid, app_id)
+    try:
+        await s3.delete_object(key, s3.BUCKET_PDF)
+    except Exception as e:
+        logger.warning("invalidate_pdf_cache s3 delete app_id={} key={}: {}", app_id, key, e)
 
 
 async def get_app_pdf_buffer(app_id: int) -> BytesIO:
@@ -491,6 +568,25 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
         blocks = {}
 
     tpl = await get_template()
+    full_name = await db.get_user_full_name(u_id)
+    position = await db.get_user_position(u_id)
+    sig_ref = await db.get_user_signature(u_id)
+    tpl_rev = await _get_pdf_template_revision()
+    token = _pdf_cache_token(app_raw, full_name, position, sig_ref, tpl, tpl_rev)
+
+    r = redis_client_module.redis_client
+    cache_key = PDF_CACHE_KEY_FMT.format(app_id=app_id)
+    if r and s3.is_s3_configured():
+        try:
+            cached = await r.get(cache_key)
+            if cached == token:
+                pdf_key = s3.pdf_key(u_id, app_id)
+                pdf_bytes = await s3.download_bytes(pdf_key, s3.BUCKET_PDF)
+                if pdf_bytes:
+                    logger.debug("PDF cache hit app_id={}", app_id)
+                    return BytesIO(pdf_bytes)
+        except Exception as e:
+            logger.warning("PDF cache read failed app_id={}: {}", app_id, e)
 
     raw_att = app_raw.get("attachments")
     clean_atts = []
@@ -510,11 +606,22 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     pdf_data = {
         "app_id": app_id,
         "attachments": clean_atts,
-        "full_name": await db.get_user_full_name(u_id),
-        "position": await db.get_user_position(u_id),
+        "full_name": full_name,
+        "position": position,
         "date": app_raw["created_at"].strftime("%d.%m.%Y"),
     }
 
-    return await generate_pdf(
-        pdf_data, user_id=u_id, tpl=tpl, blocks_map=blocks
-    )
+    buf = await generate_pdf(pdf_data, user_id=u_id, tpl=tpl, blocks_map=blocks)
+
+    if r and s3.is_s3_configured():
+        try:
+            body = buf.getvalue()
+            await s3.upload_bytes(
+                body, s3.pdf_key(u_id, app_id), s3.BUCKET_PDF, "application/pdf"
+            )
+            await r.set(cache_key, token, ex=PDF_CACHE_TTL_SEC)
+        except Exception as e:
+            logger.warning("PDF cache store failed app_id={}: {}", app_id, e)
+
+    buf.seek(0)
+    return buf

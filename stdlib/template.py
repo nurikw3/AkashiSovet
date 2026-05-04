@@ -13,6 +13,8 @@ from stdlib.resources import get_redis
 APP_TEMPLATE_KEY = "app_template"
 REDIS_TEMPLATE_CACHE_KEY = "settings:app_template"
 TEMPLATE_CACHE_TTL_SEC = 300
+# Инкремент при сохранении шаблона — попадает в токен кэша PDF (stdlib/pdf.py).
+PDF_TEMPLATE_REVISION_KEY = "pdf:template_revision"
 
 
 class BlockDefinition(BaseModel):
@@ -161,7 +163,18 @@ async def invalidate_template_cache() -> None:
         logger.warning("invalidate_template_cache: {}", e)
 
 
+async def _bump_pdf_template_revision() -> None:
+    r = get_redis()
+    if not r:
+        return
+    try:
+        await r.incr(PDF_TEMPLATE_REVISION_KEY)
+    except Exception as e:
+        logger.warning("bump pdf template revision: {}", e)
+
+
 async def persist_template(template: ApplicationTemplate) -> None:
     """Сохраняет шаблон в `settings` и сбрасывает Redis-кэш."""
     await db.upsert_setting(APP_TEMPLATE_KEY, template.model_dump(mode="json"))
     await invalidate_template_cache()
+    await _bump_pdf_template_revision()

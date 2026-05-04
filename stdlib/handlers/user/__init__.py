@@ -1,6 +1,7 @@
 from aiogram import Router
 
 from stdlib.handlers.user.start import router as start_router
+from stdlib.handlers.user.my_apps import router as my_apps_router
 from stdlib.handlers.user.filling import router as filling_router
 from stdlib.handlers.user.free_form import router as free_form_router
 from stdlib.handlers.user.files import router as files_router
@@ -10,6 +11,7 @@ from stdlib.handlers.user.common import router as common_router
 
 router = Router()
 router.include_router(start_router)
+router.include_router(my_apps_router)
 router.include_router(common_router)
 router.include_router(filling_router)
 router.include_router(free_form_router)

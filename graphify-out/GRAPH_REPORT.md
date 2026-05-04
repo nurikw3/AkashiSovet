@@ -1,16 +1,16 @@
 # Graph Report - AkashiSovet  (2026-05-04)
 
 ## Corpus Check
-- 55 files · ~73,535 words
+- 56 files · ~73,745 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1003 nodes · 1379 edges · 71 communities detected
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 128 edges (avg confidence: 0.76)
+- 1020 nodes · 1399 edges · 81 communities detected
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 131 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c1e04675`
+- Built from commit: `a14a4dbe`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -82,17 +82,27 @@
 - [[_COMMUNITY_Community 64|Community 64]]
 - [[_COMMUNITY_Community 65|Community 65]]
 - [[_COMMUNITY_Community 66|Community 66]]
+- [[_COMMUNITY_Community 67|Community 67]]
+- [[_COMMUNITY_Community 68|Community 68]]
 - [[_COMMUNITY_Community 69|Community 69]]
-- [[_COMMUNITY_Community 96|Community 96]]
-- [[_COMMUNITY_Community 97|Community 97]]
-- [[_COMMUNITY_Community 98|Community 98]]
+- [[_COMMUNITY_Community 70|Community 70]]
+- [[_COMMUNITY_Community 71|Community 71]]
+- [[_COMMUNITY_Community 72|Community 72]]
+- [[_COMMUNITY_Community 73|Community 73]]
+- [[_COMMUNITY_Community 74|Community 74]]
+- [[_COMMUNITY_Community 75|Community 75]]
+- [[_COMMUNITY_Community 76|Community 76]]
+- [[_COMMUNITY_Community 79|Community 79]]
+- [[_COMMUNITY_Community 106|Community 106]]
+- [[_COMMUNITY_Community 107|Community 107]]
+- [[_COMMUNITY_Community 108|Community 108]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `_pool_conn()` - 43 edges
 2. `get_template()` - 33 edges
-3. `get_app_pdf_buffer()` - 25 edges
-4. `generate_pdf()` - 24 edges
-5. `invalidate_pdf_cache()` - 23 edges
+3. `get_app_pdf_buffer()` - 26 edges
+4. `generate_pdf()` - 25 edges
+5. `invalidate_pdf_cache()` - 24 edges
 6. `ApplicationTemplate` - 19 edges
 7. `get_user_apps()` - 17 edges
 8. `BaseModel` - 15 edges
@@ -111,71 +121,71 @@
 - `reject_app()` --calls--> `get_template()`  [INFERRED]
   web/main.py → stdlib/template.py
 
-## Communities (99 total, 8 thin omitted)
+## Communities (109 total, 9 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (48): ApplicationTemplate, BaseModel, _normalize_submit_memo_args(), process_free_form_chat(), Free-form диалог для сбора данных заявки., Application, ApplicationAttachment, ChatMessage (+40 more)
-
-### Community 1 - "Community 1"
 Cohesion: 0.06
 Nodes (36): bindToolbar(), build(), initCalendarPage(), applyDefaults(), buildAll(), initCharts(), tokens(), start() (+28 more)
 
-### Community 2 - "Community 2"
+### Community 1 - "Community 1"
 Cohesion: 0.05
 Nodes (33): get_cached_llm_response(), save_llm_response_to_cache(), get_db_pool(), get_redis(), get_s3_session(), init_resources(), Единая инициализация и доступ к asyncpg-пулу, Redis и S3 (aiobotocore session)., Поднимает PostgreSQL, Redis (кэш/служебное) и проверяет бакеты S3. (+25 more)
 
-### Community 3 - "Community 3"
+### Community 2 - "Community 2"
 Cohesion: 0.11
 Nodes (28): _(), a(), b(), C(), D(), e(), f(), Ft() (+20 more)
 
-### Community 4 - "Community 4"
-Cohesion: 0.06
-Nodes (37): Локальное «настенное» время из форм (интерпретируем как Астану) → UTC для БД., wall_time_astana_to_utc(), _meeting_form_err_prefix(), meeting_update_schedule(), meetings_create(), _parse_meeting_schedule(), Создаёт заседание и прикрепляет отмеченные согласованные заявки., Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve (+29 more)
-
-### Community 5 - "Community 5"
+### Community 3 - "Community 3"
 Cohesion: 0.08
-Nodes (33): _block_label(), _build_messages(), format_text(), _make_cache_key(), Форматирование и генерация текста блоков через LLM., Изоляция кэша по заявке и блоку — одинаковый «test» не бьёт в чужой контекст., В ключ входят заявка (и user), иначе Redis отдаёт ответ от другой заявки с тем ж, _aget_text_prompt_client() (+25 more)
+Nodes (34): _block_label(), _build_messages(), format_text(), _make_cache_key(), Форматирование и генерация текста блоков через LLM., Изоляция кэша по заявке и блоку — одинаковый «test» не бьёт в чужой контекст., В ключ входят заявка (и user), иначе Redis отдаёт ответ от другой заявки с тем ж, В ключ входят заявка (и user), иначе Redis отдаёт ответ от другой заявки с тем ж (+26 more)
 
-### Community 6 - "Community 6"
+### Community 4 - "Community 4"
 Cohesion: 0.1
 Nodes (34): _app_attachments_prefix(), delete_app_files(), _delete_by_prefix(), delete_object(), delete_user_files(), download_bytes(), download_to_bytesio(), ensure_buckets() (+26 more)
 
-### Community 7 - "Community 7"
-Cohesion: 0.14
-Nodes (26): delete_app(), get_app(), get_chat_history(), get_draft_id_for_user(), get_last_rework_app(), get_or_create_app(), get_pending_apps(), get_user_full_name() (+18 more)
+### Community 5 - "Community 5"
+Cohesion: 0.12
+Nodes (29): delete_app(), get_app(), get_chat_history(), get_draft_id_for_user(), get_last_rework_app(), get_or_create_app(), get_pending_apps(), get_setting() (+21 more)
 
-### Community 8 - "Community 8"
+### Community 6 - "Community 6"
 Cohesion: 0.1
 Nodes (27): escape_markdown_v2(), is_delegation(), _block_title(), _get_context(), handle_block_input(), _handle_delegation(), _handle_format(), on_edit() (+19 more)
 
-### Community 9 - "Community 9"
+### Community 7 - "Community 7"
 Cohesion: 0.08
 Nodes (10): BotStates, finalize_and_notify(), on_confirm(), on_files_done(), on_review_submit(), on_rework_submit(), send_review_screen(), States (+2 more)
 
-### Community 10 - "Community 10"
-Cohesion: 0.13
-Nodes (22): build_files_step_message(), build_review_text_snapshot(), chunk_plain_text(), format_blocks_plain_copy(), html_pre_block(), Единое текстовое представление блоков заявки (plain + HTML с <pre> для Telegram), Все блоки подряд: нумерация, заголовок шаблона, текст — удобно копировать., Один экранированный блок <pre> (parse_mode=HTML). (+14 more)
-
-### Community 11 - "Community 11"
+### Community 8 - "Community 8"
 Cohesion: 0.14
 Nodes (19): ensure_app_tz(), format_app_date_only(), format_app_datetime(), Единый часовой пояс приложения: Казахстан (Астана / единое время РК), IANA `Asia, Приводит `datetime` к `APP_TIMEZONE` (для вывода пользователю)., cb_back(), cb_del(), cb_del_ok() (+11 more)
 
-### Community 12 - "Community 12"
+### Community 9 - "Community 9"
+Cohesion: 0.1
+Nodes (14): get_template(), Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, cb_rework_start(), on_rework_confirmed() (+6 more)
+
+### Community 10 - "Community 10"
+Cohesion: 0.1
+Nodes (19): Canvas, draw_background(), _LastPageCanvas, Логотип на всех страницах кроме последней., Обычный Canvas, подпись теперь рисуется в самом тексте., Логотип на всех страницах кроме последней., Логотип на всех страницах кроме последней., Логотип на всех страницах кроме последней. (+11 more)
+
+### Community 11 - "Community 11"
 Cohesion: 0.1
 Nodes (21): add_applications(), create_meeting(), create_meeting_with_applications(), delete_meeting(), get_by_id(), get_past(), get_upcoming(), Заседания Правления: создание, списки предстоящих/прошедших, добавление заявок в (+13 more)
 
+### Community 12 - "Community 12"
+Cohesion: 0.1
+Nodes (20): main(), generate_pdf(), _load_signature_for_user(), Генерирует PDF служебной записки с авто-подписью., Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., Генерирует PDF служебной записки с авто-подписью.      Заявка из БД: передайте `, Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные. (+12 more)
+
 ### Community 13 - "Community 13"
+Cohesion: 0.14
+Nodes (12): application_detail_page(), approve_app(), _clean_attachments(), dashboard(), _get_hashed_password(), login(), meeting_detail_page(), _parse_app() (+4 more)
+
+### Community 14 - "Community 14"
 Cohesion: 0.11
 Nodes (20): get_meeting_by_id(), list_meetings_past(), list_meetings_upcoming(), Заседания с датой >= сегодня (по календарю БД), ближайшие первыми., Прошедшие заседания, от новых к старым., Создаёт заседание; возвращает строку как dict (RETURNING *)., Заседания с датой >= сегодня (по календарю БД), ближайшие первыми., Заседания с датой >= сегодня (по календарю БД), ближайшие первыми. (+12 more)
 
-### Community 14 - "Community 14"
-Cohesion: 0.12
-Nodes (19): main(), _append_section_paragraphs(), generate_pdf(), _generate_pdf_sync(), _normalize_pdf_user_text(), _normalize_risk_placeholder(), _parse_attachments_field(), Генерирует PDF служебной записки с авто-подписью. (+11 more)
-
 ### Community 15 - "Community 15"
-Cohesion: 0.16
-Nodes (9): application_detail_page(), approve_app(), _clean_attachments(), dashboard(), meeting_detail_page(), _parse_app(), _render_row(), template_editor_save() (+1 more)
+Cohesion: 0.12
+Nodes (14): ApplicationTemplate, Application, ApplicationAttachment, Meeting, Централизованные Pydantic-модели домена (заявки, пользователи, шаблон, заседания, Динамический шаблон структуры заявки (блоки — см. `stdlib.template.ApplicationTe, Заседание Правления: планируемая сущность из `meetings` (id — после появления та, Динамический шаблон структуры заявки (блоки — см. `stdlib.template.ApplicationTe (+6 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.12
@@ -187,198 +197,234 @@ Nodes (17): download_attachment(), download_attachment_bytesio(), _object_key_co
 
 ### Community 18 - "Community 18"
 Cohesion: 0.12
-Nodes (12): clear_application_chat_history(), get_application_record(), get_draft_application_id_for_user(), get_status_counts(), list_user_applications(), Операции с заявкой: создание черновика, смена статуса, отправка на согласование,, Сырая строка из БД (как `db.get_app`): нужна, где важен исходный JSON вложений (, Обнуляет историю free-form / LLM по заявке. (+4 more)
+Nodes (16): get_app_pdf_buffer(), _get_pdf_template_revision(), _pdf_cache_token(), Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Отдаёт PDF из S3 (если есть флаг в Redis) или генерирует заново.     Redis храни, Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Отдаёт PDF из S3 (если есть флаг в Redis) или генерирует заново.     Redis храни (+8 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.12
-Nodes (14): generate_pdf_filename(), Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., now_app() (+6 more)
+Nodes (16): invalidate_application_pdf_cache(), Сохраняет список вложений как в БД (в т.ч. реестр файлов из Telegram до выгрузки, save_attachments_payload(), _cache_key(), _get_redis(), invalidate_pdf_cache(), Инвалидирует кэш PDF для заявки после изменения данных.      Сейчас `get_app_pdf, Инвалидирует кэш PDF для заявки после изменения данных.      Сейчас `get_app_pdf (+8 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.12
-Nodes (16): invalidate_application_pdf_cache(), Сохраняет список вложений как в БД (в т.ч. реестр файлов из Telegram до выгрузки, save_all_blocks(), save_attachments_payload(), _cache_key(), _get_redis(), invalidate_pdf_cache(), Инвалидирует кэш PDF для заявки после изменения данных.      Сейчас `get_app_pdf (+8 more)
+Cohesion: 0.2
+Nodes (14): build_files_step_message(), build_review_text_snapshot(), chunk_plain_text(), format_blocks_plain_copy(), html_pre_block(), Единое текстовое представление блоков заявки (plain + HTML с <pre> для Telegram), Все блоки подряд: нумерация, заголовок шаблона, текст — удобно копировать., Один экранированный блок <pre> (parse_mode=HTML). (+6 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.14
-Nodes (14): get_user_apps(), Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict. (+6 more)
+Cohesion: 0.13
+Nodes (9): clear_application_chat_history(), get_application_record(), get_draft_application_id_for_user(), Операции с заявкой: создание черновика, смена статуса, отправка на согласование,, Сырая строка из БД (как `db.get_app`): нужна, где важен исходный JSON вложений (, Обнуляет историю free-form / LLM по заявке., `id` черновика пользователя, если есть., save_all_blocks() (+1 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.14
 Nodes (14): get_application_status_counts(), Проверяет код и сбрасывает его., Проверяет код и сбрасывает его., Проверяет код и сбрасывает его., Проверяет код и сбрасывает его., Проверяет код и сбрасывает его., Проверяет код и сбрасывает его., Агрегаты по заявкам: pending, approved, rework и всего строк (для виджетов панел (+6 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.19
-Nodes (13): _build_pdf_sync(), _get_pdf_template_revision(), _load_signature_for_user(), _normalize_blocks_payload(), _pdf_cache_token(), PDF-генерация служебной записки через ReportLab с фоном из шаблона., Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → «, Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → « (+5 more)
+Cohesion: 0.14
+Nodes (14): get_user_apps(), Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict., Возвращает заявки пользователя как список dict. (+6 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.15
-Nodes (13): meeting_delete(), meeting_reschedule(), Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь)., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь). (+5 more)
+Cohesion: 0.25
+Nodes (8): BaseModel, AskUser, FormatResult, FormattedBlock, LLMComplete, LLMIncomplete, SubmitMemo, ApplicationTemplate
 
 ### Community 25 - "Community 25"
-Cohesion: 0.26
-Nodes (10): _cancel_button(), confirm_keyboard(), confirm_rework_keyboard(), files_keyboard(), _kb_text(), Кнопки привязаны к номеру блока — после перехода на следующий блок старые «Испра, Кнопки привязаны к номеру блока — иначе после перехода к следующему шагу «Исправ, restart_or_continue_keyboard() (+2 more)
+Cohesion: 0.24
+Nodes (13): _append_section_paragraphs(), _build_pdf_sync(), _generate_pdf_sync(), _normalize_pdf_user_text(), _normalize_risk_placeholder(), _parse_attachments_field(), PDF-генерация служебной записки через ReportLab с фоном из шаблона., Синхронная сборка PDF (ReportLab). Вызывать через ``asyncio.to_thread``. (+5 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.15
-Nodes (13): get_app_pdf_buffer(), Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Отдаёт PDF из S3 (если есть флаг в Redis) или генерирует заново.     Redis храни, Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Отдаёт PDF из S3 (если есть флаг в Redis) или генерирует заново.     Redis храни, Универсальная функция подготовки и генерации PDF для заявки.     Единый источник, Отдаёт PDF из S3 (если есть флаг в Redis) или генерирует заново.     Redis храни (+5 more)
+Nodes (13): meeting_delete(), meeting_reschedule(), Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь)., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Удаление заседания (только суперпользователь)., Удаление заседания (только суперпользователь). (+5 more)
 
 ### Community 27 - "Community 27"
+Cohesion: 0.26
+Nodes (10): _cancel_button(), confirm_keyboard(), confirm_rework_keyboard(), files_keyboard(), _kb_text(), Кнопки привязаны к номеру блока — после перехода на следующий блок старые «Испра, Кнопки привязаны к номеру блока — иначе после перехода к следующему шагу «Исправ, restart_or_continue_keyboard() (+2 more)
+
+### Community 28 - "Community 28"
 Cohesion: 0.17
 Nodes (12): get_applications_by_ids(), insert_meeting(), Создаёт заседание; возвращает строку как dict (RETURNING *)., Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id)., Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id)., Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id)., Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id)., Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id). (+4 more)
 
-### Community 28 - "Community 28"
-Cohesion: 0.2
-Nodes (11): get_template(), Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, Загружает шаблон заявки из `settings.app_template`.     Кэширует JSON в Redis на, cb_rework_start(), on_rework_confirmed() (+3 more)
-
 ### Community 29 - "Community 29"
-Cohesion: 0.18
-Nodes (11): dashboard_counters_partial(), Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки). (+3 more)
+Cohesion: 0.2
+Nodes (11): _normalize_submit_memo_args(), clean(), Очистка markdown в значениях перед model_validate., Очистка markdown и склеенных нумерованных списков перед model_validate., _strip_md(), strip_submit_memo_args(), strip_text(), expand_numbered_newlines() (+3 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.18
-Nodes (11): Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела (+3 more)
+Nodes (11): draw_last_page(), _escape_para_text(), Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., ReportLab Paragraph — экранирование XML-символов в пользовательском тексте., Логотип + футер — только на последней странице. (+3 more)
 
 ### Community 31 - "Community 31"
 Cohesion: 0.18
-Nodes (11): draw_background(), Логотип на всех страницах кроме последней., Логотип на всех страницах кроме последней., Логотип на всех страницах кроме последней., Логотип на всех страницах кроме последней., Для блока про риски сохраняем отображение «не применимо» как в старой вёрстке., Обычный Canvas, подпись теперь рисуется в самом тексте., Для блока про риски сохраняем отображение «не применимо» как в старой вёрстке. (+3 more)
+Nodes (11): dashboard_counters_partial(), Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)., Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки). (+3 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.18
-Nodes (11): append_attachments(), Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием., Добавляет вложение к заявке и сохраняет в БД., Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием., Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием. (+3 more)
+Cohesion: 0.2
+Nodes (9): broadcast_superusers_html(), notify_user_application_rework(), Отправка уведомлений пользователям через Telegram Bot API., Рассылает HTML всем суперпользователям (например при ошибке генерации PDF)., Уведомляет автора о возврате на доработку., is_superuser(), on_feedback(), on_reject() (+1 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.18
-Nodes (3): cmd_mode(), cmd_start(), on_restart_draft()
+Nodes (11): Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД)., Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела, Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела (+3 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.2
-Nodes (10): draw_last_page(), _escape_para_text(), Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., Логотип + футер — только на последней странице., ReportLab Paragraph — экранирование XML-символов в пользовательском тексте., Логотип + футер — только на последней странице. (+2 more)
+Cohesion: 0.18
+Nodes (11): append_attachments(), Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием., Добавляет вложение к заявке и сохраняет в БД., Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием., Добавляет вложение к заявке и сохраняет в БД., Возврат на доработку с комментарием. (+3 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.2
-Nodes (10): Переводит заявку в `pending`, фиксирует время подачи., Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в, Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в, Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в (+2 more)
+Nodes (10): meetings_create(), Создаёт заседание и прикрепляет отмеченные согласованные заявки., Создаёт заседание (дата+время) и при необходимости прикрепляет заявки., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Создаёт заседание и прикрепляет отмеченные согласованные заявки., Создаёт заседание и прикрепляет отмеченные согласованные заявки. (+2 more)
 
 ### Community 36 - "Community 36"
+Cohesion: 0.2
+Nodes (10): Локальное «настенное» время из форм (интерпретируем как Астану) → UTC для БД., wall_time_astana_to_utc(), _parse_meeting_schedule(), Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)., Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)., Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)., Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00)., Парсит `scheduled_at` (datetime-local) или устаревшее поле даты (10:00). (+2 more)
+
+### Community 37 - "Community 37"
+Cohesion: 0.2
+Nodes (10): get_or_create_draft(), Находит черновик пользователя или создаёт новый; возвращает `id`., Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в, Возвращает заявку как `Application` или `None`., Находит черновик пользователя или создаёт новый; возвращает `id`., Находит черновик пользователя или создаёт новый; возвращает `id`., Находит черновик пользователя или создаёт новый; возвращает `id`., Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в (+2 more)
+
+### Community 38 - "Community 38"
+Cohesion: 0.22
+Nodes (9): _meeting_form_err_prefix(), Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve, Куда редиректить ошибку валидации: страница списка заседаний или дашборд approve (+1 more)
+
+### Community 39 - "Community 39"
 Cohesion: 0.22
 Nodes (9): generate_web_login_code(), Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер)., Генерирует 6-значный код и сохраняет его в колонку mode (как временный буфер). (+1 more)
 
-### Community 37 - "Community 37"
+### Community 40 - "Community 40"
 Cohesion: 0.22
 Nodes (9): _normalize_list_text(), ReportLab Paragraph — экранирование XML-символов в пользовательском тексте., Нормализует разделители и пробелы, чтобы сплит по «; 2)» срабатывал стабильно., Нормализует разделители и пробелы, чтобы сплит по «; 2)» срабатывал стабильно., Нормализует разделители и пробелы, чтобы сплит по «; 2)» срабатывал стабильно., Делит один абзац на пункты, если LLM вставила «2)», «3.» в одну строку     или ч, Делит один абзац на пункты, если LLM вставила «2)», «3.» в одну строку     или ч, Делит один абзац на пункты, если LLM вставила «2)», «3.» в одну строку     или ч (+1 more)
 
-### Community 38 - "Community 38"
-Cohesion: 0.25
-Nodes (6): Canvas, _LastPageCanvas, Обычный Canvas, подпись теперь рисуется в самом тексте., Обычный Canvas, подпись теперь рисуется в самом тексте., Обычный Canvas, подпись теперь рисуется в самом тексте., Обычный Canvas, подпись теперь рисуется в самом тексте.
-
-### Community 39 - "Community 39"
+### Community 41 - "Community 41"
 Cohesion: 0.25
 Nodes (7): main(), Точка входа Telegram-бота AKASHI Data Center PLC. Включает: AIogram 3.7+, Redis, Задача APScheduler: ежедневный отчет суперюзерам., Задача APScheduler: ежедневный отчет суперюзерам., send_daily_report(), close_redis(), init_redis()
 
-### Community 40 - "Community 40"
+### Community 42 - "Community 42"
 Cohesion: 0.25
-Nodes (7): broadcast_superusers_html(), notify_user_application_approved(), Отправка уведомлений пользователям через Telegram Bot API., Уведомляет автора о согласовании.     Если передан `pdf_file_id` — отправляет до, Рассылает HTML всем суперпользователям (например при ошибке генерации PDF)., is_superuser(), on_approve()
+Nodes (8): _block_html_fragments(), build_blocks_summary_html(), chunk_blocks_summary_html(), HTML-тексты для Telegram (parse_mode=HTML): сводка по блокам заявки., Сводка всех блоков: заголовки жирным, текст блока в <pre> для удобного копирован, Сводка всех блоков: заголовки жирным, текст блока в <pre> для удобного копирован, Тот же формат, что ``build_blocks_summary_html``, но разбитый на несколько сообщ, Тот же формат, что ``build_blocks_summary_html``, но разбитый на несколько сообщ
 
-### Community 41 - "Community 41"
+### Community 43 - "Community 43"
+Cohesion: 0.22
+Nodes (9): generate_pdf_filename(), Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла., Генерирует стандартизированное имя для PDF-файла. (+1 more)
+
+### Community 44 - "Community 44"
+Cohesion: 0.22
+Nodes (6): now_app(), Текущие дата и время в часовом поясе приложения., finalize_and_notify(), on_review_edit(), on_review_submit(), on_rework_submit()
+
+### Community 45 - "Community 45"
+Cohesion: 0.25
+Nodes (8): meeting_update_schedule(), Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания)., Меняет дату и время заседания (форма из карточки заседания).
+
+### Community 46 - "Community 46"
 Cohesion: 0.25
 Nodes (8): get_daily_stats(), Возвращает статистику заявок за последние 24 часа., Возвращает статистику заявок за последние 24 часа., Возвращает статистику заявок за последние 24 часа., Возвращает статистику заявок за последние 24 часа., Агрегаты по заявкам (четыре статуса: draft, pending, rework, approved)., Агрегаты по заявкам (четыре статуса: draft, pending, rework, approved)., Агрегаты по заявкам (четыре статуса: draft, pending, rework, approved).
 
-### Community 42 - "Community 42"
+### Community 47 - "Community 47"
+Cohesion: 0.25
+Nodes (7): parse_admin_session(), Подписанная cookie админ-сессии (HMAC). Без секрета — только для разработки., Разбирает cookie; при WEB_SESSION_SECRET отвергает подделку., sign_admin_session(), get_admin(), login_page(), login_post()
+
+### Community 48 - "Community 48"
 Cohesion: 0.25
 Nodes (5): InterceptHandler, Централизованная настройка Loguru. Импортируй `logger` из этого модуля во всех ф, Настроить форматы вывода. Вызвать один раз при старте бота., Перенаправляет записи stdlib logging → loguru., setup_logging()
 
-### Community 43 - "Community 43"
+### Community 49 - "Community 49"
 Cohesion: 0.29
 Nodes (7): get_application_status_by_ids(), id заявки → status (только для существующих id из списка)., id заявки → status (только для существующих id из списка)., id заявки → status (только для существующих id из списка)., id заявки → status (только для существующих id из списка)., id заявки → status (только для существующих id из списка)., id заявки → status (только для существующих id из списка).
 
-### Community 44 - "Community 44"
+### Community 50 - "Community 50"
+Cohesion: 0.29
+Nodes (6): process_free_form_chat(), Free-form диалог для сбора данных заявки., build_submit_memo_model(), LLMError, Модель для OpenAI tool submit_memo: поля совпадают с блоками шаблона., Модель для OpenAI tool submit_memo: поля совпадают с блоками шаблона.
+
+### Community 51 - "Community 51"
 Cohesion: 0.29
 Nodes (7): approve(), get_application(), list_applications(), Список заявок для веб-таблицы (опционально один статус: draft/pending/rework/app, Возвращает заявку как `Application` или `None`., Возвращает заявку как `Application` или `None`., Возвращает заявку как `Application` или `None`.
 
-### Community 45 - "Community 45"
-Cohesion: 0.33
-Nodes (6): notify_user_application_rework(), Уведомляет автора о возврате на доработку., is_superuser(), on_feedback(), on_reject(), reject_app()
-
-### Community 46 - "Community 46"
+### Community 52 - "Community 52"
 Cohesion: 0.43
 Nodes (4): bumpTitleCount(), findInsertionIndex(), processPost(), uploadMedia()
 
-### Community 47 - "Community 47"
-Cohesion: 0.33
-Nodes (5): parse_admin_session(), Подписанная cookie админ-сессии (HMAC). Без секрета — только для разработки., Разбирает cookie; при WEB_SESSION_SECRET отвергает подделку., get_admin(), login_page()
-
-### Community 48 - "Community 48"
+### Community 53 - "Community 53"
 Cohesion: 0.33
 Nodes (6): download_file(), download_tg_attachment(), Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3)., Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3)., Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3)., Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3).
 
-### Community 49 - "Community 49"
+### Community 54 - "Community 54"
 Cohesion: 0.33
-Nodes (6): get_or_create_draft(), Находит черновик пользователя или создаёт новый; возвращает `id`., Возвращает заявку как `Application` или `None`., Находит черновик пользователя или создаёт новый; возвращает `id`., Находит черновик пользователя или создаёт новый; возвращает `id`., Находит черновик пользователя или создаёт новый; возвращает `id`.
+Nodes (6): Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., Переводит заявку в `pending`, фиксирует время подачи., submit_to_review()
 
-### Community 51 - "Community 51"
-Cohesion: 0.4
-Nodes (5): sign_admin_session(), _get_hashed_password(), login(), login_post(), settings_page()
-
-### Community 52 - "Community 52"
+### Community 56 - "Community 56"
 Cohesion: 0.4
 Nodes (5): get_applications(), Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх., Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх., Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх., Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх.
 
-### Community 53 - "Community 53"
+### Community 57 - "Community 57"
 Cohesion: 0.4
-Nodes (5): Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные., _resolve_user_signature_bytes()
+Nodes (4): Возвращает ID следующего блока или None, если это последний, Возвращает ID следующего блока или None, если это последний, Возвращает ID следующего блока или None, если это последний, Возвращает ID следующего блока или None, если это последний
 
-### Community 54 - "Community 54"
+### Community 59 - "Community 59"
+Cohesion: 0.4
+Nodes (4): Возвращает ID предыдущего блока или None, если это первый, Возвращает ID предыдущего блока или None, если это первый, Возвращает ID предыдущего блока или None, если это первый, Возвращает ID предыдущего блока или None, если это первый
+
+### Community 60 - "Community 60"
+Cohesion: 0.4
+Nodes (5): _normalize_blocks_payload(), Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → «, Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → «, Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → «, Новый формат: `data['blocks']`. Старый тест/генератор: topic, description, … → «
+
+### Community 61 - "Community 61"
+Cohesion: 0.5
+Nodes (4): notify_user_application_approved(), Уведомляет автора о согласовании.     Если передан `pdf_file_id` — отправляет до, is_superuser(), on_approve()
+
+### Community 62 - "Community 62"
 Cohesion: 0.7
 Nodes (4): buildReplacementFigure(), findAdminatorFigure(), processPost(), uploadMedia()
 
-### Community 55 - "Community 55"
+### Community 63 - "Community 63"
 Cohesion: 0.5
 Nodes (4): clear_chat_history(), Сбрасывает free-form / LLM-историю по заявке (при /start, смене режима)., Сбрасывает free-form / LLM-историю по заявке (при /start, смене режима)., save_chat_history()
 
-### Community 56 - "Community 56"
+### Community 64 - "Community 64"
 Cohesion: 0.5
 Nodes (3): on_cancel_app(), Универсальный обработчик отмены заявки из любого состояния., Универсальный обработчик отмены заявки из любого состояния.
 
-### Community 57 - "Community 57"
+### Community 65 - "Community 65"
+Cohesion: 0.5
+Nodes (4): get_status_counts(), list_user_applications(), Счётчики по статусам для дашборда (pending / approved / rework / total)., Заявки пользователя (как `db.get_user_apps`).
+
+### Community 66 - "Community 66"
 Cohesion: 0.83
 Nodes (3): findListicleSection(), moveEntry(), renumberHeading()
 
-### Community 58 - "Community 58"
+### Community 67 - "Community 67"
 Cohesion: 0.5
 Nodes (3): compile_free_form_local(), Локальные тексты промптов (fallback, если Langfuse недоступен или имя/label не н, Подстановка без Langfuse (тот же синтаксис {{var}}, что в Langfuse text prompt).
 
-### Community 59 - "Community 59"
+### Community 68 - "Community 68"
 Cohesion: 0.67
 Nodes (3): get_pool(), Публичный доступ к пулу (инициализация через `stdlib.resources.init_resources`)., Публичный доступ к пулу (инициализация через `stdlib.resources.init_resources`).
 
-### Community 60 - "Community 60"
+### Community 69 - "Community 69"
 Cohesion: 0.67
 Nodes (3): Сбрасывает блоки, вложения и free-form чат у черновика.     Нужен при новом /sta, Сбрасывает блоки, вложения и free-form чат у черновика.     Нужен при новом /sta, reset_draft_content()
 
-### Community 61 - "Community 61"
+### Community 70 - "Community 70"
 Cohesion: 0.67
 Nodes (3): Вставка или обновление JSONB по ключу., Вставка или обновление JSONB по ключу., upsert_setting()
 
-### Community 62 - "Community 62"
+### Community 71 - "Community 71"
 Cohesion: 0.67
-Nodes (3): get_setting(), Возвращает JSONB-значение из таблицы `settings` или None, если ключа нет., Возвращает JSONB-значение из таблицы `settings` или None, если ключа нет.
+Nodes (3): Пользователь Telegram / запись в таблице `users`., Пользователь Telegram / запись в таблице `users`., User
 
-### Community 63 - "Community 63"
+### Community 72 - "Community 72"
+Cohesion: 0.67
+Nodes (3): ChatMessage, Сообщение в истории чата с LLM по заявке., Сообщение в истории чата с LLM по заявке.
+
+### Community 73 - "Community 73"
 Cohesion: 0.67
 Nodes (3): Чистый черновик для нового /start или «Начать заново» (без контекста старого реж, Чистый черновик для нового /start или «Начать заново» (без контекста старого реж, reset_draft_for_new_session()
 
 ## Knowledge Gaps
-- **406 isolated node(s):** `Подписанная cookie админ-сессии (HMAC). Без секрета — только для разработки.`, `Разбирает cookie; при WEB_SESSION_SECRET отвергает подделку.`, `Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела`, `Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки).`, `Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3).` (+401 more)
+- **420 isolated node(s):** `Подписанная cookie админ-сессии (HMAC). Без секрета — только для разработки.`, `Разбирает cookie; при WEB_SESSION_SECRET отвергает подделку.`, `Только удаление строки в форме (без записи в БД).      HTMX по умолчанию не дела`, `Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки).`, `Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3).` (+415 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `get_template()` connect `Community 28` to `Community 0`, `Community 33`, `Community 2`, `Community 5`, `Community 8`, `Community 10`, `Community 11`, `Community 45`, `Community 14`, `Community 19`, `Community 26`?**
-  _High betweenness centrality (0.215) - this node is a cross-community bridge._
-- **Why does `generate_pdf()` connect `Community 14` to `Community 1`, `Community 53`, `Community 23`, `Community 26`, `Community 28`, `Community 31`?**
-  _High betweenness centrality (0.102) - this node is a cross-community bridge._
-- **Why does `invalidate_pdf_cache()` connect `Community 20` to `Community 32`, `Community 45`, `Community 14`, `Community 18`, `Community 19`, `Community 23`, `Community 63`?**
-  _High betweenness centrality (0.079) - this node is a cross-community bridge._
+- **Why does `get_template()` connect `Community 9` to `Community 32`, `Community 1`, `Community 3`, `Community 6`, `Community 8`, `Community 44`, `Community 12`, `Community 18`, `Community 50`, `Community 20`, `Community 29`?**
+  _High betweenness centrality (0.207) - this node is a cross-community bridge._
+- **Why does `generate_pdf()` connect `Community 12` to `Community 0`, `Community 9`, `Community 10`, `Community 18`, `Community 25`?**
+  _High betweenness centrality (0.077) - this node is a cross-community bridge._
+- **Why does `invalidate_pdf_cache()` connect `Community 19` to `Community 32`, `Community 34`, `Community 73`, `Community 12`, `Community 44`, `Community 21`, `Community 25`?**
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Are the 26 inferred relationships involving `get_template()` (e.g. with `template_editor_page()` and `reject_app()`) actually correct?**
   _`get_template()` has 26 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `get_app_pdf_buffer()` (e.g. with `download_report()` and `get_template()`) actually correct?**

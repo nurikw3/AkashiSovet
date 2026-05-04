@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator, model_validator
 
 from stdlib.template import ApplicationTemplate
+from stdlib.text_normalize import expand_numbered_newlines
 
 
 def _strip_md(v: str) -> str:
@@ -40,10 +41,13 @@ def build_submit_memo_model(tpl: ApplicationTemplate) -> type[BaseModel]:
 
 
 def strip_submit_memo_args(raw: dict[str, Any]) -> dict[str, Any]:
-    """Очистка markdown в значениях перед model_validate."""
+    """Очистка markdown и склеенных нумерованных списков перед model_validate."""
     out: dict[str, Any] = {}
     for k, v in raw.items():
-        out[k] = _strip_md(v) if isinstance(v, str) else v
+        if isinstance(v, str):
+            out[k] = expand_numbered_newlines(_strip_md(v))
+        else:
+            out[k] = v
     return out
 
 
@@ -51,12 +55,15 @@ def strip_submit_memo_args(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 class FormattedBlock(BaseModel):
-    text: str = Field(description="Текст, приведённый к официально-деловому стилю")
+    text: str = Field(
+        description="Текст блока в деловом стиле. Несколько пунктов — каждый с новой строки (1) 2) 3)), "
+        "не одной строкой через точку с запятой."
+    )
 
     @field_validator("text", mode="before")
     @classmethod
     def clean(cls, v: str) -> str:
-        return _strip_md(v)
+        return expand_numbered_newlines(_strip_md(v))
 
 
 # ── Structured Output для free-form чата ───────────────────────────────────────

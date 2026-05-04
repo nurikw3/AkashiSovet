@@ -9,6 +9,7 @@ from bot.config import config
 from bot.logger import logger
 from stdlib.llm.client import langfuse, openai_client
 from stdlib.llm.prompts import EDITOR_SYSTEM, GENERATE_SYSTEM
+from stdlib.text_normalize import expand_numbered_newlines
 from stdlib.schemas import FormattedBlock, FormatResult
 from stdlib.template import get_template, ApplicationTemplate
 
@@ -115,7 +116,11 @@ async def format_text(
         cached = await get_cached_llm_response(cache_key)
         if cached:
             logger.info("LLM cache hit | hash={}", cache_key[:8])
-            out = cached.strip() if cached.strip() else raw.strip()
+            out = (
+                expand_numbered_newlines(cached.strip())
+                if cached.strip()
+                else raw.strip()
+            )
             return FormatResult(
                 text=out,
                 changed=out != raw.strip(),

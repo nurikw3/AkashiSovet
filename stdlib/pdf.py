@@ -39,6 +39,7 @@ from stdlib.template import (
     PDF_TEMPLATE_REVISION_KEY,
     get_template,
 )
+from stdlib.text_normalize import expand_numbered_newlines
 from stdlib.timezone_util import ensure_app_tz, format_app_date_only
 import stdlib.redis_client as redis_client_module
 
@@ -209,6 +210,7 @@ def _normalize_pdf_user_text(text: str) -> str:
 def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> None:
     title = _normalize_pdf_user_text(title)
     body = _normalize_pdf_user_text(body)
+    body = expand_numbered_newlines(body)
     section_elements = [Paragraph(title, s["section_title"])]
     lines = [line.strip() for line in body.split("\n") if line.strip()]
 

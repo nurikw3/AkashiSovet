@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 import io
+import uuid
+from pathlib import PurePosixPath
 
 import stdlib.s3 as s3
 from stdlib.models import ApplicationAttachment
+
+
+def _object_key_component(display_filename: str) -> str:
+    """Имя файла в ключе S3: уникальный префикс + исходное имя (без коллизий)."""
+    base = PurePosixPath(display_filename).name.strip() or "file"
+    if base in (".", ""):
+        base = "file"
+    return f"{uuid.uuid4().hex[:12]}_{base}"
 
 
 async def upload_attachment(
@@ -15,10 +25,11 @@ async def upload_attachment(
     filename: str,
     content_type: str = "application/octet-stream",
 ) -> ApplicationAttachment:
-    """Загружает файл в бакет вложений и возвращает метаданные."""
-    key = s3.attachment_key(user_id, app_id, filename)
+    """Загружает файл в бакет вложений; в БД — оригинальное имя, в S3 — уникальный ключ."""
+    key = s3.attachment_key(user_id, app_id, _object_key_component(filename))
     await s3.upload_bytes(file_bytes, key, s3.BUCKET_ATTACHMENTS, content_type)
-    return ApplicationAttachment(name=filename, s3_key=key)
+    display = PurePosixPath(filename).name.strip() or "file"
+    return ApplicationAttachment(name=display, s3_key=key)
 
 
 async def download_attachment(key: str) -> bytes | None:

@@ -1,0 +1,39 @@
+"""Заседания Правления: создание, списки предстоящих/прошедших, добавление заявок в корзину."""
+
+from __future__ import annotations
+
+from datetime import date
+
+import stdlib.db as db
+from stdlib.models import Meeting
+
+
+async def create_meeting(scheduled_date: date, created_by: int) -> Meeting:
+    """Создаёт заседание на указанную дату; инициатор — Telegram user_id суперпользователя."""
+    row = await db.insert_meeting(scheduled_date, created_by)
+    return Meeting.model_validate(row)
+
+
+async def get_upcoming() -> list[Meeting]:
+    """Предстоящие заседания (`scheduled_date >= CURRENT_DATE`), по дате по возрастанию."""
+    rows = await db.list_meetings_upcoming()
+    return [Meeting.model_validate(r) for r in rows]
+
+
+async def get_past() -> list[Meeting]:
+    """Прошедшие заседания, сначала с более поздней датой."""
+    rows = await db.list_meetings_past()
+    return [Meeting.model_validate(r) for r in rows]
+
+
+async def add_applications(meeting_id: int, application_ids: list[int]) -> None:
+    """Добавляет id заявок в `application_ids` (уникальные, объединение с имеющимися)."""
+    await db.extend_meeting_application_ids(meeting_id, application_ids)
+
+
+async def get_by_id(meeting_id: int) -> Meeting | None:
+    """Заседание по первичному ключу или None."""
+    row = await db.get_meeting_by_id(meeting_id)
+    if not row:
+        return None
+    return Meeting.model_validate(row)

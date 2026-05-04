@@ -2,7 +2,7 @@ import json
 import asyncpg
 from bot.config import config
 from bot.logger import logger
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import random
 import string
 from passlib.context import CryptContext
@@ -456,6 +456,105 @@ async def get_applications(tab: str = "active", status: str | None = None) -> li
         else:
             rows = await conn.fetch(query)
     return [dict(r) for r in rows]
+
+
+# ─── Meetings (таблица `meetings`) ───────────────────────────────────────────
+
+
+async def insert_meeting(scheduled_date: date, created_by: int) -> dict:
+    """Создаёт заседание; возвращает строку как dict (RETURNING *)."""
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO meetings (scheduled_date, created_by)
+            VALUES ($1::date, $2)
+            RETURNING id, scheduled_date, created_by, created_at, application_ids
+            """,
+            scheduled_date,
+            created_by,
+        )
+    if not row:
+        raise RuntimeError("insert_meeting: INSERT returned no row")
+    return dict(row)
+
+
+async def list_meetings_upcoming() -> list[dict]:
+    """Заседания с датой >= сегодня (по календарю БД), ближайшие первыми."""
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, scheduled_date, created_by, created_at, application_ids
+            FROM meetings
+            WHERE scheduled_date >= CURRENT_DATE
+            ORDER BY scheduled_date ASC, id ASC
+            """
+        )
+    return [dict(r) for r in rows]
+
+
+async def list_meetings_past() -> list[dict]:
+    """Прошедшие заседания, от новых к старым."""
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, scheduled_date, created_by, created_at, application_ids
+            FROM meetings
+            WHERE scheduled_date < CURRENT_DATE
+            ORDER BY scheduled_date DESC, id DESC
+            """
+        )
+    return [dict(r) for r in rows]
+
+
+async def get_meeting_by_id(meeting_id: int) -> dict | None:
+    """Одна запись `meetings` по id."""
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT id, scheduled_date, created_by, created_at, application_ids
+            FROM meetings
+            WHERE id = $1
+            """,
+            meeting_id,
+        )
+    return dict(row) if row else None
+
+
+def _parse_application_ids_jsonb(v) -> list[int]:
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [int(x) for x in v]
+    if isinstance(v, str):
+        try:
+            data = json.loads(v)
+        except json.JSONDecodeError:
+            return []
+        return [int(x) for x in data] if isinstance(data, list) else []
+    return []
+
+
+async def extend_meeting_application_ids(meeting_id: int, app_ids: list[int]) -> None:
+    """Добавляет id заявок в JSONB-массив без дубликатов; строка должна существовать."""
+    if not app_ids:
+        return
+    new_ids = [int(x) for x in app_ids]
+    async with _pool_conn() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT application_ids FROM meetings WHERE id = $1 FOR UPDATE",
+                meeting_id,
+            )
+            if not row:
+                raise ValueError(f"meeting {meeting_id} not found")
+            cur = _parse_application_ids_jsonb(row["application_ids"])
+            merged = sorted(set(cur + new_ids))
+            payload = json.dumps(merged, ensure_ascii=False)
+            await conn.execute(
+                "UPDATE meetings SET application_ids = $1::jsonb WHERE id = $2",
+                payload,
+                meeting_id,
+            )
 
 
 import bcrypt

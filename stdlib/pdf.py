@@ -371,6 +371,15 @@ def generate_pdf_filename(
     return f"{time_str}_{safe_name}_{safe_pos}.pdf"
 
 
+async def invalidate_pdf_cache(app_id: int) -> None:
+    """Инвалидирует кэш PDF для заявки после изменения данных.
+
+    Сейчас `get_app_pdf_buffer` всегда генерирует PDF заново; при появлении
+    Redis-кэша для PDF добавьте сюда удаление ключей.
+    """
+    _ = app_id
+
+
 async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     """Универсальная функция подготовки и генерации PDF для заявки.
     Единый источник истины для бота и веба."""

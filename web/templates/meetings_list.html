@@ -1,111 +1,110 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="animate-fade">
+<div class="animate-fade max-w-4xl mx-auto pb-12">
     {% if created_ok %}
-    <div class="mb-6 px-5 py-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
+    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
         ✓ Заседание создано
     </div>
     {% endif %}
 
     {% if deleted_ok %}
-    <div class="mb-6 px-5 py-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
+    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
         ✓ Заседание удалено
     </div>
     {% endif %}
 
     {% if meeting_err %}
-    <div class="mb-6 px-5 py-4 rounded-2xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
+    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
         {{ meeting_err }}
     </div>
     {% endif %}
 
-    <div class="flex items-start justify-between mb-10 gap-6 flex-wrap">
-        <div>
-            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                <a href="/" class="hover:text-akashi-red transition-colors">← Applications</a>
-            </p>
-            <h1 class="text-3xl font-black tracking-tighter dark:text-white">Meetings</h1>
-            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
-                Предстоящие и прошедшие заседания Правления
+    <header class="mb-8">
+        <a href="/" class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors">
+            ← Applications
+        </a>
+        <h1 class="text-3xl font-black tracking-tighter dark:text-white mt-3">Meetings</h1>
+        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+            Предстоящие и прошедшие заседания
+        </p>
+    </header>
+
+    <section class="mb-10 rounded-[2rem] border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark shadow-lg p-6 sm:p-8">
+        <h2 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-5">Новое заседание</h2>
+        <div class="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10">
+            <form method="post" action="/meetings" class="flex flex-wrap items-end gap-4 flex-1">
+                <div class="min-w-[200px]">
+                    <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата</label>
+                    <input id="meetings-page-date" type="date" name="scheduled_date" required
+                           class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+                </div>
+                <button type="submit"
+                        class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/20 hover:opacity-95 active:scale-[0.98] transition-all">
+                    Создать
+                </button>
+            </form>
+            <p class="text-[10px] text-gray-400 leading-relaxed lg:max-w-md lg:border-l lg:border-gray-100 lg:dark:border-white/10 lg:pl-8">
+                Только дата в календаре. С заявками — через
+                <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Approved</a>
+                и «Add to Meeting».
             </p>
         </div>
-    </div>
-
-    <section class="mb-10 p-6 rounded-2xl bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 shadow-sm">
-        <h2 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Новое заседание</h2>
-        <form method="post" action="/meetings" class="flex flex-wrap items-end gap-4">
-            <div>
-                <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата</label>
-                <input id="meetings-page-date" type="date" name="scheduled_date" required
-                       class="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
-            </div>
-            <button type="submit"
-                    class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/25 hover:opacity-95 active:scale-[0.98] transition-all">
-                Создать заседание
-            </button>
-        </form>
-        <p class="text-[10px] text-gray-400 mt-4 leading-relaxed max-w-xl">
-            Здесь — только дата (заседание без списка заявок). Чтобы создать заседание
-            <span class="text-gray-500 dark:text-gray-500">сразу с заявками</span>, откройте
-            <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Applications → Approved</a>,
-            отметьте строки, выберите дату и нажмите «Add to Meeting».
-        </p>
     </section>
 
-    <section class="mb-12">
-        <h2 class="text-lg font-black dark:text-white mb-4 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-            Upcoming
+    <section class="mb-10">
+        <h2 class="text-sm font-black uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+            Предстоящие
         </h2>
         {% if upcoming %}
-        <div class="space-y-3">
+        <ul class="space-y-2">
             {% for m in upcoming %}
-            <a href="/meetings/{{ m.id }}"
-               class="block bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 shadow-sm hover:border-akashi-red/40 transition-colors">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
+            <li>
+                <a href="/meetings/{{ m.id }}"
+                   class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm hover:border-akashi-red/35 hover:shadow-md transition-all">
+                    <div class="min-w-0">
                         <p class="text-xl font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
-                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
                             #{{ m.id }} · {{ m.application_ids|length }} заявок
                         </p>
                     </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red">Open →</span>
-                </div>
-            </a>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red shrink-0">Открыть →</span>
+                </a>
+            </li>
             {% endfor %}
-        </div>
+        </ul>
         {% else %}
-        <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+        <p class="text-sm text-gray-500 dark:text-gray-400 py-10 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
             Нет предстоящих заседаний
         </p>
         {% endif %}
     </section>
 
     <section>
-        <h2 class="text-lg font-black dark:text-white mb-4 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-gray-500"></span>
-            Past
+        <h2 class="text-sm font-black uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>
+            Прошедшие
         </h2>
         {% if past %}
-        <div class="space-y-3">
+        <ul class="space-y-2">
             {% for m in past %}
-            <a href="/meetings/{{ m.id }}"
-               class="block bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 shadow-sm hover:border-akashi-red/40 transition-colors opacity-90">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
+            <li>
+                <a href="/meetings/{{ m.id }}"
+                   class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-akashi-dark/90 px-5 py-4 opacity-95 hover:opacity-100 hover:border-white/20 transition-all">
+                    <div class="min-w-0">
                         <p class="text-lg font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
-                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
                             #{{ m.id }} · {{ m.application_ids|length }} заявок
                         </p>
                     </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Details →</span>
-                </div>
-            </a>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">Подробнее →</span>
+                </a>
+            </li>
             {% endfor %}
-        </div>
+        </ul>
         {% else %}
-        <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+        <p class="text-sm text-gray-500 dark:text-gray-400 py-10 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
             Прошедших заседаний пока нет
         </p>
         {% endif %}

@@ -15,9 +15,19 @@ from stdlib.template import get_template, ApplicationTemplate
 from stdlib.cache import get_cached_llm_response, save_llm_response_to_cache
 
 
-def _make_cache_key(messages: list) -> str:
+def _make_cache_key(
+    messages: list,
+    *,
+    app_id: int | None,
+    user_id: int | None,
+    block_number: int | None,
+    generate: bool,
+) -> str:
+    """В ключ входят заявка (и user), иначе Redis отдаёт ответ от другой заявки с тем же текстом."""
     messages_json = json.dumps(messages, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(f"{config.OPENAI_MODEL}:{messages_json}".encode()).hexdigest()
+    scope = f"app_id={app_id}|user_id={user_id}|block={block_number}|gen={generate}"
+    payload = f"{config.OPENAI_MODEL}:{scope}:{messages_json}"
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def _block_label(tpl: ApplicationTemplate, block_number: int | None) -> tuple[str, str]:
@@ -93,7 +103,13 @@ async def format_text(
     messages = _build_messages(raw, context_str, block_number, generate, tpl)
 
     async def _call(capture_usage: bool = False) -> FormatResult:
-        cache_key = _make_cache_key(messages)
+        cache_key = _make_cache_key(
+            messages,
+            app_id=app_id,
+            user_id=user_id,
+            block_number=block_number,
+            generate=generate,
+        )
 
         # 1. Проверка кеша (через новый модуль)
         cached = await get_cached_llm_response(cache_key)

@@ -11,8 +11,9 @@
         <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
     </div>
 
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
-        Блоки определяют поля заявки в боте и текст для LLM. ID должны быть уникальными и положительными.
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+        Перетаскивайте блоки за ручку слева. Порядок строк = порядок шагов в заявке.
+        ID скрыт от случайного редактирования; чтобы выставить всем подряд <span class="font-mono">1, 2, 3…</span> по текущему порядку — кнопка ниже (осторожно: старые заявки ссылаются на прежние ID).
     </p>
 
     <form id="template-form"
@@ -25,11 +26,16 @@
             {% endfor %}
         </div>
 
-        <div class="flex flex-wrap gap-3 pt-2">
+        <div class="flex flex-wrap items-center gap-3 pt-2">
             <button type="button"
                     id="template-add-row"
                     class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-akashi-red/35 transition-colors">
                 Добавить блок
+            </button>
+            <button type="button"
+                    id="template-renumber-ids"
+                    class="px-5 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200/90 hover:bg-amber-500/20 transition-colors">
+                Пронумеровать ID 1…n
             </button>
             <button type="submit"
                     class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/20 hover:opacity-95 transition-all">
@@ -41,23 +47,93 @@
     </form>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
-    document.getElementById('template-add-row').addEventListener('click', function () {
-        var inputs = document.querySelectorAll('#block-rows input[name="block_id"]');
-        var next = 1;
-        if (inputs.length) {
-            var max = 0;
-            inputs.forEach(function (el) {
-                var v = parseInt(el.value, 10);
-                if (!isNaN(v) && v > max) max = v;
+    (function () {
+        var sortableInstance = null;
+
+        function initBlockRowsSortable() {
+            var el = document.getElementById('block-rows');
+            if (!el) return;
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            sortableInstance = Sortable.create(el, {
+                animation: 150,
+                handle: '.js-drag-handle',
+                ghostClass: 'opacity-60',
+                chosenClass: 'ring-2 ring-akashi-red/25 rounded-2xl'
             });
-            next = max + 1;
         }
-        htmx.ajax('GET', '/settings/template/new-row?next_id=' + next, {
-            target: '#block-rows',
-            swap: 'beforeend'
+
+        function syncBlockIdLabels() {
+            document.querySelectorAll('#block-rows .template-block-row').forEach(function (row) {
+                var inp = row.querySelector('.js-block-id-input');
+                var lab = row.querySelector('.js-block-id-label');
+                if (inp && lab) lab.textContent = inp.value;
+            });
+        }
+
+        function renumberAllSequential() {
+            var rows = document.querySelectorAll('#block-rows .template-block-row');
+            if (!rows.length) return;
+            if (!confirm(
+                'Перенумеровать все блоки подряд: 1, 2, 3 … по текущему порядку строк?\n\n' +
+                'Если в базе уже есть заявки, они хранят ответы по старым ID — меняйте нумерацию только осознанно.'
+            )) return;
+            rows.forEach(function (row, i) {
+                var n = String(i + 1);
+                var inp = row.querySelector('.js-block-id-input');
+                var lab = row.querySelector('.js-block-id-label');
+                if (inp) inp.value = n;
+                if (lab) lab.textContent = n;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initBlockRowsSortable();
         });
-    });
+
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            if (evt.detail.target && evt.detail.target.id === 'block-rows') {
+                initBlockRowsSortable();
+                syncBlockIdLabels();
+            }
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function (evt) {
+            if (!evt.detail.successful) return;
+            var xhr = evt.detail.xhr;
+            var url = (xhr && xhr.responseURL) ? xhr.responseURL : '';
+            if (url.indexOf('/settings/template/new-row') !== -1 ||
+                url.indexOf('/settings/template/ui-row') !== -1) {
+                initBlockRowsSortable();
+                syncBlockIdLabels();
+            }
+        });
+
+        var addBtn = document.getElementById('template-add-row');
+        if (addBtn) addBtn.addEventListener('click', function () {
+            var inputs = document.querySelectorAll('#block-rows .js-block-id-input');
+            var next = 1;
+            if (inputs.length) {
+                var max = 0;
+                inputs.forEach(function (el) {
+                    var v = parseInt(el.value, 10);
+                    if (!isNaN(v) && v > max) max = v;
+                });
+                next = max + 1;
+            }
+            htmx.ajax('GET', '/settings/template/new-row?next_id=' + next, {
+                target: '#block-rows',
+                swap: 'beforeend'
+            });
+        });
+
+        var renBtn = document.getElementById('template-renumber-ids');
+        if (renBtn) renBtn.addEventListener('click', renumberAllSequential);
+    })();
 </script>
 
 {% endblock %}

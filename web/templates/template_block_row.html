@@ -1,6 +1,23 @@
-<div class="template-block-row rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark p-5 mb-3 shadow-sm">
+<div class="template-block-row js-template-block rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark p-5 mb-3 shadow-sm">
+    <input type="hidden" name="block_id" value="{{ block.id }}" class="js-block-id-input" autocomplete="off" />
+
     <div class="flex justify-between items-start gap-3 mb-4">
-        <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Блок</span>
+        <div class="flex items-start gap-2 min-w-0">
+            <button type="button"
+                    class="js-drag-handle mt-0.5 shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-akashi-red hover:bg-gray-100 dark:hover:bg-white/10 cursor-grab active:cursor-grabbing select-none"
+                    title="Перетащить блок"
+                    aria-label="Перетащить блок">
+                <span class="text-lg leading-none tracking-tighter" aria-hidden="true">⠿</span>
+            </button>
+            <div>
+                <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-0.5">Блок</span>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">
+                    Внутренний ID:
+                    <span class="js-block-id-label font-mono font-bold text-gray-800 dark:text-gray-200">{{ block.id }}</span>
+                    <span class="text-gray-400 dark:text-gray-500">· массово: «Пронумеровать ID»</span>
+                </p>
+            </div>
+        </div>
         <button type="button"
                 class="text-[10px] font-black uppercase tracking-widest text-red-500/70 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
                 hx-delete="/settings/template/ui-row"
@@ -8,12 +25,6 @@
                 hx-swap="outerHTML swap:200ms">
             Удалить
         </button>
-    </div>
-
-    <div class="mb-4">
-        <label class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">ID блока</label>
-        <input type="number" name="block_id" min="1" step="1" required value="{{ block.id }}"
-               class="w-full max-w-[120px] rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm font-mono dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
     </div>
 
     <div class="mb-4">

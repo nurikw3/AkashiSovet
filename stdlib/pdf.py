@@ -129,7 +129,34 @@ def _normalize_risk_placeholder(block_title: str, body_raw: str) -> str:
     return body_raw
 
 
+# Шрифт Times из assets не содержит некоторых Unicode-тире/дефисов → в PDF «квадратики».
+_PDF_UNSAFE_DASH = str.maketrans(
+    {
+        "\u2011": "-",  # non-breaking hyphen
+        "\u2010": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2015": "-",
+        "\u2212": "-",
+        "\ufeff": "",
+        "\u00ad": "",
+    }
+)
+
+
+def _normalize_pdf_user_text(text: str) -> str:
+    if not text:
+        return text
+    t = text.translate(_PDF_UNSAFE_DASH)
+    for z in ("\u200b", "\u200c", "\u200d", "\u2060"):
+        t = t.replace(z, "")
+    return t
+
+
 def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> None:
+    title = _normalize_pdf_user_text(title)
+    body = _normalize_pdf_user_text(body)
     section_elements = [Paragraph(title, s["section_title"])]
     lines = [line.strip() for line in body.split("\n") if line.strip()]
 
@@ -315,6 +342,7 @@ async def generate_pdf(
             topic = blocks_map.get(str(tpl.blocks[0].id), "") or "Без темы"
         else:
             topic = data.get("topic") or ""
+        topic = _normalize_pdf_user_text(topic)
         story.append(Paragraph(f"по вопросу «{topic}»", s["subtitle"]))
 
         # ── Текстовые блоки ──
@@ -342,8 +370,8 @@ async def generate_pdf(
                 ),
                 ("4. Риски и последствия (если актуально):", risks_text),
             ]
-            for title, body in sections:
-                _append_section_paragraphs(story, title, body, s)
+            for sec_title, body in sections:
+                _append_section_paragraphs(story, sec_title, body, s)
             attach_num = 5
 
         # ── Приложения ──
@@ -358,7 +386,7 @@ async def generate_pdf(
 
         if attachments and isinstance(attachments, list) and len(attachments) > 0:
             items = [
-                ListItem(Paragraph(str(name), s["body"]))
+                ListItem(Paragraph(_normalize_pdf_user_text(str(name)), s["body"]))
                 for name in attachments
                 if str(name).strip()
             ]
@@ -375,15 +403,19 @@ async def generate_pdf(
         story.append(PageBreak())
         story.append(Spacer(1, 40))
 
-        username = (
-            data.get("full_name")
-            or data.get("fio")
-            or data.get("username")
-            or data.get("name")
-            or "Неизвестно"
+        username = _normalize_pdf_user_text(
+            str(
+                data.get("full_name")
+                or data.get("fio")
+                or data.get("username")
+                or data.get("name")
+                or "Неизвестно"
+            )
         )
-        position = data.get("position") or "Руководитель подразделения"
-        date = data.get("date") or "__.__.____"
+        position = _normalize_pdf_user_text(
+            str(data.get("position") or "Руководитель подразделения")
+        )
+        date = str(data.get("date") or "__.__.____")
 
         story.append(Paragraph(f"<b>{position}:</b>", s["body"]))
 

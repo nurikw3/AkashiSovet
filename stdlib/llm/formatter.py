@@ -7,10 +7,10 @@ import json
 
 from bot.config import config
 from bot.logger import logger
-from stdlib.handlers.blocks import BLOCKS
 from stdlib.llm.client import langfuse, openai_client
 from stdlib.llm.prompts import EDITOR_SYSTEM, GENERATE_SYSTEM
 from stdlib.schemas import FormattedBlock, FormatResult
+from stdlib.template import get_template, ApplicationTemplate
 
 from stdlib.cache import get_cached_llm_response, save_llm_response_to_cache
 
@@ -20,17 +20,24 @@ def _make_cache_key(messages: list) -> str:
     return hashlib.sha256(f"{config.OPENAI_MODEL}:{messages_json}".encode()).hexdigest()
 
 
+def _block_label(tpl: ApplicationTemplate, block_number: int | None) -> tuple[str, str]:
+    if not block_number:
+        return "текущий блок", "Нет описания"
+    try:
+        b = tpl.get_block(block_number)
+        return f"блок {block_number} — «{b.title}»", b.question
+    except ValueError:
+        return f"блок {block_number}", "Нет описания"
+
+
 def _build_messages(
     raw: str,
     context_str: str,
     block_number: int | None,
-    generate: bool = False,
+    generate: bool,
+    tpl: ApplicationTemplate,
 ) -> list:
-    block_hint = (
-        f"блок {block_number} — «{BLOCKS[block_number]['title']}»"
-        if block_number and block_number in BLOCKS
-        else "текущий блок"
-    )
+    block_hint, block_question = _block_label(tpl, block_number)
 
     if generate:
         return [
@@ -41,7 +48,7 @@ def _build_messages(
                     f"### КОНТЕКСТ\n{context_str}\n\n"
                     f"### ЗАДАЧА\n"
                     f"Предложи текст для {block_hint}.\n"
-                    f"Описание: {BLOCKS.get(block_number, {}).get('question', 'Нет описания')}"
+                    f"Описание: {block_question}"
                 ),
             },
         ]
@@ -82,7 +89,8 @@ async def format_text(
     if not context_str:
         context_str = "(Контекст пуст)"
 
-    messages = _build_messages(raw, context_str, block_number, generate)
+    tpl = await get_template()
+    messages = _build_messages(raw, context_str, block_number, generate, tpl)
 
     async def _call(capture_usage: bool = False) -> FormatResult:
         cache_key = _make_cache_key(messages)
@@ -91,11 +99,12 @@ async def format_text(
         cached = await get_cached_llm_response(cache_key)
         if cached:
             logger.info("LLM cache hit | hash={}", cache_key[:8])
+            out = cached.strip() if cached.strip() else raw.strip()
             return FormatResult(
-                text=cached,
-                changed=cached.strip() != raw.strip(),
+                text=out,
+                changed=out != raw.strip(),
                 block_number=block_number,
-                insufficient_context=not cached.strip(),
+                insufficient_context=not out,
             )
 
         try:
@@ -144,11 +153,14 @@ async def format_text(
                 getattr(response.usage, "total_tokens", "?"),
             )
 
+            out = (parsed.text or "").strip()
+            if not out:
+                out = raw.strip()
             return FormatResult(
-                text=parsed.text,
-                changed=parsed.text.strip() != raw.strip(),
+                text=out,
+                changed=out != raw.strip(),
                 block_number=block_number,
-                insufficient_context=not parsed.text.strip(),
+                insufficient_context=not out,
             )
 
         except Exception as e:

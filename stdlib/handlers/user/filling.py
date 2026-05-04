@@ -1,4 +1,6 @@
 # stdlib/handlers/user/filling.py
+from html import escape
+
 import stdlib.keyboards as kb
 from stdlib.services import application_service
 import stdlib.llm.formatter as llm
@@ -8,6 +10,11 @@ from aiogram.types import Message, CallbackQuery
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.intent import is_delegation, escape_markdown_v2
+from stdlib.summary_format import (
+    build_files_step_message,
+    chunk_plain_text,
+    format_blocks_plain_copy,
+)
 from stdlib.template import get_template
 
 router = Router()
@@ -182,16 +189,23 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
         )
         return
 
-    # Все блоки шаблона заполнены — переходим к файлам
+    # Все блоки шаблона заполнены — переходим к файлам (та же сводка, что и в free-form)
     await state.update_data(current_block="files", mode="input")
+    app_row = await application_service.get_application(data["app_id"])
+    tpl = await get_template()
+    blocks = app_row.blocks if app_row else {}
+    plain = format_blocks_plain_copy(blocks, tpl)
+    parts = chunk_plain_text(plain)
+    first = build_files_step_message(parts[0])
     await callback.message.answer(
-        "Отлично! Все разделы заполнены.\n\n"
-        "<b>Приложения</b>\n\n"
-        "Прикрепите файлы к заявке (договоры, расчёты, согласования и т.д.).\n"
-        "Отправляйте по одному. Когда закончите — нажмите <b>Готово</b>.",
-        parse_mode="HTML",
-        reply_markup=kb.files_keyboard(),
+        first, parse_mode="HTML", reply_markup=kb.files_keyboard()
     )
+    for rest in parts[1:]:
+        await callback.message.answer(
+            "… <i>продолжение текста заявки</i>\n\n"
+            f"<pre>{escape(rest)}</pre>",
+            parse_mode="HTML",
+        )
 
 
 @router.callback_query(BotStates.FILLING, F.data == "edit")

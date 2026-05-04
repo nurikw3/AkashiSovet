@@ -1,6 +1,6 @@
 # stdlib/handlers/user/review.py
-import json
 from datetime import datetime
+from html import escape
 
 import stdlib.db as db
 import stdlib.keyboards as kb
@@ -10,8 +10,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
-from stdlib.intent import escape_markdown_v2
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.summary_format import (
+    build_review_text_snapshot,
+    chunk_plain_text,
+    format_blocks_plain_copy,
+)
 from stdlib.template import get_template
 
 router = Router()
@@ -47,20 +51,37 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
                 pdf_buf.getvalue(),
                 filename=custom_filename,
             ),
-            caption="📝 *Проверьте вашу заявку перед отправкой:*",
-            parse_mode="MarkdownV2",
+            caption="📝 Проверьте PDF и текст ниже перед отправкой.",
             reply_markup=kb.review_keyboard(tpl),
         )
+        app_model = await application_service.get_application(app_id)
+        if app_model:
+            plain = format_blocks_plain_copy(app_model.blocks, tpl)
+            for idx, part in enumerate(chunk_plain_text(plain)):
+                if idx == 0:
+                    snap = build_review_text_snapshot(part)
+                else:
+                    snap = (
+                        "… <i>продолжение текста</i>\n\n"
+                        f"<pre>{escape(part)}</pre>"
+                    )
+                send_fn = (
+                    message.answer
+                    if isinstance(message, Message)
+                    else message.message.answer
+                )
+                await send_fn(snap, parse_mode="HTML")
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 
     except Exception as e:
         logger.warning("PDF fallback: {}", e)
         # Если что-то пошло не так - падаем на старый текстовый метод
 
-    # --- ФОЛЛБЕК НА ТЕКСТ (если PDF сломался) ---
-    blocks = json.loads(app.get("blocks", "{}"))
+    # --- ФОЛЛБЕК: только текст (PDF недоступен) — тот же plain-формат, что и в других шагах ---
+    app_model = await application_service.get_application(app_id)
+    blocks = app_model.blocks if app_model else {}
+    plain = format_blocks_plain_copy(blocks, tpl)
 
-    # Безопасный парсинг вложений (как в finalize)
     raw_att = app.get("attachments")
     try:
         attachments = (
@@ -71,52 +92,29 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     except Exception:
         attachments = []
 
-    # Заголовок (экранируем для MarkdownV2)
-    summary_parts = ["📝 *Проверьте вашу заявку перед отправкой:*\n\n"]
-
-    for idx, block in enumerate(tpl.blocks, start=1):
-        title = block.title
-        val = blocks.get(str(block.id), "_(не заполнено)_")
-
-        # Экранируем заголовок
-        safe_title = escape_markdown_v2(f"{idx}. {title}")
-
-        # Для блока кода: заменяем реальные \n на \n (оставляем как есть)
-        # Но экранируем только тройные кавычки
-        safe_val = val.replace("```", "\\`\\`\\`")
-
-        # Формируем блок: заголовок + код
-        block_text = f"*{safe_title}*\n```\n{safe_val}\n```\n\n"
-        summary_parts.append(block_text)
-
-    files_info = f"*Приложения:* {len(attachments)} файлов"
-    summary_parts.append(files_info)
-
-    final_summary = "".join(summary_parts)
-
     msg_func = (
         message.answer if isinstance(message, Message) else message.message.answer
     )
 
-    try:
+    parts_fb = chunk_plain_text(plain)
+    foot = f"<i>Приложений в заявке: {len(attachments)}</i>"
+    for idx, p in enumerate(parts_fb):
+        if idx == 0:
+            body = (
+                "📝 <b>Проверьте заявку</b> (PDF временно недоступен).\n\n"
+                f"<pre>{escape(p)}</pre>\n\n"
+                f"{foot}"
+            )
+        else:
+            body = (
+                "… <i>продолжение текста заявки</i>\n\n"
+                f"<pre>{escape(p)}</pre>"
+            )
         await msg_func(
-            final_summary,
-            parse_mode="MarkdownV2",
-            reply_markup=kb.review_keyboard(tpl),
+            body,
+            parse_mode="HTML",
+            reply_markup=kb.review_keyboard(tpl) if idx == 0 else None,
             disable_web_page_preview=True,
-        )
-    except Exception as e:
-        logger.error("Review screen MDv2 failed: {}", e)
-        # Фоллбек на HTML
-        html_summary = "📝 <b>Проверьте вашу заявку:</b>\n\n"
-        for idx, block in enumerate(tpl.blocks, start=1):
-            title = block.title
-            val = blocks.get(str(block.id), "<i>(не заполнено)</i>")
-            html_summary += f"<b>{idx}. {title}</b>\n<pre>{val}</pre>\n\n"
-        html_summary += f"<b>Приложения:</b> {len(attachments)} файлов"
-
-        await msg_func(
-            html_summary, parse_mode="HTML", reply_markup=kb.review_keyboard(tpl)
         )
 
 

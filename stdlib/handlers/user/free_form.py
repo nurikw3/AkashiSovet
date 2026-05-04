@@ -1,3 +1,5 @@
+from html import escape
+
 import stdlib.keyboards as kb
 from stdlib.services import application_service
 import stdlib.llm.free_form as llm
@@ -6,6 +8,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from stdlib.handlers.states import BotStates
 from stdlib.schemas import LLMComplete, LLMError, LLMIncomplete
+from stdlib.summary_format import (
+    build_files_step_message,
+    chunk_plain_text,
+    format_blocks_plain_copy,
+)
 from stdlib.template import get_template
 
 router = Router()
@@ -42,17 +49,18 @@ async def handle_free_form_input(message: Message, state: FSMContext):
         await state.set_state(BotStates.FILLING)
 
         tpl = await get_template()
-        summary = "✅ Отлично! Я собрал всю необходимую информацию.\n\n"
-        for idx, b in enumerate(tpl.blocks, start=1):
-            val = blocks.get(str(b.id), "")
-            summary += f"<b>{idx}. {b.title}</b>\n{val}\n\n"
-        summary += (
-            "<b>Приложения</b>\nПрикрепите файлы к заявке и нажмите <b>Готово</b>."
-        )
-
+        plain = format_blocks_plain_copy(blocks, tpl)
+        parts = chunk_plain_text(plain)
+        first = build_files_step_message(parts[0])
         await message.answer(
-            summary, parse_mode="HTML", reply_markup=kb.files_keyboard()
+            first, parse_mode="HTML", reply_markup=kb.files_keyboard()
         )
+        for rest in parts[1:]:
+            await message.answer(
+                "… <i>продолжение текста заявки</i>\n\n"
+                f"<pre>{escape(rest)}</pre>",
+                parse_mode="HTML",
+            )
     elif isinstance(result, LLMError):
         await message.answer(result.reply)
     else:

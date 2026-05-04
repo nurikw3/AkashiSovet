@@ -1,5 +1,3 @@
-from html import escape
-
 import stdlib.keyboards as kb
 from stdlib.services import application_service
 import stdlib.llm.free_form as llm
@@ -8,10 +6,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from stdlib.handlers.states import BotStates
 from stdlib.schemas import LLMComplete, LLMError, LLMIncomplete
-from stdlib.summary_format import (
-    build_files_step_message,
-    chunk_plain_text,
-    format_blocks_plain_copy,
+from stdlib.telegram_summary import (
+    chunk_blocks_summary_html,
+    INTRO_FREE_FORM_HTML,
 )
 from stdlib.template import get_template
 
@@ -49,17 +46,13 @@ async def handle_free_form_input(message: Message, state: FSMContext):
         await state.set_state(BotStates.FILLING)
 
         tpl = await get_template()
-        plain = format_blocks_plain_copy(blocks, tpl)
-        parts = chunk_plain_text(plain)
-        first = build_files_step_message(parts[0])
-        await message.answer(
-            first, parse_mode="HTML", reply_markup=kb.files_keyboard()
-        )
-        for rest in parts[1:]:
+        for idx, html in enumerate(
+            chunk_blocks_summary_html(tpl, blocks, INTRO_FREE_FORM_HTML)
+        ):
             await message.answer(
-                "… <i>продолжение текста заявки</i>\n\n"
-                f"<pre>{escape(rest)}</pre>",
+                html,
                 parse_mode="HTML",
+                reply_markup=kb.files_keyboard() if idx == 0 else None,
             )
     elif isinstance(result, LLMError):
         await message.answer(result.reply)

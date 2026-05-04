@@ -1,6 +1,4 @@
 # stdlib/handlers/user/filling.py
-from html import escape
-
 import stdlib.keyboards as kb
 from stdlib.services import application_service
 import stdlib.llm.formatter as llm
@@ -10,10 +8,9 @@ from aiogram.types import Message, CallbackQuery
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.intent import is_delegation, escape_markdown_v2
-from stdlib.summary_format import (
-    build_files_step_message,
-    chunk_plain_text,
-    format_blocks_plain_copy,
+from stdlib.telegram_summary import (
+    chunk_blocks_summary_html,
+    INTRO_STEP_FILLED_HTML,
 )
 from stdlib.template import get_template
 
@@ -228,17 +225,13 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
     app_row = await application_service.get_application(data["app_id"])
     tpl = await get_template()
     blocks = app_row.blocks if app_row else {}
-    plain = format_blocks_plain_copy(blocks, tpl)
-    parts = chunk_plain_text(plain)
-    first = build_files_step_message(parts[0])
-    await callback.message.answer(
-        first, parse_mode="HTML", reply_markup=kb.files_keyboard()
-    )
-    for rest in parts[1:]:
+    for idx, html in enumerate(
+        chunk_blocks_summary_html(tpl, blocks, INTRO_STEP_FILLED_HTML)
+    ):
         await callback.message.answer(
-            "… <i>продолжение текста заявки</i>\n\n"
-            f"<pre>{escape(rest)}</pre>",
+            html,
             parse_mode="HTML",
+            reply_markup=kb.files_keyboard() if idx == 0 else None,
         )
 
 

@@ -1,6 +1,6 @@
 # stdlib/handlers/user/review.py
+import json
 from datetime import datetime
-from html import escape
 
 import stdlib.db as db
 import stdlib.keyboards as kb
@@ -11,10 +11,10 @@ from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
-from stdlib.summary_format import (
-    build_review_text_snapshot,
-    chunk_plain_text,
-    format_blocks_plain_copy,
+from stdlib.telegram_summary import (
+    INTRO_FALLBACK_NO_PDF_HTML,
+    INTRO_REVIEW_HTML,
+    chunk_blocks_summary_html,
 )
 from stdlib.template import get_template
 
@@ -27,6 +27,10 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         return
     user_id = app["user_id"]
     tpl = await get_template()
+
+    send_fn = (
+        message.answer if isinstance(message, Message) else message.message.answer
+    )
 
     # Сначала пробуем получить PDF-буфер через общую функцию
     try:
@@ -56,31 +60,24 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         )
         app_model = await application_service.get_application(app_id)
         if app_model:
-            plain = format_blocks_plain_copy(app_model.blocks, tpl)
-            for idx, part in enumerate(chunk_plain_text(plain)):
-                if idx == 0:
-                    snap = build_review_text_snapshot(part)
-                else:
-                    snap = (
-                        "… <i>продолжение текста</i>\n\n"
-                        f"<pre>{escape(part)}</pre>"
-                    )
-                send_fn = (
-                    message.answer
-                    if isinstance(message, Message)
-                    else message.message.answer
+            for idx, html in enumerate(
+                chunk_blocks_summary_html(
+                    tpl,
+                    app_model.blocks,
+                    INTRO_REVIEW_HTML,
+                    attachments_footer=None,
                 )
-                await send_fn(snap, parse_mode="HTML")
+            ):
+                await send_fn(html, parse_mode="HTML")
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 
     except Exception as e:
         logger.warning("PDF fallback: {}", e)
-        # Если что-то пошло не так - падаем на старый текстовый метод
+        # Если что-то пошло не так — текстом тем же форматом, что и сводка к файлам
 
-    # --- ФОЛЛБЕК: только текст (PDF недоступен) — тот же plain-формат, что и в других шагах ---
+    # --- ФОЛЛБЕК: PDF недоступен ---
     app_model = await application_service.get_application(app_id)
     blocks = app_model.blocks if app_model else {}
-    plain = format_blocks_plain_copy(blocks, tpl)
 
     raw_att = app.get("attachments")
     try:
@@ -92,26 +89,17 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     except Exception:
         attachments = []
 
-    msg_func = (
-        message.answer if isinstance(message, Message) else message.message.answer
-    )
-
-    parts_fb = chunk_plain_text(plain)
     foot = f"<i>Приложений в заявке: {len(attachments)}</i>"
-    for idx, p in enumerate(parts_fb):
-        if idx == 0:
-            body = (
-                "📝 <b>Проверьте заявку</b> (PDF временно недоступен).\n\n"
-                f"<pre>{escape(p)}</pre>\n\n"
-                f"{foot}"
-            )
-        else:
-            body = (
-                "… <i>продолжение текста заявки</i>\n\n"
-                f"<pre>{escape(p)}</pre>"
-            )
-        await msg_func(
-            body,
+    for idx, html in enumerate(
+        chunk_blocks_summary_html(
+            tpl,
+            blocks,
+            INTRO_FALLBACK_NO_PDF_HTML,
+            attachments_footer=foot,
+        )
+    ):
+        await send_fn(
+            html,
             parse_mode="HTML",
             reply_markup=kb.review_keyboard(tpl) if idx == 0 else None,
             disable_web_page_preview=True,

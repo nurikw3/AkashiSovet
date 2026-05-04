@@ -81,6 +81,25 @@ def attachment_key(user_id: int, app_id: int, filename: str) -> str:
     return f"attachments/{user_id}/{app_id}/{safe}"
 
 
+def is_allowed_attachment_download_key(key: str) -> bool:
+    """Разрешённые ключи для скачивания вложений из панели (без выхода за префикс)."""
+    if not key or not isinstance(key, str):
+        return False
+    if ".." in key or key.startswith("/"):
+        return False
+    parts = PurePosixPath(key).parts
+    if len(parts) < 4 or parts[0] != "attachments":
+        return False
+    try:
+        int(parts[1])
+        int(parts[2])
+    except ValueError:
+        return False
+    if any(p in ("", ".", "..") for p in parts):
+        return False
+    return True
+
+
 def signature_key(user_id: int) -> str:
     return f"signatures/{user_id}/signature.png"
 

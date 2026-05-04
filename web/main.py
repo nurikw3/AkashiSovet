@@ -7,7 +7,15 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    StreamingResponse,
+    RedirectResponse,
+    PlainTextResponse,
+)
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from datetime import date, datetime, time
 from aiogram import Bot
 from io import BytesIO
@@ -19,6 +27,8 @@ import stdlib.keyboards as kb
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from bot.config import config
 from stdlib import resources
+import stdlib.s3 as s3_keys
+from web.auth_session import parse_admin_session, sign_admin_session
 from stdlib.models import Application
 from stdlib.services import application_service, file_service, meeting_service
 from stdlib.services.notification_service import (
@@ -27,6 +37,11 @@ from stdlib.services.notification_service import (
 )
 from stdlib.template import ApplicationTemplate, get_template, persist_template
 from aiogram.types import BufferedInputFile
+
+_LOGIN_FAIL_MSG = "Неверный Telegram ID или код"
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
+
 
 def _template_validation_message(e: ValidationError) -> str:
     parts: list[str] = []
@@ -44,6 +59,11 @@ def _template_validation_message(e: ValidationError) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not (config.WEB_SESSION_SECRET or "").strip():
+        logger.warning(
+            "WEB_SESSION_SECRET не задан — cookie сессии без подписи (только для разработки). "
+            "В продакшене сгенерируйте секрет и задайте WEB_COOKIE_SECURE=true за HTTPS."
+        )
     await resources.init_resources()
     app.state.tg_bot = Bot(token=config.BOT_TOKEN)
     yield
@@ -52,6 +72,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
 
 _static_dir = Path(__file__).resolve().parent / "static"
 if _static_dir.is_dir():
@@ -65,6 +86,33 @@ templates.env.filters["datefmt"] = lambda v: (
     v.strftime("%d.%m.%Y") if isinstance(v, (date, datetime)) else v
 )
 templates.env.filters["urlquote"] = lambda v: quote(str(v or ""), safe="")
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exc(request: Request, exc: RateLimitExceeded):
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept or request.url.path == "/login":
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={"error": "Слишком много попыток входа. Подождите немного."},
+            status_code=429,
+        )
+    return PlainTextResponse("Too Many Requests", status_code=429)
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "accelerometer=(), camera=(), geolocation=(), microphone=()"
+    )
+    return response
+
+
 # --- AUTH HELPERS ---
 
 
@@ -77,10 +125,11 @@ async def _get_hashed_password(user_id: int) -> str | None:
 
 
 async def get_admin(request: Request):
-    admin_id = request.cookies.get("admin_session")
-    if not admin_id or int(admin_id) not in config.SUPERUSER_IDS:
+    raw = request.cookies.get("admin_session")
+    admin_id = parse_admin_session(raw)
+    if admin_id is None or admin_id not in config.SUPERUSER_IDS:
         raise HTTPException(status_code=401)
-    return int(admin_id)
+    return admin_id
 
 
 @app.exception_handler(401)
@@ -93,8 +142,8 @@ async def auth_handler(request, exc):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    admin_id = request.cookies.get("admin_session")
-    if admin_id and int(admin_id) in config.SUPERUSER_IDS:
+    uid = parse_admin_session(request.cookies.get("admin_session"))
+    if uid is not None and uid in config.SUPERUSER_IDS:
         return RedirectResponse(url="/", status_code=302)
     err = request.query_params.get("error")
     return templates.TemplateResponse(
@@ -103,39 +152,33 @@ async def login_page(request: Request):
 
 
 @app.post("/login", response_class=HTMLResponse)
+@limiter.limit(config.WEB_LOGIN_RATE_LIMIT)
 async def login_post(
     request: Request,
     tg_id: int = Form(...),
     code: str = Form(...),
 ):
+    err_html = templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"error": _LOGIN_FAIL_MSG},
+    )
+
     if tg_id not in config.SUPERUSER_IDS:
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={"error": "Пользователь не найден"},
-        )
+        return err_html
 
     hashed = await _get_hashed_password(tg_id)
-
+    ok = False
     if hashed:
-        if not bcrypt.checkpw(code.encode(), hashed.encode()):
-            otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
-            if not otp_ok:
-                return templates.TemplateResponse(
-                    request=request,
-                    name="login.html",
-                    context={"error": "Неверный пароль или код"},
-                )
+        if bcrypt.checkpw(code.encode(), hashed.encode()):
+            ok = True
+        else:
+            ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
     else:
-        otp_ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
-        if not otp_ok:
-            return templates.TemplateResponse(
-                request=request,
-                name="login.html",
-                context={
-                    "error": "Неверный код. Получите новый через /web в боте",
-                },
-            )
+        ok = await db.verify_web_login_code(user_id=tg_id, input_code=code)
+
+    if not ok:
+        return err_html
 
     response = RedirectResponse(
         url="/settings" if not hashed else "/",
@@ -143,10 +186,12 @@ async def login_post(
     )
     response.set_cookie(
         key="admin_session",
-        value=str(tg_id),
+        value=sign_admin_session(tg_id),
         httponly=True,
         samesite="lax",
+        secure=config.WEB_COOKIE_SECURE,
         max_age=config.ADMIN_SESSION_MAX_AGE_SECONDS,
+        path="/",
     )
     return response
 
@@ -154,7 +199,13 @@ async def login_post(
 @app.get("/logout")
 async def logout():
     response = RedirectResponse(url="/login", status_code=302)
-    response.delete_cookie("admin_session")
+    response.delete_cookie(
+        "admin_session",
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=config.WEB_COOKIE_SECURE,
+    )
     return response
 
 
@@ -457,6 +508,13 @@ async def download_file(s3_key: str, admin_id=Depends(get_admin)):
     # 1. Валидация ключа
     if not s3_key or s3_key.strip() == "":
         raise HTTPException(status_code=400, detail="Пустой S3-ключ")
+    if not s3_keys.is_allowed_attachment_download_key(s3_key.strip()):
+        logger.warning(
+            "Rejected attachment download key | admin={} key_prefix={}",
+            admin_id,
+            s3_key[:80],
+        )
+        raise HTTPException(status_code=400, detail="Недопустимый ключ объекта")
 
     buf = await file_service.download_attachment_bytesio(s3_key)
     if not buf:

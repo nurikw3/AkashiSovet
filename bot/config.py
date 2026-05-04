@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     WEB_PUBLIC_URL: str = ""
     WEB_AUTH_TOKEN_TTL_SECONDS: int = 300
     ADMIN_SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 8
+    # Секрет для подписи cookie admin_session (обязательно в проде; минимум 32 случайных символа)
+    WEB_SESSION_SECRET: str = ""
+    # Установите True за HTTPS reverse-proxy
+    WEB_COOKIE_SECURE: bool = False
+    # Лимит POST /login на IP (slowapi)
+    WEB_LOGIN_RATE_LIMIT: str = "10/minute"
 
     S3_ENDPOINT_URL: str = ""
     S3_ACCESS_KEY: str = ""

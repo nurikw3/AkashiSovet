@@ -44,6 +44,11 @@ async def delete_meeting(meeting_id: int) -> bool:
     return await db.delete_meeting_by_id(meeting_id)
 
 
+async def set_scheduled_at(meeting_id: int, scheduled_at: datetime) -> bool:
+    """Обновляет дату и время заседания. False — заседание не найдено."""
+    return await db.update_meeting_scheduled_at(meeting_id, scheduled_at)
+
+
 async def create_meeting_with_applications(
     scheduled_at: datetime,
     created_by: int,

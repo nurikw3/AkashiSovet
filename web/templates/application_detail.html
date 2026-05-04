@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="animate-fade max-w-2xl">
-    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
+<div class="animate-fade w-full max-w-4xl mx-auto">
+    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
         <a href="javascript:history.back()" class="hover:text-akashi-red transition-colors">← Back</a>
         <span class="text-gray-600 mx-2">·</span>
         <a href="/" class="hover:text-akashi-red transition-colors">Applications</a>
     </p>
 
-    <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+    <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
             <h1 class="text-2xl font-black tracking-tighter dark:text-white">Заявка #{{ app.id }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}</p>

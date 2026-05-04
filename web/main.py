@@ -560,7 +560,10 @@ async def meetings_list(
 
 @app.get("/meetings/{meeting_id}", response_class=HTMLResponse)
 async def meeting_detail_page(
-    request: Request, meeting_id: int, admin_id=Depends(get_admin)
+    request: Request,
+    meeting_id: int,
+    admin_id=Depends(get_admin),
+    updated: str | None = None,
 ):
     meeting = await meeting_service.get_by_id(meeting_id)
     if not meeting:
@@ -570,8 +573,33 @@ async def meeting_detail_page(
     return templates.TemplateResponse(
         request=request,
         name="meeting_detail.html",
-        context={"request": request, "meeting": meeting, "apps": apps},
+        context={
+            "request": request,
+            "meeting": meeting,
+            "apps": apps,
+            "schedule_updated_ok": updated == "1",
+            "schedule_err": request.query_params.get("schedule_err"),
+        },
     )
+
+
+@app.post("/meetings/{meeting_id}/schedule")
+async def meeting_update_schedule(
+    request: Request, meeting_id: int, admin_id=Depends(get_admin)
+):
+    """Меняет дату и время заседания (форма из карточки заседания)."""
+    form = await request.form()
+    scheduled = _parse_meeting_schedule(form)
+    if not scheduled:
+        return RedirectResponse(
+            url=f"/meetings/{meeting_id}?schedule_err={quote('Укажите дату и время')}",
+            status_code=303,
+        )
+    ok = await meeting_service.set_scheduled_at(meeting_id, scheduled)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Заседание не найдено")
+    logger.info("meeting {} rescheduled by admin {} to {}", meeting_id, admin_id, scheduled)
+    return RedirectResponse(url=f"/meetings/{meeting_id}?updated=1", status_code=303)
 
 
 @app.post("/meetings/{meeting_id}/delete")

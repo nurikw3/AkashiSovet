@@ -224,4 +224,5 @@ test.pdf
 Шаблон_для_вынесения_вопросов_на_Правление_ (1).docx
 .DS_Store
 .cursor/
-.graphify/
+.graphify/*.pdf
+test_pdf.py

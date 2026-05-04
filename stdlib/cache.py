@@ -1,46 +1,31 @@
 # stdlib/cache.py
 from bot.logger import logger
-import stdlib.redis_client as redis_module
+from stdlib.resources import get_redis
 
 
 async def get_cached_llm_response(prompt_hash: str) -> str | None:
-    client = redis_module.redis_client
-    logger.info(
-        f"🔍 CACHE GET: client_type={type(client)}, key_prefix={prompt_hash[:8]}"
-    )
-
+    client = get_redis()
     if not client:
-        logger.error("❌ CACHE GET: client is None!")
+        logger.warning("LLM cache GET skipped: Redis unavailable")
         return None
     try:
-        val = await client.get(f"llm:{prompt_hash}")
-        logger.info(f"✅ CACHE GET: {'HIT' if val else 'MISS'}")
-        return val
+        return await client.get(f"llm:{prompt_hash}")
     except Exception as e:
-        logger.error(f"❌ CACHE GET ERROR: {e}")
+        logger.error("LLM cache GET error: {}", e)
         return None
 
 
 async def save_llm_response_to_cache(
     prompt_hash: str, response: str, ttl: int = 604800
 ) -> None:
-    client = redis_module.redis_client
-    logger.info(
-        f"💾 CACHE SAVE: client_type={type(client)}, key_prefix={prompt_hash[:8]}, response_len={len(response)}"
-    )
-
+    client = get_redis()
     if not client:
-        logger.error(
-            "❌ CACHE SAVE: client is None! Module attrs: "
-            + str([a for a in dir(redis_module) if not a.startswith("_")])
-        )
+        logger.warning("LLM cache SAVE skipped: Redis unavailable")
         return
     try:
-        logger.info("🚀 Executing Redis SETEX...")
         await client.setex(f"llm:{prompt_hash}", ttl, response)
-        logger.info("✅ Redis SETEX SUCCESS")
     except Exception as e:
-        logger.error(f"❌ CACHE SAVE ERROR: {e}")
+        logger.error("LLM cache SAVE error: {}", e)
         import traceback
 
-        logger.error(f"📋 TRACEBACK: {traceback.format_exc()}")
+        logger.error("Traceback: {}", traceback.format_exc())

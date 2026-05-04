@@ -8,11 +8,19 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from bot.logger import logger
-from stdlib.handlers.blocks import BLOCKS
 from stdlib.handlers.states import BotStates
 from stdlib.intent import is_delegation, escape_markdown_v2
+from stdlib.template import get_template
 
 router = Router()
+
+
+async def _block_title(block_id: int) -> str:
+    tpl = await get_template()
+    try:
+        return tpl.get_block(block_id).title
+    except ValueError:
+        return f"блок {block_id}"
 
 
 async def _get_context(app_id: int, current_block: int, pending: str | None) -> dict:
@@ -127,8 +135,9 @@ async def _handle_delegation(message: Message, state: FSMContext, data: dict):
     )
 
     if result.insufficient_context or not result.text:
+        title = await _block_title(current_block)
         await message.answer(
-            f"Недостаточно контекста для блока «{BLOCKS[current_block]['title']}».\n\n"
+            f"Недостаточно контекста для блока «{title}».\n\n"
             f"Заполните предыдущие блоки подробнее — тогда смогу предложить вариант."
         )
         return
@@ -159,18 +168,21 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
         await send_review_screen(callback, data["app_id"])
         return
 
-    # Переходим к следующему блоку
-    if current_block < 5:
-        next_block = current_block + 1
-        await state.update_data(current_block=next_block, mode="input")
+    tpl = await get_template()
+    next_id = tpl.get_next_block_id(current_block)
+
+    if next_id is not None:
+        b = tpl.get_block(next_id)
+        idx = tpl.block_index_1based(next_id)
+        total = tpl.total_blocks_count
+        await state.update_data(current_block=next_id, mode="input")
         await callback.message.answer(
-            f"<b>Блок {next_block} из 5 — {BLOCKS[next_block]['title']}</b>\n\n"
-            f"{BLOCKS[next_block]['question']}",
+            f"<b>Блок {idx} из {total} — {b.title}</b>\n\n{b.question}",
             parse_mode="HTML",
         )
         return
 
-    # Все 5 блоков заполнены — переходим к файлам
+    # Все блоки шаблона заполнены — переходим к файлам
     await state.update_data(current_block="files", mode="input")
     await callback.message.answer(
         "Отлично! Все разделы заполнены.\n\n"
@@ -187,7 +199,8 @@ async def on_edit(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     data = await state.get_data()
     await state.update_data(mode="input")
-    block_title = BLOCKS[data["current_block"]]["title"]
+    cb = data["current_block"]
+    block_title = await _block_title(cb) if isinstance(cb, int) else str(cb)
     await callback.message.answer(
         f"Введите исправленный текст для блока «{block_title}»:"
     )

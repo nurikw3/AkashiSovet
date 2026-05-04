@@ -8,10 +8,10 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from bot.logger import logger
-from stdlib.handlers.blocks import BLOCKS
 from stdlib.handlers.states import BotStates
 from stdlib.intent import escape_markdown_v2
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.template import get_template
 
 router = Router()
 
@@ -19,6 +19,7 @@ router = Router()
 async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     app = await db.get_app(app_id)
     user_id = app["user_id"]
+    tpl = await get_template()
 
     # Сначала пробуем получить PDF-буфер через общую функцию
     try:
@@ -45,7 +46,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             ),
             caption="📝 *Проверьте вашу заявку перед отправкой:*",
             parse_mode="MarkdownV2",
-            reply_markup=kb.review_keyboard(),
+            reply_markup=kb.review_keyboard(tpl),
         )
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 
@@ -70,12 +71,12 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     # Заголовок (экранируем для MarkdownV2)
     summary_parts = ["📝 *Проверьте вашу заявку перед отправкой:*\n\n"]
 
-    for i in range(1, 6):
-        title = BLOCKS[i]["title"]
-        val = blocks.get(str(i), "_(не заполнено)_")
+    for idx, block in enumerate(tpl.blocks, start=1):
+        title = block.title
+        val = blocks.get(str(block.id), "_(не заполнено)_")
 
         # Экранируем заголовок
-        safe_title = escape_markdown_v2(f"{i}. {title}")
+        safe_title = escape_markdown_v2(f"{idx}. {title}")
 
         # Для блока кода: заменяем реальные \n на \n (оставляем как есть)
         # Но экранируем только тройные кавычки
@@ -98,21 +99,21 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         await msg_func(
             final_summary,
             parse_mode="MarkdownV2",
-            reply_markup=kb.review_keyboard(),
+            reply_markup=kb.review_keyboard(tpl),
             disable_web_page_preview=True,
         )
     except Exception as e:
         logger.error("Review screen MDv2 failed: {}", e)
         # Фоллбек на HTML
         html_summary = "📝 <b>Проверьте вашу заявку:</b>\n\n"
-        for i in range(1, 6):
-            title = BLOCKS[i]["title"]
-            val = blocks.get(str(i), "<i>(не заполнено)</i>")
-            html_summary += f"<b>{i}. {title}</b>\n<pre>{val}</pre>\n\n"
+        for idx, block in enumerate(tpl.blocks, start=1):
+            title = block.title
+            val = blocks.get(str(block.id), "<i>(не заполнено)</i>")
+            html_summary += f"<b>{idx}. {title}</b>\n<pre>{val}</pre>\n\n"
         html_summary += f"<b>Приложения:</b> {len(attachments)} файлов"
 
         await msg_func(
-            html_summary, parse_mode="HTML", reply_markup=kb.review_keyboard()
+            html_summary, parse_mode="HTML", reply_markup=kb.review_keyboard(tpl)
         )
 
 
@@ -124,7 +125,13 @@ async def on_review_edit(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(BotStates.FILLING)
 
-    title = BLOCKS[block_num]["title"]
+    tpl = await get_template()
+    try:
+        b = tpl.get_block(block_num)
+        title = b.title
+    except ValueError:
+        title = f"блок {block_num}"
+
     await callback.message.answer(
         f"<b>Редактирование: Блок {block_num} — {title}</b>\n\nВведите новый текст для этого блока:",
         parse_mode="HTML",

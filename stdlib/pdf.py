@@ -5,7 +5,6 @@ PDF-генерация служебной записки через ReportLab с
 import re
 import io
 import json
-from functools import partial
 from io import BytesIO
 from pathlib import Path
 
@@ -32,6 +31,7 @@ from datetime import datetime
 
 from bot.logger import logger
 import stdlib.db as db
+from stdlib.template import ApplicationTemplate, get_template
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
@@ -122,6 +122,56 @@ def _styles() -> dict:
     }
 
 
+def _normalize_risk_placeholder(block_title: str, body_raw: str) -> str:
+    if "риск" in block_title.lower() and body_raw.lower().strip() == "не применимо":
+        return "(не применимо)"
+    return body_raw
+
+
+def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> None:
+    section_elements = [Paragraph(title, s["section_title"])]
+    lines = [line.strip() for line in body.split("\n") if line.strip()]
+
+    has_numbering = any(
+        len(line) > 2
+        and line[0].isdigit()
+        and (line[1:3] == ". " or line[1:3] == ") ")
+        for line in lines
+    )
+
+    if has_numbering and lines:
+        bullet_items = []
+        for line in lines:
+            clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
+            bullet_items.append(ListItem(Paragraph(clean_line, s["body"])))
+
+        section_elements.append(
+            ListFlowable(
+                bullet_items, bulletType="bullet", start="•", leftIndent=15
+            )
+        )
+    else:
+        for line in lines:
+            section_elements.append(Paragraph(line, s["body"]))
+
+    story.append(KeepTogether(section_elements))
+    story.append(Spacer(1, 6))
+
+
+def _parse_attachments_field(raw) -> list:
+    attachments = raw or []
+    if isinstance(attachments, str):
+        try:
+            valid_json_str = attachments.replace("'", '"')
+            attachments = json.loads(valid_json_str)
+        except Exception:
+            if attachments.strip() in ("[]", "", "[ ]"):
+                attachments = []
+            else:
+                attachments = [attachments]
+    return attachments
+
+
 # ─── Отрисовка фона ──────────────────────────────────────────────────────────
 def draw_background(canvas, doc):
     """Логотип на всех страницах кроме последней."""
@@ -196,8 +246,18 @@ class _LastPageCanvas(Canvas):
 
 
 # ─── Генерация ────────────────────────────────────────────────────────────────
-async def generate_pdf(data: dict, user_id: int | None = None) -> BytesIO:
-    """Генерирует PDF служебной записки с авто-подписью."""
+async def generate_pdf(
+    data: dict,
+    user_id: int | None = None,
+    *,
+    tpl: ApplicationTemplate | None = None,
+    blocks_map: dict[str, str] | None = None,
+) -> BytesIO:
+    """Генерирует PDF служебной записки с авто-подписью.
+
+    Заявка из БД: передайте ``tpl`` и ``blocks_map`` (ключи — ``str(block_id)``).
+    Локальные тесты: плоский ``data`` (topic, description, …) без ``tpl``.
+    """
     try:
         if not data:
             data = {}
@@ -228,69 +288,50 @@ async def generate_pdf(data: dict, user_id: int | None = None) -> BytesIO:
 
         # ── Заголовок ──
         story.append(Paragraph("СЛУЖЕБНАЯ ЗАПИСКА", s["title"]))
-        topic = data.get("topic") or ""
+        if tpl is not None and blocks_map is not None and tpl.blocks:
+            topic = blocks_map.get(str(tpl.blocks[0].id), "") or "Без темы"
+        else:
+            topic = data.get("topic") or ""
         story.append(Paragraph(f"по вопросу «{topic}»", s["subtitle"]))
 
-        # ── Блоки ──
-        risks_raw = data.get("risks") or ""
-        risks_text = (
-            "(не применимо)"
-            if risks_raw.lower().strip() == "не применимо"
-            else risks_raw
-        )
-
-        sections = [
-            ("1. Краткое описание и суть вопроса:", data.get("description") or ""),
-            ("2. Основание для вынесения:", data.get("basis") or ""),
-            ("3. Предлагаемое решение / варианты решений:", data.get("solution") or ""),
-            ("4. Риски и последствия (если актуально):", risks_text),
-        ]
-
-        for title, body in sections:
-            section_elements = [Paragraph(title, s["section_title"])]
-            lines = [line.strip() for line in body.split("\n") if line.strip()]
-
-            has_numbering = any(
-                len(line) > 2
-                and line[0].isdigit()
-                and (line[1:3] == ". " or line[1:3] == ") ")
-                for line in lines
-            )
-
-            if has_numbering and lines:
-                bullet_items = []
-                for line in lines:
-                    clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
-                    bullet_items.append(ListItem(Paragraph(clean_line, s["body"])))
-
-                section_elements.append(
-                    ListFlowable(
-                        bullet_items, bulletType="bullet", start="•", leftIndent=15
-                    )
+        # ── Текстовые блоки ──
+        if tpl is not None and blocks_map is not None:
+            for sec_idx, block in enumerate(tpl.blocks[1:], start=1):
+                raw = blocks_map.get(str(block.id), "")
+                body = _normalize_risk_placeholder(block.title, raw)
+                _append_section_paragraphs(
+                    story, f"{sec_idx}. {block.title}:", body, s
                 )
-            else:
-                for line in lines:
-                    section_elements.append(Paragraph(line, s["body"]))
-
-            story.append(KeepTogether(section_elements))
-            story.append(Spacer(1, 6))
+            attach_num = len(tpl.blocks)
+        else:
+            risks_raw = data.get("risks") or ""
+            risks_text = (
+                "(не применимо)"
+                if risks_raw.lower().strip() == "не применимо"
+                else risks_raw
+            )
+            sections = [
+                ("1. Краткое описание и суть вопроса:", data.get("description") or ""),
+                ("2. Основание для вынесения:", data.get("basis") or ""),
+                (
+                    "3. Предлагаемое решение / варианты решений:",
+                    data.get("solution") or "",
+                ),
+                ("4. Риски и последствия (если актуально):", risks_text),
+            ]
+            for title, body in sections:
+                _append_section_paragraphs(story, title, body, s)
+            attach_num = 5
 
         # ── Приложения ──
         story.append(
-            Paragraph("5. Приложения / дополнительные материалы:", s["section_title"])
+            Paragraph(
+                f"{attach_num}. Приложения / дополнительные материалы:",
+                s["section_title"],
+            )
         )
 
-        attachments = data.get("attachments") or []
-
-        if isinstance(attachments, str):
-            try:
-                valid_json_str = attachments.replace("'", '"')
-                attachments = json.loads(valid_json_str)
-            except Exception:
-                if attachments.strip() in ("[]", "", "[ ]"):
-                    attachments = []
-                else:
-                    attachments = [attachments]
+        attachments = _parse_attachments_field(data.get("attachments"))
 
         if attachments and isinstance(attachments, list) and len(attachments) > 0:
             items = [
@@ -391,17 +432,18 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     u_id = app_raw["user_id"]
     try:
         blocks = json.loads(app_raw.get("blocks", "{}"))
-    except:
+    except Exception:
         blocks = {}
 
-    # Та самая логика очистки файлов, но теперь она живет здесь
+    tpl = await get_template()
+
     raw_att = app_raw.get("attachments")
     clean_atts = []
     if raw_att:
         if isinstance(raw_att, str):
             try:
                 raw_att = json.loads(raw_att.replace("'", '"'))
-            except:
+            except Exception:
                 raw_att = []
         if isinstance(raw_att, list):
             for f in raw_att:
@@ -410,19 +452,14 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
                 else:
                     clean_atts.append(str(f))
 
-    # Формируем данные
     pdf_data = {
         "app_id": app_id,
-        "topic": blocks.get("1", "Без темы"),
-        "description": blocks.get("2", ""),
-        "basis": blocks.get("3", ""),
-        "solution": blocks.get("4", ""),
-        "risks": blocks.get("5", ""),
         "attachments": clean_atts,
         "full_name": await db.get_user_full_name(u_id),
         "position": await db.get_user_position(u_id),
         "date": app_raw["created_at"].strftime("%d.%m.%Y"),
     }
 
-    # Возвращаем готовый буфер
-    return await generate_pdf(pdf_data, user_id=u_id)
+    return await generate_pdf(
+        pdf_data, user_id=u_id, tpl=tpl, blocks_map=blocks
+    )

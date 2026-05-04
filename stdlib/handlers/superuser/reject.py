@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.config import config
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
+from stdlib.template import get_template
 
 router = Router()
 
@@ -52,6 +53,7 @@ async def on_feedback(message: Message, state: FSMContext, bot: Bot):
     await message.answer(f"Замечания по заявке #{app_id} отправлены автору.")
 
     app = await db.get_app(app_id)
+    tpl = await get_template()
     try:
         await bot.send_message(
             app["user_id"],
@@ -59,7 +61,7 @@ async def on_feedback(message: Message, state: FSMContext, bot: Bot):
             f"<b>Замечания:</b>\n{feedback_text}\n\n"
             "Выберите блок для редактирования:",
             parse_mode="HTML",
-            reply_markup=kb.rework_keyboard(),
+            reply_markup=kb.rework_keyboard(tpl),
         )
     except Exception as e:
         logger.error(

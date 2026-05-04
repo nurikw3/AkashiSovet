@@ -9,6 +9,7 @@ from aiogram.types import Message, CallbackQuery
 from stdlib.handlers.blocks import BLOCKS
 from stdlib.handlers.states import BotStates
 from stdlib.intent import is_delegation
+from stdlib.template import get_template
 
 router = Router()
 
@@ -26,10 +27,19 @@ async def on_rework_select(callback: CallbackQuery, state: FSMContext):
     blocks = json.loads(app["blocks"])
     current_text = blocks.get(str(block_num), "")
 
+    tpl = await get_template()
+    try:
+        block_title = tpl.get_block(block_num).title
+    except ValueError:
+        try:
+            block_title = BLOCKS[block_num]["title"]
+        except KeyError:
+            block_title = f"блок {block_num}"
+
     await state.set_state(BotStates.REWORK)
     await state.update_data(app_id=app["id"], rework_block=block_num, mode="input")
     await callback.message.answer(
-        f"<b>Текущий текст блока «{BLOCKS[block_num]['title']}»:</b>\n\n"
+        f"<b>Текущий текст блока «{block_title}»:</b>\n\n"
         f"<i>{current_text}</i>\n\n"
         "Введите исправленный вариант:",
         parse_mode="HTML",
@@ -76,9 +86,10 @@ async def on_rework_input(message: Message, state: FSMContext):
 async def on_rework_confirmed(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.update_data(mode="input")
+    tpl = await get_template()
     await callback.message.answer(
         "Выберите другой блок для правки или отправьте заявку повторно:",
-        reply_markup=kb.rework_keyboard(),
+        reply_markup=kb.rework_keyboard(tpl),
     )
 
 
@@ -87,7 +98,15 @@ async def on_rework_edit(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     data = await state.get_data()
     await state.update_data(mode="input")
-    block_title = BLOCKS[data["rework_block"]]["title"]
+    tpl = await get_template()
+    rb = data["rework_block"]
+    try:
+        block_title = tpl.get_block(rb).title
+    except ValueError:
+        try:
+            block_title = BLOCKS[rb]["title"]
+        except KeyError:
+            block_title = f"блок {rb}"
     await callback.message.answer(
         f"Введите исправленный текст для блока «{block_title}»:"
     )

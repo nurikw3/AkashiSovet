@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from stdlib.handlers.blocks import BLOCKS
+from stdlib.template import ApplicationTemplate
 
 
 def _cancel_button():
@@ -45,16 +46,27 @@ def approve_reject_keyboard(app_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def rework_keyboard() -> InlineKeyboardMarkup:
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text=f"Блок {i} — {BLOCKS[i]['title']}",
-                callback_data=f"rework_block_{i}",
-            )
+def rework_keyboard(tpl: ApplicationTemplate | None = None) -> InlineKeyboardMarkup:
+    if tpl is not None:
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    text=f"Блок {b.id} — {b.title}",
+                    callback_data=f"rework_block_{b.id}",
+                )
+            ]
+            for b in tpl.blocks
         ]
-        for i in range(1, 6)
-    ]
+    else:
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    text=f"Блок {i} — {BLOCKS[i]['title']}",
+                    callback_data=f"rework_block_{i}",
+                )
+            ]
+            for i in range(1, 6)
+        ]
     buttons.append(
         [
             InlineKeyboardButton(
@@ -68,16 +80,27 @@ def rework_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def review_keyboard() -> InlineKeyboardMarkup:
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text=f"✏️ Изменить Блок {i}",
-                callback_data=f"review_edit_{i}",
-            )
+def review_keyboard(tpl: ApplicationTemplate | None = None) -> InlineKeyboardMarkup:
+    if tpl is not None:
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    text=f"✏️ {idx}. {b.title}"[:64],
+                    callback_data=f"review_edit_{b.id}",
+                )
+            ]
+            for idx, b in enumerate(tpl.blocks, start=1)
         ]
-        for i in range(1, 6)
-    ]
+    else:
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    text=f"✏️ Изменить Блок {i}",
+                    callback_data=f"review_edit_{i}",
+                )
+            ]
+            for i in range(1, 6)
+        ]
     buttons.append(
         [
             InlineKeyboardButton(

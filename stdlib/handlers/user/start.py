@@ -5,8 +5,8 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
-from stdlib.handlers.blocks import BLOCKS
 from stdlib.handlers.states import BotStates
+from stdlib.template import get_template
 
 router = Router()
 
@@ -45,12 +45,16 @@ async def cmd_start(message: Message, state: FSMContext):
             parse_mode="HTML",
         )
     else:
+        tpl = await get_template()
+        first = tpl.blocks[0]
         await state.set_state(BotStates.FILLING)
-        await state.update_data(app_id=app_id, current_block=1, mode="input")
+        await state.update_data(
+            app_id=app_id, current_block=first.id, mode="input"
+        )
         await message.answer(
-            f"Добрый день! Заполним служебную записку на Правление.\n\n"
-            f"<b>Блок 1 из 5 — {BLOCKS[1]['title']}</b>\n\n"
-            f"{BLOCKS[1]['question']}",
+            "Добрый день! Заполним служебную записку на Правление.\n\n"
+            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
+            f"{first.question}",
             parse_mode="HTML",
         )
 
@@ -65,7 +69,7 @@ async def cmd_mode(message: Message):
     mode_name = (
         "Свободный ввод (ИИ сам соберёт заявку)"
         if new_mode == "free"
-        else "Пошаговый (5 вопросов)"
+        else "Пошаговый (поля из шаблона)"
     )
     await message.answer(
         f"🔄 Режим изменен.\nТекущий режим: <b>{mode_name}</b>\n\nИспользуйте /start для создания новой заявки.",
@@ -165,9 +169,14 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
             parse_mode="HTML",
         )
     else:
+        tpl = await get_template()
+        first = tpl.blocks[0]
         await state.set_state(BotStates.FILLING)
-        await state.update_data(app_id=app_id, current_block=1, mode="input")
+        await state.update_data(
+            app_id=app_id, current_block=first.id, mode="input"
+        )
         await callback.message.answer(
-            f"<b>Блок 1 из 5 — {BLOCKS[1]['title']}</b>\n\n{BLOCKS[1]['question']}",
+            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
+            f"{first.question}",
             parse_mode="HTML",
         )

@@ -1,94 +1,121 @@
-<tr id="app-row-{{ app.id }}"
-    class="hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-all group border-b border-gray-100 dark:border-white/[0.05]">
-    <td class="px-8 py-7 font-mono text-[11px]">
-        <div class="flex flex-col gap-2">
-            <span class="text-gray-400">#{{ app.id }}</span>
-            <a href="/download/{{ app.id }}" target="_blank"
-                class="flex items-center gap-1.5 text-akashi-red font-black text-[9px] uppercase tracking-widest hover:text-red-400 transition-colors group/pdf">
-                <svg class="w-3 h-3 transition-transform group-hover/pdf:scale-110" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                Просмотр PDF
-            </a>
-            {% if app.reject_count > 0 %}
-            <span class="text-[9px] text-orange-500 font-bold">[{{ app.reject_count }} правки]</span>
+<!-- @format-ignore -->
+<tr id="row-{{ app.id }}"
+    class="border-b border-gray-50 dark:border-white/5 hover:bg-gray-50/50 dark:hover:bg-white/2 transition-colors animate-row last:border-0">
+
+    {% if meeting_basket %}
+    <td class="px-3 py-4 w-11 align-middle">
+        {% if app.status in ['approved', 'done'] %}
+        <input type="checkbox" name="app_id" value="{{ app.id }}" form="meeting-create-form"
+               class="w-4 h-4 rounded border-gray-300 dark:border-white/20 bg-white dark:bg-black/40 text-akashi-red focus:ring-akashi-red/30" />
+        {% endif %}
+    </td>
+    {% endif %}
+
+    <!-- ID -->
+    <td class="px-6 py-4">
+        <span class="text-[10px] font-black text-gray-400 font-mono">#{{ app.id }}</span>
+    </td>
+
+    <!-- Applicant -->
+    <td class="px-6 py-4">
+        <div>
+            <p class="font-bold text-sm dark:text-white">{{ app.display_name }}</p>
+            {% if app.position %}
+            <p class="text-[9px] text-gray-400 mt-0.5 uppercase tracking-wide font-bold">{{ app.position }}</p>
             {% endif %}
         </div>
     </td>
 
-    <td class="px-8 py-7">
-        <div class="font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">{{ app.display_name }}</div>
-        <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest mt-1">{{ app.position or 'Сотрудник' }}
-        </div>
+    <!-- Topic -->
+    <td class="px-6 py-4 max-w-xs">
+        <p class="text-sm text-gray-700 dark:text-gray-300 truncate" title="{{ app.topic }}">{{ app.topic }}</p>
+        {% if app.feedback %}
+        <p class="text-[9px] text-akashi-red mt-1 truncate font-bold" title="{{ app.feedback }}">↩ {{ app.feedback }}
+        </p>
+        {% endif %}
     </td>
 
-    <td class="px-8 py-7 text-gray-500 dark:text-gray-400 text-xs italic leading-relaxed max-w-sm">
-        {{ app.topic }}
+    <!-- Status -->
+    <td class="px-6 py-4">
+        <span class="status-badge status-{{ app.status }}">
+            {% if app.status == 'pending' %}⏳
+            {% elif app.status == 'approved' %}✓
+            {% elif app.status == 'done' %}✓✓
+            {% elif app.status == 'rework' %}↩
+            {% elif app.status == 'draft' %}✎
+            {% endif %}
+            {{ app.status }}
+        </span>
+        {% if app.reject_count and app.reject_count > 0 %}
+        <span class="block text-[9px] text-gray-400 mt-1 font-bold">{{ app.reject_count }}× rework</span>
+        {% endif %}
     </td>
 
-    <td class="px-8 py-7">
-        <div class="flex flex-wrap gap-2">
+    <!-- Date -->
+    <td class="px-6 py-4">
+        <p class="text-[10px] text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
+            {{ app.created_at | datetime }}
+        </p>
+    </td>
+
+    <!-- Files -->
+    <td class="px-6 py-4">
+        <div class="flex flex-col gap-1.5">
+            <a href="/download/{{ app.id }}" target="_blank"
+                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors">
+                <span>📄</span> PDF
+            </a>
             {% for f in app.parsed_attachments %}
-            <a href="/download_attachment/{{ f.file_id }}" target="_blank"
-                class="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg hover:scale-110 transition-all shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
+            <a href="/download_attachment/{{ f.s3_key }}" target="_blank"
+                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors max-w-[120px]">
+                <span>📎</span>
+                <span class="truncate">{{ f.file_name }}</span>
             </a>
             {% endfor %}
-            {% if not app.parsed_attachments %}<span class="text-[9px] text-gray-300 font-bold">НЕТ</span>{% endif %}
         </div>
     </td>
 
-    <td class="px-8 py-7 text-center">
-        <span class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border
-            {% if app.status == 'pending' %}bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-500/10 dark:border-yellow-500/20
-            {% elif app.status == 'approved' %}bg-green-50 text-green-600 border-green-200 dark:bg-green-500/10 dark:border-green-500/20
-            {% elif app.status == 'rework' %}bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-500/10 dark:border-orange-500/20
-            {% else %}bg-red-50 text-akashi-red border-red-200 dark:bg-red-500/10 dark:border-red-500/20{% endif %}">
-            {{ 'ОЖИДАНИЕ' if app.status == 'pending' else 'ПРАВКИ' if app.status == 'rework' else app.status }}
-        </span>
-    </td>
-
-    <td class="px-8 py-7 text-right">
+    <!-- Actions -->
+    <td class="px-6 py-4 text-right">
         {% if app.status == 'pending' %}
-        <div id="actions-{{ app.id }}"
-            class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-            <button hx-post="/approve/{{ app.id }}" hx-target="#app-row-{{ app.id }}" hx-swap="outerHTML"
-                class="bg-akashi-red text-white px-5 py-2 rounded-xl text-[10px] font-black shadow-lg shadow-akashi-red/20 hover:scale-105 active:scale-95 transition-all">
-                ОДОБРИТЬ
+        <div id="actions-{{ app.id }}" class="flex items-center justify-end gap-2">
+            <button hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
+                class="px-4 py-2 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 text-green-600 dark:text-green-400 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95">
+                ✓ Approve
             </button>
-            <button onclick="showRejectForm('{{ app.id }}')"
-                class="bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300 px-5 py-2 rounded-xl text-[10px] font-black hover:bg-gray-200 dark:hover:bg-white/20 transition-all">
-                РЕВОРК
+            <button onclick="showRejectForm({{ app.id }})" ;
+                class="px-4 py-2 bg-akashi-red/10 hover:bg-akashi-red/20 border border-akashi-red/20 text-akashi-red text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95">
+                ↩ Rework
             </button>
         </div>
 
-        <div id="reject-form-{{ app.id }}" class="hidden animate-fade">
-            <form hx-post="/reject/{{ app.id }}" hx-target="#app-row-{{ app.id }}" hx-swap="outerHTML"
+        <div id="reject-form-{{ app.id }}" class="hidden">
+            <form hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
                 class="flex flex-col gap-2 items-end">
-                <textarea name="feedback" placeholder="Что исправить?" required
-                    class="w-64 p-3 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 ring-akashi-red/50 transition-all"></textarea>
-                <div class="flex gap-4">
-                    <button type="button" onclick="hideRejectForm('{{ app.id }}')"
-                        class="text-[9px] text-gray-400 font-black uppercase">Отмена</button>
+                <textarea name="feedback" required placeholder="Укажите замечания..." rows="2"
+                    class="w-64 bg-gray-50 dark:bg-black/60 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-akashi-red/20 dark:text-white resize-none"></textarea>
+                <div class="flex gap-2">
+                    <button type="button" onclick="hideRejectForm({{ app.id }})"
+                        class="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors">
+                        Cancel
+                    </button>
                     <button type="submit"
-                        class="bg-gray-900 dark:bg-white text-white dark:text-black px-4 py-1.5 rounded-lg text-[9px] font-black uppercase">Оправить</button>
+                        class="px-4 py-2 bg-akashi-red text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-akashi-red/20">
+                        Send
+                    </button>
                 </div>
             </form>
         </div>
+
+        {% elif app.status in ['approved', 'done'] %}
+        <span class="text-[9px] font-black uppercase tracking-widest text-green-500">✓ Done</span>
+
+        {% elif app.status == 'rework' %}
+        <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red">↩ Rework</span>
+
         {% else %}
-        <div class="flex flex-col items-end">
-            <span class="text-[9px] text-gray-400 uppercase font-black tracking-widest">Обработано</span>
-            {% if app.feedback %}
-            <span class="text-[9px] text-gray-400 italic mt-1">"{{ app.feedback }}"</span>
-            {% endif %}
-        </div>
+        <span class="text-[9px] font-black uppercase tracking-widest text-gray-300 dark:text-gray-600">—</span>
         {% endif %}
     </td>
+
 </tr>

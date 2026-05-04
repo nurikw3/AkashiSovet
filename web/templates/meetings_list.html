@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade">
+    {% if created_ok %}
+    <div class="mb-6 px-5 py-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
+        ✓ Заседание создано
+    </div>
+    {% endif %}
+
+    <div class="flex items-start justify-between mb-10 gap-6 flex-wrap">
+        <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                <a href="/" class="hover:text-akashi-red transition-colors">← Applications</a>
+            </p>
+            <h1 class="text-3xl font-black tracking-tighter dark:text-white">Meetings</h1>
+            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+                Предстоящие и прошедшие заседания Правления
+            </p>
+        </div>
+    </div>
+
+    <section class="mb-12">
+        <h2 class="text-lg font-black dark:text-white mb-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            Upcoming
+        </h2>
+        {% if upcoming %}
+        <div class="space-y-3">
+            {% for m in upcoming %}
+            <a href="/meetings/{{ m.id }}"
+               class="block bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 shadow-sm hover:border-akashi-red/40 transition-colors">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <p class="text-xl font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+                            #{{ m.id }} · {{ m.application_ids|length }} заявок
+                        </p>
+                    </div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red">Open →</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+            Нет предстоящих заседаний
+        </p>
+        {% endif %}
+    </section>
+
+    <section>
+        <h2 class="text-lg font-black dark:text-white mb-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+            Past
+        </h2>
+        {% if past %}
+        <div class="space-y-3">
+            {% for m in past %}
+            <a href="/meetings/{{ m.id }}"
+               class="block bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 shadow-sm hover:border-akashi-red/40 transition-colors opacity-90">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <p class="text-lg font-black dark:text-white">{{ m.scheduled_date | datefmt }}</p>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
+                            #{{ m.id }} · {{ m.application_ids|length }} заявок
+                        </p>
+                    </div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400">Details →</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+            Прошедших заседаний пока нет
+        </p>
+        {% endif %}
+    </section>
+</div>
+
+{% endblock %}

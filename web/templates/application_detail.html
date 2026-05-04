@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade max-w-2xl">
+    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
+        <a href="javascript:history.back()" class="hover:text-akashi-red transition-colors">← Back</a>
+        <span class="text-gray-600 mx-2">·</span>
+        <a href="/" class="hover:text-akashi-red transition-colors">Applications</a>
+    </p>
+
+    <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+            <h1 class="text-2xl font-black tracking-tighter dark:text-white">Заявка #{{ app.id }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}</p>
+        </div>
+        <span class="status-badge status-{{ app.status }}">{{ app.status }}</span>
+    </div>
+
+    <div class="bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-sm space-y-6">
+        <div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Тема</p>
+            <p class="text-base dark:text-white whitespace-pre-wrap">{{ app.topic }}</p>
+        </div>
+
+        <div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Создано</p>
+            <p class="text-sm font-mono text-gray-600 dark:text-gray-300">{{ app.created_at | datetime }}</p>
+        </div>
+
+        {% if app.feedback %}
+        <div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Комментарий</p>
+            <p class="text-sm text-akashi-red whitespace-pre-wrap">{{ app.feedback }}</p>
+        </div>
+        {% endif %}
+
+        <div class="pt-4 border-t border-gray-100 dark:border-white/10">
+            <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Файлы</p>
+            <div class="flex flex-col gap-2">
+                <a href="/download/{{ app.id }}" target="_blank"
+                   class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-akashi-red hover:underline">
+                    📄 PDF отчёт
+                </a>
+                {% for f in app.parsed_attachments %}
+                <a href="/download_attachment/{{ f.s3_key }}" target="_blank"
+                   class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red truncate">
+                    📎 {{ f.file_name }}
+                </a>
+                {% endfor %}
+                {% if not app.parsed_attachments %}
+                <p class="text-xs text-gray-500">Вложений нет</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

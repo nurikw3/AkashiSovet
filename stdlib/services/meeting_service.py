@@ -37,3 +37,29 @@ async def get_by_id(meeting_id: int) -> Meeting | None:
     if not row:
         return None
     return Meeting.model_validate(row)
+
+
+async def create_meeting_with_applications(
+    scheduled_date: date,
+    created_by: int,
+    application_ids: list[int],
+) -> Meeting:
+    """Создаёт заседание и прикрепляет заявки (только status approved или done)."""
+    if not application_ids:
+        raise ValueError("Выберите хотя бы одну заявку")
+    ids = list(dict.fromkeys(int(x) for x in application_ids))
+    status_map = await db.get_application_status_by_ids(ids)
+    for aid in ids:
+        st = status_map.get(aid)
+        if st is None:
+            raise ValueError(f"Заявка {aid} не найдена")
+        if st not in ("approved", "done"):
+            raise ValueError(
+                "В заседание можно добавить только согласованные заявки (approved / done)"
+            )
+    meeting = await create_meeting(scheduled_date, created_by)
+    await add_applications(meeting.id, ids)
+    updated = await get_by_id(meeting.id)
+    if not updated:
+        raise RuntimeError("meeting_create_with_apps: meeting missing after insert")
+    return updated

@@ -458,6 +458,36 @@ async def get_applications(tab: str = "active", status: str | None = None) -> li
     return [dict(r) for r in rows]
 
 
+async def get_application_status_by_ids(ids: list[int]) -> dict[int, str]:
+    """id заявки → status (только для существующих id из списка)."""
+    if not ids:
+        return {}
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
+            "SELECT id, status FROM applications WHERE id = ANY($1::int[])",
+            ids,
+        )
+    return {r["id"]: r["status"] for r in rows}
+
+
+async def get_applications_by_ids(ids: list[int]) -> list[dict]:
+    """Заявки с JOIN к users, порядок как в `ids` (пропуск отсутствующих id)."""
+    if not ids:
+        return []
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT a.*, u.full_name, u.position
+            FROM applications a
+            LEFT JOIN users u ON a.user_id = u.user_id
+            WHERE a.id = ANY($1::int[])
+            """,
+            ids,
+        )
+    by_id = {r["id"]: dict(r) for r in rows}
+    return [by_id[i] for i in ids if i in by_id]
+
+
 # ─── Meetings (таблица `meetings`) ───────────────────────────────────────────
 
 

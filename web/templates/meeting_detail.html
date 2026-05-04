@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade max-w-3xl">
+    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
+        <a href="/meetings" class="hover:text-akashi-red transition-colors">← Meetings</a>
+    </p>
+
+    <h1 class="text-3xl font-black tracking-tighter dark:text-white mb-1">
+        {{ meeting.scheduled_date | datefmt }}
+    </h1>
+    <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-10">
+        Заседание #{{ meeting.id }} · создано {{ meeting.created_at | datetime }}
+    </p>
+
+    <h2 class="text-sm font-black uppercase tracking-widest text-gray-500 mb-4">Заявки</h2>
+
+    {% if apps %}
+    <ul class="space-y-3">
+        {% for app in apps %}
+        <li class="bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="min-w-0">
+                    <a href="/applications/{{ app.id }}"
+                       class="font-bold text-sm dark:text-white hover:text-akashi-red transition-colors truncate block">
+                        #{{ app.id }} — {{ app.topic }}
+                    </a>
+                    <p class="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-wide">
+                        {{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}
+                    </p>
+                </div>
+                <div class="flex items-center gap-3 flex-shrink-0">
+                    <span class="status-badge status-{{ app.status }}">{{ app.status }}</span>
+                    <a href="/download/{{ app.id }}" target="_blank"
+                       class="text-[9px] font-black uppercase tracking-widest text-akashi-red hover:underline">
+                        PDF
+                    </a>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-500 py-8 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+        К этому заседанию заявки не прикреплены
+    </p>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from datetime import datetime
+from datetime import date, datetime
 from aiogram import Bot
 from urllib.parse import quote
 from bot.logger import logger
@@ -20,7 +20,7 @@ import bcrypt
 
 from stdlib import resources
 from stdlib.models import Application
-from stdlib.services import application_service, file_service
+from stdlib.services import application_service, file_service, meeting_service
 from stdlib.services.notification_service import (
     notify_user_application_approved,
     notify_user_application_rework,
@@ -58,6 +58,9 @@ app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="web/templates")
 templates.env.filters["datetime"] = lambda v: (
     v.strftime("%d.%m.%Y %H:%M") if isinstance(v, datetime) else v
+)
+templates.env.filters["datefmt"] = lambda v: (
+    v.strftime("%d.%m.%Y") if isinstance(v, date) else v
 )
 
 
@@ -329,12 +332,14 @@ async def dashboard(
     raw_apps = await application_service.list_applications(tab, status_filter)
     parsed_apps = [_parse_app(a) for a in raw_apps]
     counts = await application_service.get_status_counts()
+    meeting_basket = tab == "archive"
     ctx = {
         "request": request,
         "apps": parsed_apps,
         "tab": tab,
         "status_filter": status_filter,
         "counts": counts,
+        "meeting_basket": meeting_basket,
     }
     tpl = "table_body.html" if "hx-request" in request.headers else "index.html"
     return templates.TemplateResponse(request=request, name=tpl, context=ctx)
@@ -439,5 +444,99 @@ async def _render_row(request, app_id):
     return templates.TemplateResponse(
         request=request,
         name="row.html",
+        context={
+            "request": request,
+            "app": _parse_app(row),
+            "meeting_basket": False,
+        },
+    )
+
+
+# --- MEETINGS ---
+
+
+@app.post("/meetings")
+async def meetings_create(request: Request, admin_id=Depends(get_admin)):
+    """Создаёт заседание и прикрепляет отмеченные согласованные заявки."""
+    form = await request.form()
+    raw_date = form.get("scheduled_date")
+    if not raw_date or not str(raw_date).strip():
+        return RedirectResponse(
+            url=f"/?tab=archive&meeting_err={quote('Укажите дату заседания')}",
+            status_code=303,
+        )
+    try:
+        scheduled = datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return RedirectResponse(
+            url=f"/?tab=archive&meeting_err={quote('Некорректная дата')}",
+            status_code=303,
+        )
+    raw_ids = form.getlist("app_id")
+    app_ids: list[int] = []
+    for x in raw_ids:
+        try:
+            app_ids.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    try:
+        await meeting_service.create_meeting_with_applications(
+            scheduled, admin_id, app_ids
+        )
+    except ValueError as e:
+        return RedirectResponse(
+            url=f"/?tab=archive&meeting_err={quote(str(e))}",
+            status_code=303,
+        )
+    logger.info("meeting created by admin {} date {}", admin_id, scheduled)
+    return RedirectResponse(url="/meetings?created=1", status_code=303)
+
+
+@app.get("/meetings", response_class=HTMLResponse)
+async def meetings_list(
+    request: Request, admin_id=Depends(get_admin), created: str | None = None
+):
+    upcoming = await meeting_service.get_upcoming()
+    past = await meeting_service.get_past()
+    return templates.TemplateResponse(
+        request=request,
+        name="meetings_list.html",
+        context={
+            "request": request,
+            "upcoming": upcoming,
+            "past": past,
+            "created_ok": created == "1",
+        },
+    )
+
+
+@app.get("/meetings/{meeting_id}", response_class=HTMLResponse)
+async def meeting_detail_page(
+    request: Request, meeting_id: int, admin_id=Depends(get_admin)
+):
+    meeting = await meeting_service.get_by_id(meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Заседание не найдено")
+    raw_list = await db.get_applications_by_ids(meeting.application_ids)
+    apps = [_parse_app(a) for a in raw_list]
+    return templates.TemplateResponse(
+        request=request,
+        name="meeting_detail.html",
+        context={"request": request, "meeting": meeting, "apps": apps},
+    )
+
+
+@app.get("/applications/{app_id}", response_class=HTMLResponse)
+async def application_detail_page(
+    request: Request, app_id: int, admin_id=Depends(get_admin)
+):
+    app = await application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    row = app.model_dump()
+    row["full_name"] = await db.get_user_full_name(app.user_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="application_detail.html",
         context={"request": request, "app": _parse_app(row)},
     )

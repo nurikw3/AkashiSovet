@@ -1,10 +1,4 @@
-# Образ приложения один на web+bot: сборка только у web (иначе два параллельных build
-# пишут в один тег akashisovet:app и BuildKit падает с «already exists»).
-# Первый запуск: docker compose up --build  (или: docker compose build web && docker compose up)
-# Для правок шаблонов/Python без пересборки: docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
-
 services:
-  # --- ВЕБ-ИНТЕРФЕЙС (FASTAPI) ---
   web:
     build: .
     image: akashisovet:app
@@ -16,16 +10,13 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://akashi:${POSTGRES_PASSWORD}@postgres:5432/akashi
-      # Внутри compose хост — имя сервиса, не localhost (иначе кэш и /web токены не работают)
       REDIS_URL: redis://redis:6379/0
-      # MinIO config
       S3_ENDPOINT_URL: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
       S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
       S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
-      # Публичный URL панели для одноразовых ссылок из бота (/web); с хоста: http://localhost:8000
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
     depends_on:
       postgres:
@@ -36,7 +27,6 @@ services:
         condition: service_healthy
     command: uv run uvicorn web.main:app --host 0.0.0.0 --port 8000
 
-  # --- ТЕЛЕГРАМ БОТ (тот же образ, что и web; без отдельного build — см. комментарий выше) ---
   bot:
     image: akashisovet:app
     pull_policy: never
@@ -65,7 +55,6 @@ services:
         condition: service_healthy
     command: uv run python -m bot.bot
 
-  # --- БАЗА ДАННЫХ ---
   postgres:
     image: postgres:16-alpine
     container_name: akashi_db
@@ -84,7 +73,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- КЭШ (REDIS) ---
   redis:
     image: redis:7-alpine
     container_name: akashi_redis
@@ -94,15 +82,14 @@ services:
     ports:
       - "6379:6379"
 
-  # --- S3 ХРАНИЛИЩЕ (MINIO) ---
   minio:
     image: minio/minio:latest
     container_name: akashi_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000" # API endpoint
-      - "9001:9001" # Web UI
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
@@ -114,20 +101,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- МОНИТОРИНГ ---
-grafana:
-  image: grafana/grafana:latest
-  container_name: akashi_grafana
-  restart: unless-stopped
-  ports:
-    - "3000:3000"
-  environment:
-    GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
-  volumes:
-    - grafana_data:/var/lib/grafana
-    - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-    - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+  grafana:
+    image: grafana/grafana:latest
+    container_name: akashi_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
 
 volumes:
   data:

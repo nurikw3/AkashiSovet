@@ -20,7 +20,9 @@ async def cmd_start(message: Message, state: FSMContext):
     full_name = await db.get_user_full_name(user_id)
     if not full_name:
         await message.answer(
-            "Перед созданием заявки, пожалуйста, укажите ваше Ф.И.О. с помощью команды /register"
+            "Перед созданием заявки, пожалуйста, укажите ваше Ф.И.О. с помощью команды /register\n "
+            "вашу должность с помощью команды /position (опционально)\n"
+            "вашу подпись с помощью команды /sign (опционально)"
         )
         return
 
@@ -127,7 +129,7 @@ async def cmd_sign(message: Message, state: FSMContext):
     await state.set_state(BotStates.WAITING_SIGNATURE)
     await message.answer(
         "🖋️ <b>Загрузка подписи</b>\n\n"
-        "Отправьте фото подписи одним сообщением.\n"
+        "Отправьте фото (1:1 , белый фон) подписи одним сообщением. \n"
         "Бот сохранит её в базу и будет автоматически подставлять в PDF.",
         parse_mode="HTML",
     )

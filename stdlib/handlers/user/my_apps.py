@@ -191,7 +191,7 @@ async def cb_view(callback: CallbackQuery, state: FSMContext):
     )
 
     kb_rows = [[InlineKeyboardButton(text="📥 PDF", callback_data=f"apps_dl_{app_id}")]]
-    if status in ("rework", "approved", "pending"):
+    if status in ("draft", "rework", "approved", "pending"):
         kb_rows.append(
             [
                 InlineKeyboardButton(
@@ -282,9 +282,9 @@ async def cb_rework_start(callback: CallbackQuery, state: FSMContext):
     app = await application_service.get_application(app_id)
     if not app or app.user_id != callback.from_user.id:
         return await callback.message.answer("❌ Нельзя редактировать")
-    if app.status not in ("rework", "approved", "pending"):
+    if app.status not in ("draft", "rework", "approved", "pending"):
         return await callback.message.answer(
-            "❌ Редактирование доступно для заявок на рассмотрении, одобренных или на доработке."
+            "❌ Редактирование доступно для черновиков, заявок на рассмотрении, одобренных или на доработке."
         )
 
     await state.clear()

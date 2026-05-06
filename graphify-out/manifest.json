@@ -112,8 +112,8 @@
     "hash": "ac1831fffdca6e58f3317a0b93f3e2bd"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/llm/prompts.py": {
-    "mtime": 1777914850.6993241,
-    "hash": "64e50ea4c2c2d55603ff1cdec1a58057"
+    "mtime": 1778043073.9998636,
+    "hash": "cd3a691931c790a32caa51f450b5cb6c"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/llm/free_form.py": {
     "mtime": 1777906037.5944533,
@@ -152,8 +152,8 @@
     "hash": "2c6188963e4b393cfa429bc6aa73c734"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/my_apps.py": {
-    "mtime": 1777914385.2284777,
-    "hash": "af7fdcd981042846715e253a138ba41c"
+    "mtime": 1778049718.5833087,
+    "hash": "181d26732fdda1fce540e9b2385dc71b"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/rework.py": {
     "mtime": 1778041148.0161378,
@@ -172,7 +172,7 @@
     "hash": "44e8d961f6d02a3f6df45b4aeb4ebd52"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/start.py": {
-    "mtime": 1778041148.0160685,
+    "mtime": 1778049718.5784671,
     "hash": "de63884d0f9bd2f5c4beaf920d098136"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/common.py": {
@@ -224,8 +224,8 @@
     "hash": "6767c79f9f7b781705046f4c620bfd99"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/docker-compose.yaml": {
-    "mtime": 1777911289.9857297,
-    "hash": "8c9cefebc3d51df88ed1ceaaa88e4682"
+    "mtime": 1778049232.9520245,
+    "hash": "699fe207a674c7fc390b68de90855521"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/PROJECT.MD": {
     "mtime": 1777906037.608375,
@@ -302,6 +302,14 @@
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/web/templates/meeting_detail.html": {
     "mtime": 1778042339.648845,
     "hash": "f4d870ee4ca3fa9038d6c7cf82f4a766"
+  },
+  "/Users/nurasyk/Desktop/python/projects/AkashiSovet/grafana/provisioning/datasources/datasources.yaml": {
+    "mtime": 1778048374.212194,
+    "hash": "e05b9fcc46da3363c7ce3b4f194f6aa8"
+  },
+  "/Users/nurasyk/Desktop/python/projects/AkashiSovet/grafana/provisioning/dashboards/dashboards.yaml": {
+    "mtime": 1778048414.6405299,
+    "hash": "c1c6ded3cf3f77d819ea0293fd6d129e"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/output_test.pdf": {
     "mtime": 1777318113.2126749,

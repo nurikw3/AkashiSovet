@@ -25,16 +25,26 @@ def confirm_keyboard(block_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def files_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def files_keyboard(attachment_names: list[str] | None = None) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for idx, name in enumerate(attachment_names or []):
+        label = (name or f"Файл {idx + 1}").strip() or f"Файл {idx + 1}"
+        rows.append(
             [
-                InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
-                InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
-            ],
-            [_cancel_button()[0]],
+                InlineKeyboardButton(
+                    text=f"🗑 Удалить: {label}"[:64],
+                    callback_data=f"files_del_{idx}",
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
         ]
     )
+    rows.append([_cancel_button()[0]])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def approve_reject_keyboard(app_id: int) -> InlineKeyboardMarkup:
@@ -52,12 +62,16 @@ def approve_reject_keyboard(app_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def rework_keyboard(tpl: ApplicationTemplate) -> InlineKeyboardMarkup:
+def rework_keyboard(tpl: ApplicationTemplate, app_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
         [
             InlineKeyboardButton(
                 text=f"Блок {b.id} — {b.title}",
-                callback_data=f"rework_block_{b.id}",
+                callback_data=(
+                    f"rework_block_{app_id}_{b.id}"
+                    if app_id is not None
+                    else f"rework_block_{b.id}"
+                ),
             )
         ]
         for b in tpl.blocks
@@ -65,10 +79,16 @@ def rework_keyboard(tpl: ApplicationTemplate) -> InlineKeyboardMarkup:
     buttons.append(
         [
             InlineKeyboardButton(
-                text="📎 Изменить приложения", callback_data="rework_files"
+                text="📎 Изменить приложения",
+                callback_data=(
+                    f"rework_files_{app_id}" if app_id is not None else "rework_files"
+                ),
             ),
             InlineKeyboardButton(
-                text="📤 Отправить повторно", callback_data="rework_submit"
+                text="📤 Отправить повторно",
+                callback_data=(
+                    f"rework_submit_{app_id}" if app_id is not None else "rework_submit"
+                ),
             ),
         ]
     )
@@ -128,5 +148,18 @@ def restart_or_continue_keyboard() -> InlineKeyboardMarkup:
                 ),
             ],
             [_cancel_button()[0]],
+        ]
+    )
+
+
+def cleanup_chat_keyboard(app_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🧹 Очистить служебные сообщения",
+                    callback_data=f"cleanup_chat_{app_id}",
+                )
+            ]
         ]
     )

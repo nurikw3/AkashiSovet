@@ -17,6 +17,13 @@ from stdlib.template import get_template
 router = Router()
 
 
+async def _remember_cleanup_message(state: FSMContext, message_id: int) -> None:
+    data = await state.get_data()
+    ids = list(data.get("cleanup_bot_message_ids") or [])
+    ids.append(message_id)
+    await state.update_data(cleanup_bot_message_ids=ids[-120:])
+
+
 async def _block_title(block_id: int) -> str:
     tpl = await get_template()
     try:
@@ -228,11 +235,12 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
     for idx, html in enumerate(
         chunk_blocks_summary_html(tpl, blocks, INTRO_STEP_FILLED_HTML)
     ):
-        await callback.message.answer(
+        sent = await callback.message.answer(
             html,
             parse_mode="HTML",
             reply_markup=kb.files_keyboard() if idx == 0 else None,
         )
+        await _remember_cleanup_message(state, sent.message_id)
 
 
 @router.callback_query(BotStates.FILLING, F.data.startswith("fcb_edit_"))

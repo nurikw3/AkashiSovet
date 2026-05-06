@@ -48,7 +48,9 @@
 
     <!-- Date -->
     <td class="px-4 py-3">
-        <span class="text-[9px] font-mono text-[#a09890] whitespace-nowrap">{{ app.created_at | datetime }}</span>
+        <span class="text-[9px] font-mono text-[#a09890] whitespace-nowrap">
+            {{ (app.t_submit or app.updated_at or app.created_at) | datetime }}
+        </span>
     </td>
 
     <!-- Files -->
@@ -58,6 +60,12 @@
                class="inline-flex items-center gap-1 text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors uppercase tracking-wide">
                 📄 PDF
             </a>
+            {% if app.parsed_attachments|length > 2 %}
+            <a href="/download_archive/{{ app.id }}" target="_blank"
+               class="inline-flex items-center gap-1 text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors uppercase tracking-wide">
+                🗜️ Архив
+            </a>
+            {% endif %}
             {% for f in app.parsed_attachments %}
             {% if f.s3_key %}
             <a href="/download_attachment/{{ f.s3_key }}" target="_blank"

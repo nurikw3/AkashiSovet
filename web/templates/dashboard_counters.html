@@ -1,19 +1,21 @@
 <!-- Editorial stat cards -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-px border border-[#DDD8CE] dark:border-[#242424] rounded-lg overflow-hidden mb-8 bg-[#DDD8CE] dark:bg-[#242424]">
-    <a href="/?status=pending" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
+    {% set q_suffix = '&q=' + (search_query|urlquote) if search_query else '' %}
+    {% set all_url = '/?q=' + (search_query|urlquote) if search_query else '/' %}
+    <a href="/?status=pending{{ q_suffix }}" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
         <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-amber-600 dark:text-amber-400 mb-2" data-i18n="count.pending">На рассмотрении</p>
         <p class="text-4xl font-bold font-mono text-[#111111] dark:text-[#EDE8DF] leading-none">{{ counts.pending }}</p>
     </a>
-    <a href="/?status=approved" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
+    <a href="/?status=approved{{ q_suffix }}" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
         <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-green-700 dark:text-green-400 mb-2" data-i18n="count.approved">Согласовано</p>
         <p class="text-4xl font-bold font-mono text-[#111111] dark:text-[#EDE8DF] leading-none">{{ counts.approved }}</p>
     </a>
-    <a href="/?status=rework" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
+    <a href="/?status=rework{{ q_suffix }}" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
         <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-ak-red dark:text-ak-red-d mb-2" data-i18n="count.rework">На доработке</p>
         <p class="text-4xl font-bold font-mono text-[#111111] dark:text-[#EDE8DF] leading-none">{{ counts.rework }}</p>
     </a>
-    <div class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5">
+    <a href="{{ all_url }}" class="bg-[#F7F4EF] dark:bg-[#141414] px-5 py-5 hover:bg-white dark:hover:bg-[#1A1A1A] transition-colors group">
         <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-2" data-i18n="count.total">Всего заявок</p>
         <p class="text-4xl font-bold font-mono text-[#111111] dark:text-[#EDE8DF] leading-none">{{ counts.total }}</p>
-    </div>
+    </a>
 </div>

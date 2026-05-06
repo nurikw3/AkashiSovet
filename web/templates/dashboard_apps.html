@@ -9,16 +9,42 @@
         </p>
     </div>
 
+    <div class="flex items-center gap-3 flex-wrap">
+        <form
+            hx-get="/"
+            hx-target="#dashboard-apps"
+            hx-push-url="true"
+            class="flex items-center"
+        >
+            {% if status_filter %}
+            <input type="hidden" name="status" value="{{ status_filter }}" />
+            {% endif %}
+            <input
+                type="search"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Поиск по ФИО"
+                class="ak-input h-9 w-52 text-xs"
+                hx-get="/"
+                hx-target="#app-table-body"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-trigger="input changed delay:250ms, search"
+            />
+        </form>
+
     <!-- Filter tabs -->
     <div class="flex items-center gap-1 flex-wrap">
         <span class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#b0a8a0] mr-1" data-i18n="dash.filter">Фильтр</span>
+        {% set q_suffix = '&q=' + (search_query|urlquote) if search_query else '' %}
         {% set filters = [('', 'filter.all'), ('draft', 'filter.draft'), ('pending', 'filter.pending'), ('rework', 'filter.rework'), ('approved', 'filter.approved')] %}
         {% for val, key in filters %}
         {% set is_active = (not val and not status_filter) or (val and status_filter == val) %}
-        <a href="{{ '/?status=' + val if val else '/' }}"
-           hx-get="{{ '/?status=' + val if val else '/' }}"
+        {% set url = ('/?status=' + val + q_suffix) if val else ('/?q=' + (search_query|urlquote) if search_query else '/') %}
+        <a href="{{ url }}"
+           hx-get="{{ url }}"
            hx-target="#dashboard-apps"
-           hx-push-url="{{ '/?status=' + val if val else '/' }}"
+           hx-push-url="{{ url }}"
            class="px-3 py-1.5 rounded text-[9px] font-mono font-bold tracking-wide uppercase transition-all
                   {% if is_active %}bg-ak-red text-white{% else %}bg-transparent border border-[#DDD8CE] dark:border-[#2A2A2A] text-[#a09890] hover:border-ak-red hover:text-ak-red dark:hover:border-ak-red-d dark:hover:text-ak-red-d{% endif %}"
            data-i18n="{{ key }}">
@@ -31,6 +57,7 @@
         </a>
         {% endfor %}
     </div>
+</div>
 </div>
 
 {% if meeting_basket %}

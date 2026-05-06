@@ -450,30 +450,60 @@ async def get_application_status_counts() -> dict[str, int]:
     }
 
 
-async def get_applications(status: str | None = None) -> list[dict]:
-    """Список заявок для веб-таблицы. Без фильтра — все статусы; иначе один из четырёх."""
+async def get_applications(
+    status: str | None = None, full_name_query: str | None = None
+) -> list[dict]:
+    """Список заявок для веб-таблицы с фильтром по статусу и поиском по ФИО."""
     allowed = frozenset({"draft", "pending", "rework", "approved"})
+    q = (full_name_query or "").strip()
+    like_q = f"%{q}%"
     async with _pool_conn() as conn:
         if status in allowed:
-            rows = await conn.fetch(
-                """
-                SELECT a.*, u.full_name, u.position
-                FROM applications a
-                LEFT JOIN users u ON a.user_id = u.user_id
-                WHERE a.status = $1
-                ORDER BY a.created_at DESC
-                """,
-                status,
-            )
+            if q:
+                rows = await conn.fetch(
+                    """
+                    SELECT a.*, u.full_name, u.position
+                    FROM applications a
+                    LEFT JOIN users u ON a.user_id = u.user_id
+                    WHERE a.status = $1
+                      AND COALESCE(u.full_name, '') ILIKE $2
+                    ORDER BY COALESCE(a.t_submit, a.updated_at, a.created_at) DESC
+                    """,
+                    status,
+                    like_q,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT a.*, u.full_name, u.position
+                    FROM applications a
+                    LEFT JOIN users u ON a.user_id = u.user_id
+                    WHERE a.status = $1
+                    ORDER BY COALESCE(a.t_submit, a.updated_at, a.created_at) DESC
+                    """,
+                    status,
+                )
         else:
-            rows = await conn.fetch(
-                """
-                SELECT a.*, u.full_name, u.position
-                FROM applications a
-                LEFT JOIN users u ON a.user_id = u.user_id
-                ORDER BY a.created_at DESC
-                """
-            )
+            if q:
+                rows = await conn.fetch(
+                    """
+                    SELECT a.*, u.full_name, u.position
+                    FROM applications a
+                    LEFT JOIN users u ON a.user_id = u.user_id
+                    WHERE COALESCE(u.full_name, '') ILIKE $1
+                    ORDER BY COALESCE(a.t_submit, a.updated_at, a.created_at) DESC
+                    """,
+                    like_q,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT a.*, u.full_name, u.position
+                    FROM applications a
+                    LEFT JOIN users u ON a.user_id = u.user_id
+                    ORDER BY COALESCE(a.t_submit, a.updated_at, a.created_at) DESC
+                    """
+                )
     return [dict(r) for r in rows]
 
 

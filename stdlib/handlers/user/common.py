@@ -34,3 +34,43 @@ async def on_cancel_app(callback: CallbackQuery, state: FSMContext):
         "Чтобы создать новую, введите /start.",
         parse_mode="HTML",
     )
+
+
+@router.callback_query(F.data.startswith("cleanup_chat_"))
+async def on_cleanup_chat(callback: CallbackQuery, state: FSMContext):
+    """Мягкая чистка служебных сообщений бота по завершённой заявке."""
+    await callback.answer()
+    try:
+        app_id = int(callback.data.split("_")[-1])
+    except ValueError:
+        await callback.message.answer("Некорректная кнопка.")
+        return
+
+    data = await state.get_data()
+    stored_app_id = data.get("cleanup_app_id")
+    if stored_app_id != app_id:
+        await callback.message.answer(
+            "Кнопка устарела. Отправьте заявку повторно и попробуйте ещё раз."
+        )
+        return
+
+    chat_id = callback.message.chat.id
+    to_delete = list(data.get("cleanup_bot_message_ids") or [])
+    if callback.message:
+        to_delete.append(callback.message.message_id)
+    unique_ids = list(dict.fromkeys(to_delete))[-120:]
+
+    deleted = 0
+    for mid in reversed(unique_ids):
+        try:
+            await callback.bot.delete_message(chat_id=chat_id, message_id=mid)
+            deleted += 1
+        except Exception:
+            # Старые/недоступные сообщения пропускаем.
+            continue
+
+    await state.clear()
+    await callback.bot.send_message(
+        chat_id=chat_id,
+        text=f"✅ Чат очищен. Удалено служебных сообщений: {deleted}.",
+    )

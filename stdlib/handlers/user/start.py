@@ -1,6 +1,7 @@
 import stdlib.db as db
 import stdlib.keyboards as kb
 from stdlib.services import application_service, file_service
+import json
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -12,6 +13,49 @@ from stdlib.template import get_template
 router = Router()
 
 
+HELP_TEXT_SETTINGS_KEY = "user_help_text"
+
+
+def _default_help_text() -> str:
+    return (
+        "📘 <b>Как пользоваться ботом AKASHI</b>\n\n"
+        "1) Заполните профиль:\n"
+        "• /register — ФИО\n"
+        "• /position — должность\n"
+        "• /sign — подпись\n\n"
+        "2) Создайте заявку: /start\n"
+        "3) Заполните блоки, добавьте файлы и отправьте на согласование.\n\n"
+        "Полезные команды:\n"
+        "• /mode — переключить режим (пошаговый / свободный)\n"
+        "• /web — вход в веб-панель\n"
+        "• /myapps — мои заявки"
+    )
+
+
+async def _get_help_text() -> str:
+    raw = await db.get_setting(HELP_TEXT_SETTINGS_KEY)
+    data = raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = None
+    if isinstance(data, dict):
+        txt = str(data.get("text") or "").strip()
+        if txt:
+            return txt
+    return _default_help_text()
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    txt = await _get_help_text()
+    try:
+        await message.answer(txt, parse_mode="HTML")
+    except Exception:
+        await message.answer(txt)
+
+
 @router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -21,8 +65,8 @@ async def cmd_start(message: Message, state: FSMContext):
     if not full_name:
         await message.answer(
             "Перед созданием заявки, пожалуйста, укажите ваше Ф.И.О. с помощью команды /register\n "
-            "вашу должность с помощью команды /position (опционально)\n"
-            "вашу подпись с помощью команды /sign (опционально)"
+            "вашу должность с помощью команды /position\n"
+            "вашу подпись с помощью команды /sign"
         )
         return
 

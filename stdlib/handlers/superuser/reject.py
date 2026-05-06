@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.config import config
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
+from stdlib.services.notification_service import notify_user_application_rework
 from stdlib.template import get_template
 
 router = Router()
@@ -54,13 +55,13 @@ async def on_feedback(message: Message, state: FSMContext, bot: Bot):
     if not app_row:
         return
     try:
-        await bot.send_message(
-            app_row.user_id,
-            f"❌ Заявка #{app_id} возвращена на доработку.\n\n"
-            f"<b>Замечания:</b>\n{feedback_text}\n\n"
-            "Выберите блок для редактирования:",
-            parse_mode="HTML",
-            reply_markup=kb.rework_keyboard(tpl),
+        await notify_user_application_rework(
+            bot=bot,
+            user_id=app_row.user_id,
+            app_id=app_id,
+            feedback=feedback_text,
+            reply_markup=kb.rework_keyboard(tpl, app_id),
+            web_wording=False,
         )
     except Exception as e:
         logger.error(

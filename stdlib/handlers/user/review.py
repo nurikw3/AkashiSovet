@@ -115,12 +115,15 @@ async def on_review_edit(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(BotStates.REVIEW, F.data == "review_files")
 async def on_review_files(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    app = await application_service.get_application(data["app_id"])
+    attachment_names = [att.name for att in (app.attachments or [])] if app else []
     await state.update_data(current_block="files", returning_to="review")
     await state.set_state(BotStates.FILLING)
     await callback.message.answer(
         "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите.",
         parse_mode="HTML",
-        reply_markup=kb.files_keyboard(),
+        reply_markup=kb.files_keyboard(attachment_names),
     )
     await callback.answer()
 

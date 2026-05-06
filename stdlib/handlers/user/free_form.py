@@ -15,6 +15,13 @@ from stdlib.template import get_template
 router = Router()
 
 
+async def _remember_cleanup_message(state: FSMContext, message_id: int) -> None:
+    data = await state.get_data()
+    ids = list(data.get("cleanup_bot_message_ids") or [])
+    ids.append(message_id)
+    await state.update_data(cleanup_bot_message_ids=ids[-120:])
+
+
 @router.message(BotStates.FREE_FORM, F.text)
 async def handle_free_form_input(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -49,11 +56,12 @@ async def handle_free_form_input(message: Message, state: FSMContext):
         for idx, html in enumerate(
             chunk_blocks_summary_html(tpl, blocks, INTRO_FREE_FORM_HTML)
         ):
-            await message.answer(
+            sent = await message.answer(
                 html,
                 parse_mode="HTML",
                 reply_markup=kb.files_keyboard() if idx == 0 else None,
             )
+            await _remember_cleanup_message(state, sent.message_id)
     elif isinstance(result, LLMError):
         await message.answer(result.reply)
     else:

@@ -2,6 +2,8 @@ import html
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
+import zipfile
+import json
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
@@ -44,6 +46,23 @@ from stdlib.timezone_util import (
 from aiogram.types import BufferedInputFile
 
 _LOGIN_FAIL_MSG = "Неверный Telegram ID или код"
+HELP_TEXT_SETTINGS_KEY = "user_help_text"
+
+
+def _default_help_text() -> str:
+    return (
+        "📘 <b>Как пользоваться ботом AKASHI</b>\n\n"
+        "1) Заполните профиль:\n"
+        "• /register — ФИО\n"
+        "• /position — должность\n"
+        "• /sign — подпись\n\n"
+        "2) Создайте заявку: /start\n"
+        "3) Заполните блоки, добавьте файлы и отправьте на согласование.\n\n"
+        "Полезные команды:\n"
+        "• /mode — переключить режим (пошаговый / свободный)\n"
+        "• /web — вход в веб-панель\n"
+        "• /myapps — мои заявки"
+    )
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
@@ -225,6 +244,18 @@ async def logout():
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, admin_id=Depends(get_admin)):
     hashed = await _get_hashed_password(admin_id)
+    raw_help = await db.get_setting(HELP_TEXT_SETTINGS_KEY)
+    help_text = _default_help_text()
+    help_data = raw_help
+    if isinstance(raw_help, str):
+        try:
+            help_data = json.loads(raw_help)
+        except Exception:
+            help_data = None
+    if isinstance(help_data, dict):
+        saved = str(help_data.get("text") or "").strip()
+        if saved:
+            help_text = saved
     return templates.TemplateResponse(
         request=request,
         name="settings.html",
@@ -232,6 +263,7 @@ async def settings_page(request: Request, admin_id=Depends(get_admin)):
             "has_password": bool(hashed),
             "success": request.query_params.get("success"),
             "error": None,
+            "help_text": help_text,
         },
     )
 
@@ -253,6 +285,39 @@ async def set_password(
     return HTMLResponse(
         '<p class="text-green-500 text-[10px] font-black text-center uppercase tracking-widest">'
         "✓ Пароль сохранён — используйте его при следующем входе</p>"
+    )
+
+
+@app.post("/settings/help-text", response_class=HTMLResponse)
+async def set_help_text(help_text: str = Form(...), admin_id=Depends(get_admin)):
+    text = (help_text or "").strip()
+    if not text:
+        return HTMLResponse(
+            '<p class="text-akashi-red text-[10px] font-black text-center uppercase tracking-widest">'
+            "⚠ Текст инструкции не должен быть пустым</p>",
+            status_code=400,
+        )
+    await db.upsert_setting(HELP_TEXT_SETTINGS_KEY, {"text": text})
+    logger.info("help text updated by admin {}", admin_id)
+    return HTMLResponse(
+        '<p class="text-green-500 text-[10px] font-black text-center uppercase tracking-widest">'
+        "✓ Инструкция для команды /help сохранена</p>"
+    )
+
+
+@app.post("/settings/help-text/reset", response_class=HTMLResponse)
+async def reset_help_text(admin_id=Depends(get_admin)):
+    default_text = _default_help_text()
+    await db.upsert_setting(HELP_TEXT_SETTINGS_KEY, {"text": default_text})
+    logger.info("help text reset to default by admin {}", admin_id)
+    escaped = html.escape(default_text)
+    return HTMLResponse(
+        '<p class="text-green-500 text-[10px] font-black text-center uppercase tracking-widest">'
+        "✓ Инструкция сброшена на дефолтный текст</p>"
+        f'<textarea id="help-text-field" hx-swap-oob="true" '
+        'name="help_text" rows="12" class="ak-input resize-y" '
+        'placeholder="Введите текст инструкции для команды /help (можно с HTML-разметкой)" required>'
+        f"{escaped}</textarea>"
     )
 
 
@@ -328,19 +393,9 @@ async def template_editor_save(
     rows: list[dict] = []
     for i in range(n):
         d = (desc_list[i] or "").strip()
-        try:
-            bid = int(block_id[i])
-        except ValueError:
-            return HTMLResponse(
-                '<p class="text-akashi-red text-[10px] font-black">Некорректный ID блока</p>',
-                status_code=400,
-            )
-        if bid <= 0:
-            return HTMLResponse(
-                '<p class="text-akashi-red text-[10px] font-black">'
-                "ID блока должен быть положительным числом</p>",
-                status_code=400,
-            )
+        # На сервере всегда нумеруем последовательно по текущему порядку строк формы.
+        # Это защищает от рассинхрона UI/HTMX и гарантирует стабильные ID после refresh.
+        bid = i + 1
         rows.append(
             {
                 "id": bid,
@@ -381,10 +436,11 @@ async def template_editor_save(
 async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admin)):
     """Фрагмент HTMX: виджеты счётчиков (обновление без перезагрузки)."""
     counts = await application_service.get_status_counts()
+    search_query = (request.query_params.get("q") or "").strip()
     return templates.TemplateResponse(
         request=request,
         name="dashboard_counters.html",
-        context={"request": request, "counts": counts},
+        context={"request": request, "counts": counts, "search_query": search_query},
     )
 
 
@@ -392,6 +448,7 @@ async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admi
 async def dashboard(
     request: Request,
     status: str | None = None,
+    q: str | None = None,
     admin_id=Depends(get_admin),
 ):
     # Старые ссылки ?tab=active&status=… / ?tab=archive → без tab
@@ -406,13 +463,17 @@ async def dashboard(
         me = request.query_params.get("meeting_err")
         if me:
             q["meeting_err"] = me
+        search_q = request.query_params.get("q")
+        if search_q:
+            q["q"] = search_q
         dest = "/" + ("?" + urlencode(q) if q else "")
         return RedirectResponse(url=dest, status_code=302)
 
     status_filter = (
         status if status in ("draft", "pending", "rework", "approved") else None
     )
-    raw_apps = await application_service.list_applications(status_filter)
+    search_query = (q or "").strip()
+    raw_apps = await application_service.list_applications(status_filter, search_query)
     parsed_apps = [_parse_app(a) for a in raw_apps]
     counts = await application_service.get_status_counts()
     meeting_basket = status_filter == "approved"
@@ -422,8 +483,16 @@ async def dashboard(
         "status_filter": status_filter,
         "counts": counts,
         "meeting_basket": meeting_basket,
+        "search_query": search_query,
     }
-    tpl = "dashboard_apps.html" if "hx-request" in request.headers else "index.html"
+    is_hx = "hx-request" in request.headers
+    hx_target = request.headers.get("hx-target")
+    if is_hx and hx_target == "app-table-body":
+        tpl = "tbody_rows.html"
+    elif is_hx:
+        tpl = "dashboard_apps.html"
+    else:
+        tpl = "index.html"
     return templates.TemplateResponse(request=request, name=tpl, context=ctx)
 
 
@@ -456,7 +525,7 @@ async def reject_app(
             row.user_id,
             app_id,
             feedback,
-            reply_markup=kb.rework_keyboard(tpl),
+            reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
         )
 
@@ -495,7 +564,7 @@ async def rework_approved_app(
             row.user_id,
             app_id,
             feedback.strip(),
-            reply_markup=kb.rework_keyboard(tpl),
+            reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
         )
 
@@ -584,6 +653,64 @@ async def download_file(s3_key: str, admin_id=Depends(get_admin)):
     return StreamingResponse(
         buf, media_type="application/octet-stream", headers=headers
     )
+
+
+@app.get("/download_archive/{app_id}")
+async def download_archive(app_id: int, request: Request, admin_id=Depends(get_admin)):
+    """ZIP со всеми файлами заявки (PDF + приложения)."""
+    app_row = await application_service.get_application(app_id)
+    if not app_row:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+    zip_buf = BytesIO()
+    missed_files: list[str] = []
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Всегда добавляем PDF самой заявки.
+        pdf_buf = await get_app_pdf_buffer(app_id)
+        full_name = await db.get_user_full_name(app_row.user_id)
+        position = await db.get_user_position(app_row.user_id)
+        pdf_name = generate_pdf_filename(full_name, position, app_row.created_at)
+        zf.writestr(Path(pdf_name).name or f"application_{app_id}.pdf", pdf_buf.getvalue())
+
+        for idx, att in enumerate(app_row.attachments, start=1):
+            file_name = Path((att.name or "").strip() or f"attachment_{idx}").name
+            try:
+                if att.s3_key:
+                    file_buf = await file_service.download_attachment_bytesio(att.s3_key)
+                    if not file_buf:
+                        raise RuntimeError("S3 object is missing")
+                    zf.writestr(file_name, file_buf.getvalue())
+                elif att.file_id:
+                    bot: Bot = request.app.state.tg_bot
+                    tg_file = await bot.get_file(att.file_id)
+                    if not tg_file.file_path:
+                        raise RuntimeError("Telegram file path is missing")
+                    tg_buf = BytesIO()
+                    await bot.download_file(tg_file.file_path, destination=tg_buf)
+                    tg_buf.seek(0)
+                    zf.writestr(file_name, tg_buf.getvalue())
+                else:
+                    missed_files.append(file_name)
+            except Exception as e:
+                logger.warning(
+                    "Archive item skipped | app_id={} file={} err={}",
+                    app_id,
+                    file_name,
+                    e,
+                )
+                missed_files.append(file_name)
+
+        if missed_files:
+            zf.writestr(
+                "_archive_warnings.txt",
+                "Не удалось добавить в архив файлы:\n- " + "\n- ".join(missed_files),
+            )
+
+    zip_buf.seek(0)
+    headers = {
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(f'application_{app_id}_files.zip')}"
+    }
+    return StreamingResponse(zip_buf, media_type="application/zip", headers=headers)
 
 
 # --- Internal ---

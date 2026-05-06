@@ -296,7 +296,7 @@ async def cb_rework_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.message.answer(
         "✏️ <b>Режим доработки</b>\n\nВыберите блок:",
-        reply_markup=kb.rework_keyboard(tpl),
+        reply_markup=kb.rework_keyboard(tpl, app_id),
         parse_mode="HTML",
     )
 

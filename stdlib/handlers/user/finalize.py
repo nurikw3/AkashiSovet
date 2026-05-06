@@ -18,10 +18,38 @@ async def finalize_and_notify(
     app_id: int,
     bot: Bot,
 ) -> None:
+    data = await state.get_data()
+    cleanup_ids = list(data.get("cleanup_bot_message_ids") or [])
+    if callback.message:
+        cleanup_ids.append(callback.message.message_id)
+
     app = await application_service.get_application_record(app_id)
     if not app:
         await state.clear()
         return
+
+    user_id = callback.from_user.id
+    full_name = await db.get_user_full_name(user_id)
+    position = await db.get_user_position(user_id)
+    signature = await db.get_user_signature(user_id)
+    missing: list[str] = []
+    if not full_name:
+        missing.append("/register (ФИО)")
+    if not position:
+        missing.append("/position (должность)")
+    if not signature:
+        missing.append("/sign (подпись)")
+    if missing:
+        txt = (
+            "❌ Нельзя отправить заявку: не заполнен профиль.\n\n"
+            "Заполните обязательные данные:\n"
+            + "\n".join(f"• {x}" for x in missing)
+        )
+        msg = await callback.message.answer(txt)
+        cleanup_ids.append(msg.message_id)
+        await state.update_data(cleanup_bot_message_ids=cleanup_ids[-120:])
+        return
+
     blocks = json.loads(app.get("blocks") or "{}")
 
     raw_att = app.get("attachments")
@@ -47,19 +75,21 @@ async def finalize_and_notify(
             await bot.send_message(su_id, text_fallback, parse_mode="HTML")
 
         await application_service.submit_to_review(app_id)
-        await callback.message.answer(
+        err_msg = await callback.message.answer(
             "📤 Заявка отправлена (без PDF — техническая ошибка)."
         )
-        await state.clear()
+        cleanup_ids.append(err_msg.message_id)
+        await state.set_state(None)
+        await state.update_data(
+            cleanup_bot_message_ids=cleanup_ids[-120:],
+            cleanup_app_id=app_id,
+        )
         return
 
     # 2. Переводим в pending (время подачи)
     await application_service.submit_to_review(app_id)
 
     # 3. Достаем данные и формируем красивое имя файла ОДИН раз
-    user_id = callback.from_user.id
-    full_name = await db.get_user_full_name(user_id)
-    position = await db.get_user_position(user_id)
     created_at = app.get("created_at") or now_app()
 
     custom_filename = generate_pdf_filename(full_name, position, created_at)
@@ -72,6 +102,12 @@ async def finalize_and_notify(
         ),
         caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
     )
+
+    done_msg = await callback.message.answer(
+        "Когда проверите, можно очистить служебные сообщения этой заявки:",
+        reply_markup=kb.cleanup_chat_keyboard(app_id),
+    )
+    cleanup_ids.append(done_msg.message_id)
 
     # 5. Отправляем суперюзерам
     for su_id in config.SUPERUSER_IDS:
@@ -134,4 +170,8 @@ async def finalize_and_notify(
     logger.info(
         "App {} submitted for review | attachments={}", app_id, len(attachments)
     )
-    await state.clear()
+    await state.set_state(None)
+    await state.update_data(
+        cleanup_bot_message_ids=cleanup_ids[-120:],
+        cleanup_app_id=app_id,
+    )

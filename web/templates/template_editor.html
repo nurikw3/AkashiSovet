@@ -1,59 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-
 <style>
-    .sortable-ghost {
-        opacity: 0.35 !important;
-        background: rgba(227, 58, 53, 0.06) !important;
-    }
-    .sortable-chosen {
-        box-shadow: 0 0 0 2px rgba(227, 58, 53, 0.35);
-    }
+    .sortable-ghost { opacity: 0.4 !important; background: rgba(201, 53, 40, 0.05) !important; }
+    .sortable-chosen { box-shadow: inset 2px 0 0 0 #C93528; }
 </style>
 
-<div class="w-full min-w-0 max-w-none animate-fade">
-    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-        <a href="/settings" class="hover:text-akashi-red transition-colors">← Settings</a>
-    </p>
+<div class="max-w-4xl mx-auto anim-fade pb-12">
+    <a href="/settings" class="text-[8px] font-mono tracking-widest uppercase text-[#a09890] hover:text-ak-red transition-colors mb-6 inline-block" data-i18n="app.back">← Назад</a>
 
-    <div class="flex items-center gap-3 mb-3">
-        <h1 class="text-xl sm:text-2xl font-black tracking-tighter dark:text-white">Шаблон заявки</h1>
-        <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
+    <div class="flex items-center gap-4 mb-4">
+        <h1 class="text-2xl font-bold tracking-tight text-[#111111] dark:text-[#EDE8DF]" data-i18n="nav.template">Шаблон заявки</h1>
+        <div class="h-px flex-1 bg-[#DDD8CE] dark:bg-[#242424]"></div>
     </div>
 
-    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-snug max-w-4xl">
-        Тяните блок за <strong>три полоски</strong> слева. Порядок карточек = порядок шагов.
-        ID правятся кнопкой «Пронумеровать» (осторожно с уже поданными заявками).
+    <p class="text-[10px] font-mono text-[#a09890] mb-8 leading-relaxed max-w-xl uppercase tracking-wide">
+        Порядок карточек = порядок шагов.<br>
+        ID правятся кнопкой «Пронумеровать» (влияет на старые заявки!).
     </p>
 
-    <form id="template-form"
-          hx-post="/settings/template/save"
-          hx-target="#save-status"
-          class="space-y-2">
-        <div id="block-rows">
+    <form id="template-form" hx-post="/settings/template/save" hx-target="#save-status" class="space-y-4">
+        <div id="block-rows" class="space-y-3">
             {% for block in blocks %}
                 {% include "template_block_row.html" %}
             {% endfor %}
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-white/10 mt-2">
-            <button type="button"
-                    id="template-add-row"
-                    class="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-akashi-red/35 transition-colors">
+        <div class="flex flex-wrap items-center gap-3 pt-6 border-t border-[#DDD8CE] dark:border-[#242424]">
+            <button type="button" id="template-add-row" class="ak-btn-ghost bg-white dark:bg-[#1A1A1A]">
                 Добавить блок
             </button>
-            <button type="button"
-                    id="template-renumber-ids"
-                    class="px-4 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[10px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200/90 hover:bg-amber-500/20 transition-colors">
-                Пронумеровать ID 1…n
-            </button>
-            <button type="submit"
-                    class="px-5 py-2 rounded-lg bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-akashi-red/20 hover:opacity-95 transition-all">
+            <button type="submit" class="ak-btn-red" id="template-save-btn">
                 Сохранить шаблон
             </button>
         </div>
 
-        <div id="save-status" class="text-center min-h-[1.25rem] text-xs"></div>
+        <div id="save-status" class="text-[9px] font-mono tracking-wide uppercase mt-2 h-4 transition-opacity duration-300"></div>
     </form>
 </div>
 
@@ -61,33 +42,18 @@
 <script>
     (function () {
         var sortableInstance = null;
-
         function initBlockRowsSortable() {
             var el = document.getElementById('block-rows');
-            if (!el || typeof Sortable === 'undefined') {
-                return;
-            }
-            if (sortableInstance) {
-                sortableInstance.destroy();
-                sortableInstance = null;
-            }
-            /* Только ручка `.js-drag-handle` начинает drag — input/textarea не трогаем.
-               Раньше были filter + preventOnFilter: из‑за preventDefault клики в полях
-               не давали фокус, текст не набирался. */
+            if (!el || typeof Sortable === 'undefined') return;
+            if (sortableInstance) sortableInstance.destroy();
             sortableInstance = Sortable.create(el, {
-                animation: 180,
-                easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-                handle: '.js-drag-handle',
-                draggable: '.template-block-row',
-                ghostClass: 'sortable-ghost',
-                chosenClass: 'sortable-chosen',
-                forceFallback: true,
-                fallbackOnBody: true,
-                swapThreshold: 0.65,
-                invertSwap: true,
+                animation: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                handle: '.js-drag-handle', draggable: '.template-block-row',
+                ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+                forceFallback: true, fallbackOnBody: true,
+                swapThreshold: 0.65, invertSwap: true,
             });
         }
-
         function syncBlockIdLabels() {
             document.querySelectorAll('#block-rows .template-block-row').forEach(function (row) {
                 var inp = row.querySelector('.js-block-id-input');
@@ -95,14 +61,9 @@
                 if (inp && lab) lab.textContent = inp.value;
             });
         }
-
         function renumberAllSequential() {
             var rows = document.querySelectorAll('#block-rows .template-block-row');
             if (!rows.length) return;
-            if (!confirm(
-                'Перенумеровать все блоки подряд: 1, 2, 3 … по текущему порядку?\n\n' +
-                'Старые заявки ссылаются на прежние ID — меняйте только если понимаете последствия.'
-            )) return;
             rows.forEach(function (row, i) {
                 var n = String(i + 1);
                 var inp = row.querySelector('.js-block-id-input');
@@ -111,61 +72,49 @@
                 if (lab) lab.textContent = n;
             });
         }
-
         function boot() {
             initBlockRowsSortable();
             syncBlockIdLabels();
         }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else boot();
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', boot);
-        } else {
-            boot();
-        }
-
-        document.body.addEventListener('htmx:afterSwap', function (evt) {
-            if (evt.detail.target && evt.detail.target.id === 'block-rows') {
-                requestAnimationFrame(function () {
-                    initBlockRowsSortable();
-                    syncBlockIdLabels();
-                });
+        document.body.addEventListener('htmx:beforeRequest', function (evt) {
+            if (evt.detail.target && evt.detail.target.id === 'save-status') {
+                renumberAllSequential();
             }
         });
 
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            if (evt.detail.target && evt.detail.target.id === 'block-rows') {
+                requestAnimationFrame(function () { initBlockRowsSortable(); syncBlockIdLabels(); });
+            }
+            if (evt.detail.target && evt.detail.target.id === 'save-status') {
+                var el = document.getElementById('save-status');
+                el.style.opacity = '1';
+                setTimeout(function() {
+                    el.style.opacity = '0';
+                    setTimeout(function() { el.innerHTML = ''; el.style.opacity = '1'; }, 300);
+                }, 3000);
+            }
+        });
         document.body.addEventListener('htmx:afterRequest', function (evt) {
             if (!evt.detail.successful) return;
-            var xhr = evt.detail.xhr;
-            var url = (xhr && xhr.responseURL) ? xhr.responseURL : '';
-            if (url.indexOf('/settings/template/new-row') !== -1 ||
-                url.indexOf('/settings/template/ui-row') !== -1) {
-                requestAnimationFrame(function () {
-                    initBlockRowsSortable();
-                    syncBlockIdLabels();
-                });
+            var url = evt.detail.xhr?.responseURL || '';
+            if (url.includes('/settings/template/new-row') || url.includes('/settings/template/ui-row')) {
+                requestAnimationFrame(function () { initBlockRowsSortable(); syncBlockIdLabels(); });
             }
         });
 
         var addBtn = document.getElementById('template-add-row');
         if (addBtn) addBtn.addEventListener('click', function () {
-            var inputs = document.querySelectorAll('#block-rows .js-block-id-input');
-            var next = 1;
-            if (inputs.length) {
-                var max = 0;
-                inputs.forEach(function (el) {
-                    var v = parseInt(el.value, 10);
-                    if (!isNaN(v) && v > max) max = v;
-                });
-                next = max + 1;
-            }
-            htmx.ajax('GET', '/settings/template/new-row?next_id=' + next, {
-                target: '#block-rows',
-                swap: 'beforeend'
+            var max = 0;
+            document.querySelectorAll('#block-rows .js-block-id-input').forEach(el => {
+                var v = parseInt(el.value, 10);
+                if (!isNaN(v) && v > max) max = v;
             });
+            htmx.ajax('GET', '/settings/template/new-row?next_id=' + (max + 1), { target: '#block-rows', swap: 'beforeend' });
         });
-
-        var renBtn = document.getElementById('template-renumber-ids');
-        if (renBtn) renBtn.addEventListener('click', renumberAllSequential);
     })();
 </script>
-
 {% endblock %}

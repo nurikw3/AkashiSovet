@@ -1,41 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-2xl mx-auto animate-fade">
-    <a href="/"
-        class="text-[10px] font-black text-gray-400 hover:text-akashi-red mb-12 inline-block transition-colors uppercase tracking-widest">←
-        Back to Terminal</a>
+<div class="max-w-xl mx-auto anim-fade">
+    <a href="/" class="text-[8px] font-mono tracking-widest uppercase text-[#a09890] hover:text-ak-red transition-colors mb-8 inline-block" data-i18n="app.back">← Назад</a>
 
-    <div class="flex items-center gap-6 mb-12">
-        <h1 class="text-4xl font-black tracking-tighter">Security Settings</h1>
-        <div class="h-px flex-1 bg-gray-200 dark:bg-white/10"></div>
+    <div class="flex items-center gap-4 mb-8">
+        <h1 class="text-2xl font-bold tracking-tight text-[#111111] dark:text-[#EDE8DF]" data-i18n="settings.title">Безопасность</h1>
+        <div class="h-px flex-1 bg-[#DDD8CE] dark:bg-[#242424]"></div>
     </div>
 
-    <div
-        class="bg-white dark:bg-akashi-dark border border-gray-200 dark:border-white/10 rounded-[2.5rem] p-12 shadow-2xl">
-        <div class="flex items-center gap-4 mb-8">
-            <div class="w-10 h-10 bg-gray-100 dark:bg-white/5 rounded-xl flex items-center justify-center text-xl">🔐</div>
+    <div class="border border-[#DDD8CE] dark:border-[#242424] rounded bg-white dark:bg-[#141414] p-7">
+        <div class="flex items-center gap-3 mb-6 pb-5 border-b border-[#EDE8DF] dark:border-[#222222]">
+            <span class="text-xl">🔐</span>
             <div>
-                <h3 class="font-black text-lg tracking-tight">Постоянный пароль</h3>
-                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Необязательно — можно входить только по OTP из /web</p>
+                <h3 class="font-bold text-sm text-[#111111] dark:text-[#EDE8DF]" data-i18n="settings.pw">Постоянный пароль</h3>
+                <p class="text-[8px] font-mono text-[#a09890] mt-0.5 tracking-wide" data-i18n="settings.pw_h">Необязательно — можно входить по OTP из /web</p>
             </div>
         </div>
 
-        <form hx-post="/settings/password" hx-target="#status" class="space-y-6">
-            <input type="password" name="password" placeholder="Минимум 8 символов" required
-                class="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-4 ring-akashi-red/10 outline-none transition-all">
-
-            <button type="submit"
-                class="w-full bg-akashi-red text-white font-black py-5 rounded-2xl shadow-xl shadow-akashi-red/20 hover:bg-red-600 transition-all uppercase tracking-widest text-xs">
-                Save Secure Password
-            </button>
-            <div id="status" class="text-center"></div>
+        <form hx-post="/settings/password" hx-target="#pw-status" class="space-y-4">
+            <div>
+                <input type="password" name="password" required
+                    data-i18n-ph="settings.min" placeholder="Минимум 8 символов"
+                    class="ak-input">
+            </div>
+            <button type="submit" class="ak-btn-red w-full" data-i18n="settings.save">Сохранить пароль</button>
+            <div id="pw-status" class="text-center text-[9px] font-mono"></div>
         </form>
 
-        <p class="text-[10px] text-gray-400 mt-8 uppercase font-bold tracking-tight">
-            Вход: в боте <b>/web</b> — скопируйте Telegram ID и код на страницу <a href="/login" class="text-akashi-red hover:underline">/login</a>.
+        <p class="text-[8px] font-mono text-[#b0a8a0] mt-6 leading-relaxed" data-i18n="settings.hint">
+            Команда /web в боте — скопируйте ID и одноразовый код.
         </p>
         {% if success %}
-        <p class="mt-4 text-green-600 dark:text-green-400 text-sm font-bold">{{ success }}</p>
+        <p class="mt-3 text-green-600 dark:text-green-400 text-[9px] font-mono font-bold">{{ success }}</p>
         {% endif %}
     </div>
 </div>

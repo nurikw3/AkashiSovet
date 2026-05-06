@@ -1,43 +1,39 @@
 <!-- @format-ignore -->
-<tr id="row-{{ app.id }}"
-    class="border-b border-gray-50 dark:border-white/5 hover:bg-gray-50/50 dark:hover:bg-white/2 transition-colors animate-row last:border-0">
+<tr id="row-{{ app.id }}" class="anim-row border-b border-[#F0EBE3] dark:border-[#1E1E1E] last:border-0 hover:bg-[#FDFAF7] dark:hover:bg-[#181818] transition-colors">
 
     {% if meeting_basket %}
-    <td class="px-3 py-4 w-11 align-middle">
+    <td class="px-3 py-3 w-10">
         {% if app.status == 'approved' %}
         <input type="checkbox" name="app_id" value="{{ app.id }}" form="meeting-create-form"
-               class="w-4 h-4 rounded border-gray-300 dark:border-white/20 bg-white dark:bg-black/40 text-akashi-red focus:ring-akashi-red/30" />
+               class="w-3.5 h-3.5 rounded-sm border-[#DDD8CE] dark:border-[#303030] accent-ak-red" />
         {% endif %}
     </td>
     {% endif %}
 
     <!-- ID -->
-    <td class="px-6 py-4">
-        <span class="text-[10px] font-black text-gray-400 font-mono">#{{ app.id }}</span>
+    <td class="px-4 py-3">
+        <span class="text-[9px] font-mono text-[#b0a8a0]">#{{ app.id }}</span>
     </td>
 
     <!-- Applicant -->
-    <td class="px-6 py-4">
-        <div>
-            <p class="font-bold text-sm dark:text-white">{{ app.display_name }}</p>
-            {% if app.position %}
-            <p class="text-[9px] text-gray-400 mt-0.5 uppercase tracking-wide font-bold">{{ app.position }}</p>
-            {% endif %}
-        </div>
+    <td class="px-4 py-3">
+        <p class="text-sm font-semibold text-[#111111] dark:text-[#EDE8DF] leading-tight">{{ app.display_name }}</p>
+        {% if app.position %}
+        <p class="text-[8px] font-mono text-[#a09890] mt-0.5 tracking-wide uppercase">{{ app.position }}</p>
+        {% endif %}
     </td>
 
     <!-- Topic -->
-    <td class="px-6 py-4 max-w-xs">
-        <p class="text-sm text-gray-700 dark:text-gray-300 truncate" title="{{ app.topic }}">{{ app.topic }}</p>
+    <td class="px-4 py-3 max-w-xs">
+        <p class="text-sm text-[#444] dark:text-[#CCC8C0] truncate" title="{{ app.topic }}">{{ app.topic }}</p>
         {% if app.feedback %}
-        <p class="text-[9px] text-akashi-red mt-1 truncate font-bold" title="{{ app.feedback }}">↩ {{ app.feedback }}
-        </p>
+        <p class="text-[8px] font-mono text-ak-red mt-0.5 truncate" title="{{ app.feedback }}">↩ {{ app.feedback }}</p>
         {% endif %}
     </td>
 
     <!-- Status -->
-    <td class="px-6 py-4">
-        <span class="status-badge status-{{ app.status }}">
+    <td class="px-4 py-3">
+        <span class="s-badge s-{{ app.status }}">
             {% if app.status == 'pending' %}⏳
             {% elif app.status == 'approved' %}✓
             {% elif app.status == 'rework' %}↩
@@ -46,43 +42,37 @@
             {{ app.status }}
         </span>
         {% if app.reject_count and app.reject_count > 0 %}
-        <span class="block text-[9px] text-gray-400 mt-1 font-bold">{{ app.reject_count }}× rework</span>
+        <span class="block text-[8px] font-mono text-[#b0a8a0] mt-0.5">{{ app.reject_count }}× rework</span>
         {% endif %}
     </td>
 
     <!-- Date -->
-    <td class="px-6 py-4">
-        <p class="text-[10px] text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
-            {{ app.created_at | datetime }}
-        </p>
+    <td class="px-4 py-3">
+        <span class="text-[9px] font-mono text-[#a09890] whitespace-nowrap">{{ app.created_at | datetime }}</span>
     </td>
 
     <!-- Files -->
-    <td class="px-6 py-4">
-        <div class="flex flex-col gap-1.5">
+    <td class="px-4 py-3">
+        <div class="flex flex-col gap-1">
             <a href="/download/{{ app.id }}" target="_blank"
-                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors">
-                <span>📄</span> PDF
+               class="inline-flex items-center gap-1 text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors uppercase tracking-wide">
+                📄 PDF
             </a>
             {% for f in app.parsed_attachments %}
             {% if f.s3_key %}
             <a href="/download_attachment/{{ f.s3_key }}" target="_blank"
-                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors max-w-[120px]">
-                <span>📎</span>
-                <span class="truncate">{{ f.file_name }}</span>
+               class="inline-flex items-center gap-1 text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors max-w-[110px]">
+                📎 <span class="truncate">{{ f.file_name }}</span>
             </a>
             {% elif f.file_id %}
             <a href="/download_tg_attachment?file_id={{ f.file_id | urlquote }}&name={{ f.file_name | urlquote }}"
-                target="_blank"
-                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors max-w-[120px]">
-                <span>📎</span>
-                <span class="truncate">{{ f.file_name }}</span>
+               target="_blank"
+               class="inline-flex items-center gap-1 text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors max-w-[110px]">
+                📎 <span class="truncate">{{ f.file_name }}</span>
             </a>
             {% else %}
-            <span
-                class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 max-w-[120px]">
-                <span>📎</span>
-                <span class="truncate" title="Нет файла, только имя в списке">{{ f.file_name }}</span>
+            <span class="inline-flex items-center gap-1 text-[8px] font-mono text-[#c0b8b0] max-w-[110px]">
+                📎 <span class="truncate">{{ f.file_name }}</span>
             </span>
             {% endif %}
             {% endfor %}
@@ -90,45 +80,62 @@
     </td>
 
     <!-- Actions -->
-    <td class="px-6 py-4 text-right">
+    <td class="px-4 py-3 text-right">
         {% if app.status == 'pending' %}
         <div id="actions-{{ app.id }}" class="flex items-center justify-end gap-2">
             <button hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
-                class="px-4 py-2 bg-green-400/10 hover:bg-green-400/20 border border-green-400/20 text-green-600 dark:text-green-400 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95">
-                ✓ Approve
-            </button>
-            <button onclick="showRejectForm({{ app.id }})" ;
-                class="px-4 py-2 bg-akashi-red/10 hover:bg-akashi-red/20 border border-akashi-red/20 text-akashi-red text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95">
-                ↩ Rework
-            </button>
+                class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
+                data-i18n="btn.approve">Согласовать</button>
+            <button onclick="showRejectForm({{ app.id }})"
+                class="ak-btn-ghost border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
+                data-i18n="btn.rework">На доработку</button>
         </div>
-
-        <div id="reject-form-{{ app.id }}" class="hidden">
+        <div id="reject-form-{{ app.id }}" class="hidden mt-2">
             <form hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
-                class="flex flex-col gap-2 items-end">
-                <textarea name="feedback" required placeholder="Укажите замечания..." rows="2"
-                    class="w-64 bg-gray-50 dark:bg-black/60 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-akashi-red/20 dark:text-white resize-none"></textarea>
+                  class="flex flex-col gap-2 items-end">
+                <textarea name="feedback" required rows="2"
+                    data-i18n-ph="rework.ph"
+                    placeholder="Укажите замечания..."
+                    class="ak-input w-60 text-xs resize-none"></textarea>
                 <div class="flex gap-2">
                     <button type="button" onclick="hideRejectForm({{ app.id }})"
-                        class="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit"
-                        class="px-4 py-2 bg-akashi-red text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-akashi-red/20">
-                        Send
-                    </button>
+                        class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                        data-i18n="btn.cancel">Отменить</button>
+                    <button type="submit" class="ak-btn-red text-[9px]" data-i18n="btn.send">Отправить</button>
                 </div>
             </form>
         </div>
 
         {% elif app.status == 'approved' %}
-        <span class="text-[9px] font-black uppercase tracking-widest text-green-500">✓ Approved</span>
+        <div id="actions-approved-{{ app.id }}">
+            <div class="flex items-center justify-end gap-2">
+                <span class="text-[9px] font-mono text-green-600 dark:text-green-400 font-bold">✓ Approved</span>
+                <button onclick="showReworkApprovedForm({{ app.id }})"
+                    class="ak-btn-ghost border-amber-500/30 text-amber-600 hover:border-amber-500 hover:text-amber-600 dark:text-amber-400 dark:border-amber-400/30"
+                    title="Вернуть на доработку">↩ Rework</button>
+            </div>
+            <div id="rework-approved-form-{{ app.id }}" class="hidden mt-2">
+                <form hx-post="/rework-approved/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
+                      class="flex flex-col gap-2 items-end">
+                    <textarea name="feedback" required rows="2"
+                        data-i18n-ph="rework.approved.ph"
+                        placeholder="Причина возврата на доработку..."
+                        class="ak-input w-60 text-xs resize-none"></textarea>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="hideReworkApprovedForm({{ app.id }})"
+                            class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                            data-i18n="btn.cancel">Отменить</button>
+                        <button type="submit" class="ak-btn-red text-[9px]" data-i18n="btn.send">Отправить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         {% elif app.status == 'rework' %}
-        <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red">↩ Rework</span>
+        <span class="text-[9px] font-mono text-ak-red dark:text-ak-red-d font-bold">↩ Rework</span>
 
         {% else %}
-        <span class="text-[9px] font-black uppercase tracking-widest text-gray-300 dark:text-gray-600">—</span>
+        <span class="text-[9px] font-mono text-[#c0b8b0]">—</span>
         {% endif %}
     </td>
 

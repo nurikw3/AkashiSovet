@@ -355,8 +355,7 @@ async def template_editor_save(
     except ValidationError as e:
         msg = _template_validation_message(e)
         return HTMLResponse(
-            f'<p class="text-akashi-red text-[10px] font-black">'
-            f"{html.escape(msg)}</p>",
+            f'<p class="text-akashi-red text-[10px] font-black">{html.escape(msg)}</p>',
             status_code=400,
         )
 
@@ -464,6 +463,50 @@ async def reject_app(
     return await _render_row(request, app_id)
 
 
+@app.post("/rework-approved/{app_id}")
+async def rework_approved_app(
+    request: Request,
+    app_id: int,
+    feedback: str = Form(...),
+    admin_id=Depends(get_admin),
+):
+    """Возвращает уже согласованную заявку на доработку (только суперпользователь)."""
+    app_row = await application_service.get_application(app_id)
+    if not app_row:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if app_row.status != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ожидается статус 'approved', получен '{app_row.status}'",
+        )
+
+    row = await application_service.send_for_rework(app_id, feedback.strip())
+    logger.info(
+        "App {} returned to rework from approved by admin {} | feedback_len={}",
+        app_id,
+        admin_id,
+        len(feedback),
+    )
+
+    if row:
+        tpl = await get_template()
+        await notify_user_application_rework(
+            request.app.state.tg_bot,
+            row.user_id,
+            app_id,
+            feedback.strip(),
+            reply_markup=kb.rework_keyboard(tpl),
+            web_wording=True,
+        )
+
+    # Определяем meeting_basket по URL страницы, с которой пришёл HTMX-запрос:
+    # на вкладке ?status=approved таблица имеет колонку чекбоксов — строка должна
+    # содержать такое же количество <td>, иначе колонки сместятся.
+    current_url = request.headers.get("hx-current-url", "")
+    _meeting_basket = "status=approved" in current_url
+    return await _render_row(request, app_id, meeting_basket=_meeting_basket)
+
+
 @app.get("/download_tg_attachment")
 async def download_tg_attachment(
     request: Request,
@@ -478,7 +521,9 @@ async def download_tg_attachment(
     try:
         tg_file = await bot.get_file(file_id.strip())
     except Exception as e:
-        logger.warning("Telegram get_file failed | file_id prefix={} err={}", file_id[:16], e)
+        logger.warning(
+            "Telegram get_file failed | file_id prefix={} err={}", file_id[:16], e
+        )
         raise HTTPException(
             status_code=404,
             detail="Файл недоступен (истёк срок хранения в Telegram или неверный идентификатор).",
@@ -561,7 +606,7 @@ def _parse_app(a: dict) -> dict:
     return out
 
 
-async def _render_row(request, app_id):
+async def _render_row(request, app_id, *, meeting_basket: bool = False):
     app = await application_service.get_application(app_id)
     if not app:
         raise HTTPException(status_code=404)
@@ -573,7 +618,7 @@ async def _render_row(request, app_id):
         context={
             "request": request,
             "app": _parse_app(row),
-            "meeting_basket": False,
+            "meeting_basket": meeting_basket,
         },
     )
 
@@ -716,8 +761,27 @@ async def meeting_update_schedule(
     ok = await meeting_service.set_scheduled_at(meeting_id, scheduled)
     if not ok:
         raise HTTPException(status_code=404, detail="Заседание не найдено")
-    logger.info("meeting {} rescheduled by admin {} to {}", meeting_id, admin_id, scheduled)
+    logger.info(
+        "meeting {} rescheduled by admin {} to {}", meeting_id, admin_id, scheduled
+    )
     return RedirectResponse(url=f"/meetings/{meeting_id}?updated=1", status_code=303)
+
+
+@app.post("/meetings/{meeting_id}/remove_app/{app_id}")
+async def meeting_remove_app(
+    request: Request,
+    meeting_id: int,
+    app_id: int,
+    admin_id=Depends(get_admin),
+):
+    """Убирает заявку из повестки заседания."""
+    ok = await meeting_service.remove_application_from_meeting(meeting_id, app_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Заседание не найдено")
+    logger.info(
+        "app {} removed from meeting {} by admin {}", app_id, meeting_id, admin_id
+    )
+    return RedirectResponse(url=f"/meetings/{meeting_id}", status_code=303)
 
 
 @app.post("/meetings/{meeting_id}/delete")
@@ -739,8 +803,18 @@ async def application_detail_page(
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     row = app.model_dump()
     row["full_name"] = await db.get_user_full_name(app.user_id)
+
+    # Подгружаем шаблон, чтобы отобразить вопросы для каждого ответа
+    tpl = await get_template()
+    tpl_blocks_map = {str(b.id): b for b in tpl.blocks}
+
     return templates.TemplateResponse(
         request=request,
         name="application_detail.html",
-        context={"request": request, "app": _parse_app(row)},
+        context={
+            "request": request,
+            "app": _parse_app(row),
+            "app_blocks": app.blocks,
+            "tpl_blocks_map": tpl_blocks_map,
+        },
     )

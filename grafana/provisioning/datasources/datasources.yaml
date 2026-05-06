@@ -1,0 +1,12 @@
+apiVersion: 1
+datasources:
+  - name: grafana-postgresql-datasource
+    type: postgres
+    url: postgres:5432
+    database: akashi
+    user: akashi
+    secureJsonData:
+      password: ${GF_DATASOURCE_PASSWORD}
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500

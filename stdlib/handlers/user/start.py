@@ -47,6 +47,31 @@ async def _get_help_text() -> str:
     return _default_help_text()
 
 
+async def _ensure_profile_complete(message: Message) -> bool:
+    """Проверяет обязательные поля профиля перед началом заявки."""
+    user_id = message.from_user.id
+    full_name = await db.get_user_full_name(user_id)
+    position = await db.get_user_position(user_id)
+    signature = await db.get_user_signature(user_id)
+
+    missing: list[str] = []
+    if not full_name:
+        missing.append("/register — Ф.И.О.")
+    if not position:
+        missing.append("/position — должность")
+    if not signature:
+        missing.append("/sign — подпись")
+
+    if not missing:
+        return True
+
+    await message.answer(
+        "Перед созданием заявки заполните профиль:\n\n"
+        + "\n".join(f"• {x}" for x in missing)
+    )
+    return False
+
+
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     txt = await _get_help_text()
@@ -61,13 +86,7 @@ async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username
 
-    full_name = await db.get_user_full_name(user_id)
-    if not full_name:
-        await message.answer(
-            "Перед созданием заявки, пожалуйста, укажите ваше Ф.И.О. с помощью команды /register\n "
-            "вашу должность с помощью команды /position\n"
-            "вашу подпись с помощью команды /sign"
-        )
+    if not await _ensure_profile_complete(message):
         return
 
     current_state = await state.get_state()
@@ -144,7 +163,7 @@ async def process_register(message: Message, state: FSMContext):
     await db.set_user_full_name(message.from_user.id, full_name)
     await state.clear()
     await message.answer(
-        f"✅ Ф.И.О. успешно сохранено: <b>{full_name}</b>\n\nТеперь вы можете создать заявку с помощью команды /start",
+        f"✅ Ф.И.О. успешно сохранено: <b>{full_name}</b>\n",
         parse_mode="HTML",
     )
 
@@ -209,6 +228,9 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     user_id = callback.from_user.id
     username = callback.from_user.username
+
+    if not await _ensure_profile_complete(callback.message):
+        return
 
     await state.clear()
     app_id = await application_service.get_or_create_draft(user_id, username)

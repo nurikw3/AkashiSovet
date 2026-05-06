@@ -2,11 +2,68 @@
 Централизованная настройка Loguru.
 Импортируй `logger` из этого модуля во всех файлах вместо стандартного logging.
 """
+from __future__ import annotations
+
+import os
 import sys
+from pathlib import Path
 from loguru import logger
 
 
-def setup_logging(level: str = "INFO") -> None:
+def _iter_log_files(log_dir: str) -> list[Path]:
+    p = Path(log_dir)
+    if not p.exists():
+        return []
+    return [x for x in p.iterdir() if x.is_file()]
+
+
+def prepare_log_storage(
+    *,
+    log_dir: str,
+    clean_on_start: bool,
+    max_total_mb: int,
+) -> None:
+    """Готовит папку логов и при необходимости подчищает старые файлы."""
+    os.makedirs(log_dir, exist_ok=True)
+    if clean_on_start:
+        for fp in _iter_log_files(log_dir):
+            try:
+                fp.unlink(missing_ok=True)
+            except Exception:
+                continue
+
+    max_bytes = max(0, int(max_total_mb)) * 1024 * 1024
+    if max_bytes == 0:
+        return
+    files = _iter_log_files(log_dir)
+    total = sum(f.stat().st_size for f in files if f.exists())
+    if total <= max_bytes:
+        return
+
+    # Удаляем самые старые, пока не уложимся в лимит.
+    files.sort(key=lambda f: f.stat().st_mtime)
+    for fp in files:
+        if total <= max_bytes:
+            break
+        try:
+            size = fp.stat().st_size
+            fp.unlink(missing_ok=True)
+            total -= size
+        except Exception:
+            continue
+
+
+def setup_logging(
+    *,
+    level: str = "INFO",
+    file_level: str = "INFO",
+    error_level: str = "ERROR",
+    log_dir: str = "logs",
+    rotation_mb: int = 10,
+    retention_days: int = 7,
+    errors_rotation_mb: int = 5,
+    errors_retention_days: int = 30,
+) -> None:
     """Настроить форматы вывода. Вызвать один раз при старте бота."""
     logger.remove()  # убрать дефолтный handler
 
@@ -20,24 +77,27 @@ def setup_logging(level: str = "INFO") -> None:
     # stdout — все уровни >= level
     logger.add(sys.stdout, format=fmt, level=level, colorize=True)
 
-    # файл — всё включая DEBUG, ротация 10 МБ, хранить 7 дней
+    app_log_path = str(Path(log_dir) / "bot.log")
+    errors_log_path = str(Path(log_dir) / "errors.log")
+
+    # основной файл
     logger.add(
-        "logs/bot.log",
+        app_log_path,
         format=fmt,
-        level="DEBUG",
-        rotation="10 MB",
-        retention="7 days",
+        level=file_level,
+        rotation=f"{max(1, int(rotation_mb))} MB",
+        retention=f"{max(1, int(retention_days))} days",
         encoding="utf-8",
         colorize=False,
     )
 
     # отдельный файл только для ошибок
     logger.add(
-        "logs/errors.log",
+        errors_log_path,
         format=fmt,
-        level="ERROR",
-        rotation="5 MB",
-        retention="30 days",
+        level=error_level,
+        rotation=f"{max(1, int(errors_rotation_mb))} MB",
+        retention=f"{max(1, int(errors_retention_days))} days",
         encoding="utf-8",
         colorize=False,
     )

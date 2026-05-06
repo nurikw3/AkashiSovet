@@ -4,7 +4,6 @@
 """
 
 import asyncio
-import os
 
 import redis.asyncio as redis
 from aiogram import Bot, Dispatcher
@@ -16,15 +15,28 @@ from aiogram.client.default import DefaultBotProperties
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.config import config
-from bot.logger import logger, setup_logging, InterceptHandler
+from bot.logger import logger, setup_logging, InterceptHandler, prepare_log_storage
 import stdlib.db as db
 from stdlib import resources
 from stdlib.handlers import user, superuser
 from stdlib.timezone_util import APP_TIMEZONE
 
 # ─── Настройка логирования ────────────────────────────────────────────────────
-os.makedirs("logs", exist_ok=True)
-setup_logging(level="INFO")
+prepare_log_storage(
+    log_dir=config.LOG_DIR,
+    clean_on_start=config.LOG_CLEAN_ON_START,
+    max_total_mb=config.LOG_MAX_TOTAL_MB,
+)
+setup_logging(
+    level=config.LOG_LEVEL,
+    file_level=config.LOG_FILE_LEVEL,
+    error_level=config.LOG_ERROR_LEVEL,
+    log_dir=config.LOG_DIR,
+    rotation_mb=config.LOG_ROTATION_MB,
+    retention_days=config.LOG_RETENTION_DAYS,
+    errors_rotation_mb=config.LOG_ERRORS_ROTATION_MB,
+    errors_retention_days=config.LOG_ERRORS_RETENTION_DAYS,
+)
 InterceptHandler.install()
 
 # ─── Планировщик и Таймзона ───────────────────────────────────────────────────

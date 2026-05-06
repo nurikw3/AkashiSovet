@@ -45,6 +45,7 @@ services:
       S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
     volumes:
+      - ./logs:/app/logs
       - data:/app/data
     depends_on:
       postgres:

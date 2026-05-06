@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
 
+    # Logging
+    LOG_DIR: str = "logs"
+    LOG_LEVEL: str = "INFO"  # console level
+    LOG_FILE_LEVEL: str = "INFO"
+    LOG_ERROR_LEVEL: str = "ERROR"
+    LOG_ROTATION_MB: int = 10
+    LOG_RETENTION_DAYS: int = 7
+    LOG_ERRORS_ROTATION_MB: int = 5
+    LOG_ERRORS_RETENTION_DAYS: int = 30
+    LOG_CLEAN_ON_START: bool = False
+    LOG_MAX_TOTAL_MB: int = 1024
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @field_validator("SUPERUSER_IDS", mode="before")

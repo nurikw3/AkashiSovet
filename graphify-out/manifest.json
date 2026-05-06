@@ -28,8 +28,8 @@
     "hash": "e7dafe575951fde85862c0c0baf59492"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/web/main.py": {
-    "mtime": 1778058788.9180996,
-    "hash": "86f97c05d562ac5c09efa12ef014999a"
+    "mtime": 1778059079.7457836,
+    "hash": "956827064e299ae2e92aebaeb26aceb6"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/web/static/vendor/sortable.min.js": {
     "mtime": 1777906037.5641544,
@@ -152,7 +152,7 @@
     "hash": "2c6188963e4b393cfa429bc6aa73c734"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/my_apps.py": {
-    "mtime": 1778055333.4417267,
+    "mtime": 1778058856.495824,
     "hash": "ed367f02932e5eefee055f151b4704f8"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/rework.py": {
@@ -172,8 +172,8 @@
     "hash": "f68ba5150e8386d37ba6c8929cd58118"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/start.py": {
-    "mtime": 1778058699.6620588,
-    "hash": "4ca6f2ae57930be75ce6f878ec4b42a6"
+    "mtime": 1778059073.4237933,
+    "hash": "73668a257dfec2730fb12ef1bce48343"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/common.py": {
     "mtime": 1778057300.0853138,
@@ -208,20 +208,20 @@
     "hash": "271f09cd3efa38bcf82e3336d55d7965"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/bot/config.py": {
-    "mtime": 1777912738.2745247,
-    "hash": "eed3d35136b49765f7e8163b83f4ef32"
+    "mtime": 1778062281.2375636,
+    "hash": "5771490eeeb5a583756d43045cda229d"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/bot/__init__.py": {
     "mtime": 1777199173.2964702,
     "hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/bot/logger.py": {
-    "mtime": 1777118838.1092849,
-    "hash": "b58d8233048fa62c17ecc318b5444692"
+    "mtime": 1778062299.5022478,
+    "hash": "ab7099c824ea57a4e75f3c4b00b635e0"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/bot/bot.py": {
-    "mtime": 1777914389.868272,
-    "hash": "6767c79f9f7b781705046f4c620bfd99"
+    "mtime": 1778062306.7736967,
+    "hash": "458ac6b8986941dd4c7d7faddea294b7"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/docker-compose.yaml": {
     "mtime": 1778049232.9520245,
@@ -232,8 +232,8 @@
     "hash": "ed0844a336f0ad471dac289c81fef35b"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/deploy.md": {
-    "mtime": 1777914477.0071402,
-    "hash": "b849197aee37ca1d236210a215f53899"
+    "mtime": 1778061104.0745723,
+    "hash": "8af92be8b9cdcd6ff8965a3557168e35"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/resume_experience.md": {
     "mtime": 1778051556.167561,
@@ -300,8 +300,8 @@
     "hash": "f40b176beb694f70930a73d7b8483c30"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/web/templates/settings.html": {
-    "mtime": 1778058795.4913905,
-    "hash": "4121bd28618ff33c1d55d6581230db6b"
+    "mtime": 1778058983.5836399,
+    "hash": "8fa0e6a5096336c3cc54add138a1ec72"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/web/templates/meeting_detail.html": {
     "mtime": 1778042339.648845,

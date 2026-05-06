@@ -1,115 +1,100 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="anim-fade max-w-5xl mx-auto pb-12">
 
-<div class="animate-fade max-w-4xl mx-auto pb-12">
+    <!-- Toasts -->
     {% if created_ok %}
-    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
-        ✓ Заседание создано
-    </div>
+    <div class="mb-4 px-4 py-3 rounded border border-green-500/20 bg-green-500/5 text-green-700 dark:text-green-400 text-[9px] font-mono font-bold tracking-wide uppercase" data-i18n="meeting.created">✓ Заседание создано</div>
     {% endif %}
-
     {% if deleted_ok %}
-    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-black uppercase tracking-widest">
-        ✓ Заседание удалено
-    </div>
+    <div class="mb-4 px-4 py-3 rounded border border-green-500/20 bg-green-500/5 text-green-700 dark:text-green-400 text-[9px] font-mono font-bold tracking-wide uppercase" data-i18n="meeting.deleted">✓ Заседание удалено</div>
     {% endif %}
-
     {% if meeting_err %}
-    <div class="mb-5 px-5 py-3.5 rounded-2xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
-        {{ meeting_err }}
-    </div>
+    <div class="mb-4 px-4 py-3 rounded border border-ak-red/20 bg-ak-red/5 text-ak-red text-[9px] font-mono font-bold">{{ meeting_err }}</div>
     {% endif %}
 
-    <header class="mb-8">
-        <a href="/" class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors">
-            ← Applications
-        </a>
-        <h1 class="text-3xl font-black tracking-tighter dark:text-white mt-3">Meetings</h1>
-        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">
-            Предстоящие и прошедшие заседания
-        </p>
+    <!-- Header -->
+    <header class="mb-8 flex items-end justify-between">
+        <div>
+            <a href="/" class="text-[8px] font-mono tracking-widest uppercase text-[#a09890] hover:text-ak-red transition-colors" data-i18n="app.back">← Назад</a>
+            <h1 class="text-2xl font-bold tracking-tight text-[#111111] dark:text-[#EDE8DF] mt-2" data-i18n="meeting.title">Заседания</h1>
+        </div>
     </header>
 
-    <section class="mb-10 rounded-[2rem] border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark shadow-lg p-6 sm:p-8">
-        <h2 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-5">Новое заседание</h2>
-        <div class="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10">
+    <!-- New meeting form -->
+    <div class="mb-8 p-5 border border-[#DDD8CE] dark:border-[#242424] rounded bg-white dark:bg-[#141414]">
+        <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-4" data-i18n="meeting.new">Новое заседание</p>
+        <div class="flex flex-wrap items-end gap-4">
             <form method="post" action="/meetings" class="flex flex-wrap items-end gap-4 flex-1">
                 <input type="hidden" name="meeting_form_source" value="meetings" />
-                <div class="min-w-[220px]">
-                    <label for="meetings-page-date" class="block text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Дата и время</label>
-                    <input id="meetings-page-date" type="datetime-local" name="scheduled_at" required
-                           class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2.5 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
+                <div>
+                    <label for="meetings-page-date" class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5" data-i18n="meeting.date">Дата и время</label>
+                    <input id="meetings-page-date" type="datetime-local" name="scheduled_at" required class="ak-input w-auto text-sm" />
                 </div>
-                <button type="submit"
-                        class="px-6 py-2.5 rounded-xl bg-akashi-red text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-akashi-red/20 hover:opacity-95 active:scale-[0.98] transition-all">
-                    Создать
-                </button>
+                <button type="submit" class="ak-btn-red" data-i18n="meeting.add">К заседанию</button>
             </form>
-            <p class="text-[10px] text-gray-400 leading-relaxed lg:max-w-md lg:border-l lg:border-gray-100 lg:dark:border-white/10 lg:pl-8">
-                Дата и время заседания. С заявками — через
-                <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Approved</a>
-                и «Add to Meeting».
+            <p class="text-[9px] font-mono text-[#b0a8a0] max-w-xs leading-relaxed border-l border-[#DDD8CE] dark:border-[#282828] pl-4">
+                <span data-i18n="meeting.hint_intro">Дата заседания. Прикрепить заявки — через</span>
+                <a href="/?status=approved" class="text-ak-red hover:underline" data-i18n="filter.approved">Согласованы</a>
+                <span data-i18n="meeting.hint_outro">→ «К заседанию».</span>
             </p>
         </div>
-    </section>
+    </div>
 
-    <section class="mb-10">
-        <h2 class="text-sm font-black uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-            Предстоящие
-        </h2>
+    <!-- Upcoming -->
+    <section class="mb-8">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+            <h2 class="text-[9px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890]" data-i18n="meeting.upcoming">Предстоящие</h2>
+        </div>
         {% if upcoming %}
-        <ul class="space-y-2">
+        <ul class="space-y-1.5">
             {% for m in upcoming %}
             <li>
                 <a href="/meetings/{{ m.id }}"
-                   class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark px-5 py-4 shadow-sm hover:border-akashi-red/35 hover:shadow-md transition-all">
-                    <div class="min-w-0">
-                        <p class="text-xl font-black dark:text-white">{{ m.scheduled_at | datetime }}</p>
-                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
-                            #{{ m.id }} · {{ m.application_ids|length }} заявок
+                   class="flex items-center justify-between gap-4 px-5 py-4 border border-[#DDD8CE] dark:border-[#242424] rounded bg-white dark:bg-[#141414] hover:border-ak-red/40 transition-colors">
+                    <div>
+                        <p class="text-base font-bold font-mono text-[#111111] dark:text-[#EDE8DF]">{{ m.scheduled_at | datetime }}</p>
+                        <p class="text-[8px] font-mono text-[#a09890] mt-0.5 tracking-wide">
+                            #{{ m.id }} · {{ m.application_ids|length }} <span data-i18n="meeting.apps_label">заявок</span>
                         </p>
                     </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-akashi-red shrink-0">Открыть →</span>
+                    <span class="text-[8px] font-mono text-ak-red shrink-0 tracking-wide" data-i18n="meeting.open">Открыть →</span>
                 </a>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-sm text-gray-500 dark:text-gray-400 py-10 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-            Нет предстоящих заседаний
-        </p>
+        <p class="text-sm text-[#a09890] font-mono py-8 text-center border border-dashed border-[#DDD8CE] dark:border-[#242424] rounded" data-i18n="meeting.no_up">Нет предстоящих заседаний</p>
         {% endif %}
     </section>
 
+    <!-- Past -->
     <section>
-        <h2 class="text-sm font-black uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>
-            Прошедшие
-        </h2>
+        <div class="flex items-center gap-2 mb-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#b0a8a0] shrink-0"></span>
+            <h2 class="text-[9px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890]" data-i18n="meeting.past">Прошедшие</h2>
+        </div>
         {% if past %}
-        <ul class="space-y-2">
+        <ul class="space-y-1.5">
             {% for m in past %}
             <li>
                 <a href="/meetings/{{ m.id }}"
-                   class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-akashi-dark/90 px-5 py-4 opacity-95 hover:opacity-100 hover:border-white/20 transition-all">
-                    <div class="min-w-0">
-                        <p class="text-lg font-black dark:text-white">{{ m.scheduled_at | datetime }}</p>
-                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
-                            #{{ m.id }} · {{ m.application_ids|length }} заявок
+                   class="flex items-center justify-between gap-4 px-5 py-4 border border-[#DDD8CE] dark:border-[#242424] rounded bg-white/60 dark:bg-[#141414]/60 hover:bg-white dark:hover:bg-[#141414] transition-colors opacity-80 hover:opacity-100">
+                    <div>
+                        <p class="text-sm font-bold font-mono text-[#111111] dark:text-[#EDE8DF]">{{ m.scheduled_at | datetime }}</p>
+                        <p class="text-[8px] font-mono text-[#a09890] mt-0.5">
+                            #{{ m.id }} · {{ m.application_ids|length }} <span data-i18n="meeting.apps_label">заявок</span>
                         </p>
                     </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 shrink-0">Подробнее →</span>
+                    <span class="text-[8px] font-mono text-[#a09890] shrink-0" data-i18n="meeting.view">Подробнее →</span>
                 </a>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-sm text-gray-500 dark:text-gray-400 py-10 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-            Прошедших заседаний пока нет
-        </p>
+        <p class="text-sm text-[#a09890] font-mono py-8 text-center border border-dashed border-[#DDD8CE] dark:border-[#242424] rounded" data-i18n="meeting.no_past">Прошедших заседаний пока нет</p>
         {% endif %}
     </section>
 </div>
-
 {% endblock %}

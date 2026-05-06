@@ -1,131 +1,118 @@
 {% extends "base.html" %}
 {% block content %}
-
-<div class="animate-fade max-w-4xl mx-auto pb-8">
-    <nav class="mb-3">
+<div class="anim-fade max-w-4xl mx-auto pb-8">
+    <nav class="mb-6">
         <a href="/meetings"
-           class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-akashi-red transition-colors">
-            <span aria-hidden="true" class="opacity-70">←</span>
-            К списку заседаний
+            class="text-[8px] font-mono tracking-widest uppercase text-[#a09890] hover:text-ak-red transition-colors"
+            data-i18n="app.back">
+            ← Назад
         </a>
     </nav>
 
     {% if schedule_updated_ok %}
-    <div class="mb-4 px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[10px] font-black uppercase tracking-widest">
+    <div
+        class="mb-4 px-4 py-3 rounded border border-green-500/20 bg-green-500/5 text-green-700 dark:text-green-400 text-[9px] font-mono font-bold tracking-wide uppercase"
+        data-i18n="meeting.schedule_updated">
         Время заседания обновлено
     </div>
     {% endif %}
     {% if schedule_err %}
-    <div class="mb-4 px-4 py-2.5 rounded-xl bg-akashi-red/10 border border-akashi-red/25 text-akashi-red text-[11px] font-bold">
-        {{ schedule_err }}
-    </div>
+    <div class="mb-4 px-4 py-3 rounded border border-ak-red/20 bg-ak-red/5 text-ak-red text-[9px] font-mono font-bold">
+        {{ schedule_err }}</div>
     {% endif %}
 
-    <!-- Карточка метаданных -->
-    <header class="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark shadow-lg overflow-hidden mb-6">
-        <div class="px-5 sm:px-6 py-4 sm:py-5">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-                <div class="min-w-0 flex-1">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Заседание</p>
-                    <h1 class="text-2xl sm:text-3xl font-black tracking-tighter text-akashi-red dark:text-white leading-tight">
-                        {{ meeting.scheduled_at | datetime }}
-                    </h1>
-                    <dl class="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                        <div class="flex gap-2">
-                            <dt class="font-black uppercase tracking-wider text-gray-400">№</dt>
-                            <dd class="font-mono font-bold text-gray-800 dark:text-gray-200">{{ meeting.id }}</dd>
-                        </div>
-                        <div class="flex gap-2">
-                            <dt class="font-black uppercase tracking-wider text-gray-400">Создано</dt>
-                            <dd class="font-mono">{{ meeting.created_at | datetime }}</dd>
-                        </div>
-                    </dl>
+    <!-- Header Card -->
+    <header class="border border-[#DDD8CE] dark:border-[#242424] rounded bg-white dark:bg-[#141414] mb-8">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between p-6">
+            <div class="flex-1 mb-6 lg:mb-0 lg:pr-8">
+                <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-2"
+                    data-i18n="meeting.singular">Заседание</p>
+                <h1 class="text-3xl font-bold font-mono text-ak-red dark:text-ak-red-d leading-none mb-4">
+                    {{ meeting.scheduled_at | datetime }}
+                </h1>
+                <div class="flex gap-6 text-[9px] font-mono text-[#706860] dark:text-[#a09890] tracking-wide uppercase">
+                    <div><span class="font-bold mr-1">№</span>{{ meeting.id }}</div>
+                    <div><span class="font-bold mr-1" data-i18n="app.created">Создано</span>{{ meeting.created_at |
+                        datetime }}</div>
                 </div>
+            </div>
 
-                <div class="flex flex-col gap-3 lg:items-stretch lg:min-w-[220px] shrink-0 border-t border-gray-100 dark:border-white/10 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0 pt-4">
-                    <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 lg:text-right">Управление</p>
-                    <form method="post"
-                          action="/meetings/{{ meeting.id }}/schedule"
-                          class="flex flex-col gap-2 w-full">
-                        <label for="meeting-scheduled-at" class="text-[9px] font-black uppercase tracking-widest text-gray-400 lg:text-right">Время заседания</label>
-                        <input id="meeting-scheduled-at" type="datetime-local" name="scheduled_at" required
-                               value="{{ meeting.scheduled_at | datetime_local }}"
-                               class="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 px-3 py-2 text-sm dark:text-white outline-none focus:ring-2 focus:ring-akashi-red/25" />
-                        <button type="submit"
-                                class="w-full px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest
-                                       border border-akashi-red/30 bg-akashi-red/10 text-akashi-red dark:text-akashi-red
-                                       hover:bg-akashi-red/20 active:scale-[0.98] transition-all">
-                            Сохранить время
-                        </button>
-                    </form>
-                    <form method="post"
-                          action="/meetings/{{ meeting.id }}/delete"
-                          class="w-full"
-                          onsubmit="return confirm('Удалить это заседание?');">
-                        <button type="submit"
-                                class="w-full px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest
-                                       border border-red-500/30 bg-red-500/[0.06] text-red-600 dark:text-red-400
-                                       hover:bg-red-500/15 active:scale-[0.98] transition-all">
-                            Удалить заседание
-                        </button>
-                    </form>
-                </div>
+            <div class="lg:w-64 shrink-0 lg:border-l border-[#F0EBE3] dark:border-[#1E1E1E] lg:pl-6">
+                <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-3"
+                    data-i18n="meeting.management">Управление</p>
+                <form method="post" action="/meetings/{{ meeting.id }}/schedule" class="mb-3 space-y-2">
+                    <input type="datetime-local" name="scheduled_at" required
+                        value="{{ meeting.scheduled_at | datetime_local }}" class="ak-input text-xs py-2 px-3">
+                    <button type="submit" class="ak-btn-ghost w-full py-2 bg-[#F7F4EF] dark:bg-[#1A1A1A]"
+                        data-i18n="meeting.save_time">Сохранить время</button>
+                </form>
+                <form method="post" action="/meetings/{{ meeting.id }}/delete"
+                    onsubmit="return confirmDeleteMeeting();">
+                    <button type="submit"
+                        class="ak-btn-ghost w-full py-2 border-ak-red/30 text-ak-red hover:bg-ak-red/5"
+                        data-i18n="meeting.delete_meeting">Удалить заседание</button>
+                </form>
             </div>
         </div>
     </header>
 
-    <!-- Заявки -->
-    <section aria-labelledby="apps-heading">
-        <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
-            <h2 id="apps-heading" class="text-lg font-black tracking-tight dark:text-white">
-                Заявки
-            </h2>
+    <!-- Applications -->
+    <section>
+        <div class="flex items-end justify-between mb-4">
+            <h2 class="text-xl font-bold tracking-tight text-[#111111] dark:text-[#EDE8DF]"
+                data-i18n="app.applications">Заявки</h2>
             {% if apps %}
-            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400 tabular-nums">
-                В повестке: {{ apps|length }}
-            </span>
+            <span class="text-[9px] font-mono tracking-widest uppercase text-[#a09890]"><span
+                    data-i18n="meeting.on_agenda">В повестке:</span> {{ apps|length }}</span>
             {% endif %}
         </div>
 
         {% if apps %}
-        <div class="rounded-[2rem] border border-gray-200 dark:border-white/10 bg-white dark:bg-akashi-dark shadow-lg overflow-hidden">
-            <ul class="divide-y divide-gray-100 dark:divide-white/[0.06]">
-                {% for app in apps %}
-                <li class="px-5 sm:px-6 py-4 hover:bg-gray-50/90 dark:hover:bg-white/[0.03] transition-colors">
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-                        <div class="min-w-0 flex-1">
+        <div class="border border-[#DDD8CE] dark:border-[#242424] rounded overflow-hidden bg-white dark:bg-[#141414]">
+            <table class="w-full ak-table">
+                <tbody>
+                    {% for app in apps %}
+                    <tr
+                        class="hover:bg-[#FDFAF7] dark:hover:bg-[#181818] transition-colors group border-b border-[#F0EBE3] dark:border-[#1E1E1E] last:border-0">
+                        <td class="px-5 py-4 w-12 text-[9px] font-mono text-[#b0a8a0]">#{{ app.id }}</td>
+                        <td class="px-5 py-4">
                             <a href="/applications/{{ app.id }}"
-                               class="font-bold text-sm sm:text-base text-gray-900 dark:text-white hover:text-akashi-red transition-colors line-clamp-2">
-                                #{{ app.id }} — {{ app.topic }}
+                                class="block font-bold text-sm text-[#111111] dark:text-[#EDE8DF] hover:text-ak-red dark:hover:text-ak-red-d transition-colors leading-snug">
+                                {{ app.topic }}
                             </a>
-                            <p class="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-wide">
+                            <p class="text-[8px] font-mono text-[#a09890] mt-1.5 uppercase tracking-wide">
                                 {{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}
                             </p>
-                        </div>
-                        <div class="flex items-center justify-between sm:justify-end gap-4 shrink-0 sm:min-w-[200px]">
-                            <span class="status-badge status-{{ app.status }}">{{ app.status }}</span>
-                            <a href="/download/{{ app.id }}" target="_blank" rel="noopener"
-                               class="inline-flex items-center justify-center min-h-[36px] px-4 rounded-xl border border-akashi-red/25 bg-akashi-red/5
-                                      text-[9px] font-black uppercase tracking-widest text-akashi-red hover:bg-akashi-red/15 transition-colors">
-                                PDF
-                            </a>
-                        </div>
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
+                        </td>
+                        <td class="px-5 py-4 w-32 text-right whitespace-nowrap">
+                            <span class="s-badge s-{{ app.status }} block mb-2">{{ app.status }}</span>
+                            <a href="/download/{{ app.id }}" target="_blank"
+                                class="inline-block text-[8px] font-mono font-bold tracking-widest uppercase text-ak-red dark:text-ak-red-d hover:underline">📄
+                                PDF</a>
+                            <form method="post" action="/meetings/{{ meeting.id }}/remove_app/{{ app.id }}"
+                                onsubmit="return confirmRemoveFromMeeting({{ app.id }})" class="mt-2">
+                                <button type="submit"
+                                    class="text-[8px] font-mono tracking-widest text-[#b0a8a0] hover:text-ak-red transition-colors"
+                                    data-i18n="meeting.remove">
+                                    ✕ убрать
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% else %}
-        <div class="rounded-2xl border border-dashed border-gray-200 dark:border-white/15 px-6 py-14 text-center bg-gray-50/50 dark:bg-white/[0.02]">
-            <p class="text-3xl mb-3 leading-none opacity-50" aria-hidden="true">📋</p>
-            <p class="text-sm font-bold text-gray-600 dark:text-gray-300">Заявки не прикреплены</p>
-            <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-2 max-w-sm mx-auto leading-relaxed">
-                Чтобы добавить: <a href="/?status=approved" class="text-akashi-red font-bold hover:underline">Applications</a>
-                → фильтр Approved → отметьте строки → Add to Meeting
+        <div class="border border-dashed border-[#DDD8CE] dark:border-[#242424] rounded p-12 text-center">
+            <p class="text-sm font-bold text-[#111111] dark:text-[#EDE8DF] mb-2" data-i18n="meeting.no_apps_title">
+                Заявки не прикреплены</p>
+            <p class="text-[9px] font-mono text-[#a09890] tracking-wide leading-relaxed max-w-xs mx-auto"
+                data-i18n="meeting.no_apps_hint">
+                Чтобы добавить: раздел Заявки → фильтр «Согласованы» → отметьте строки → «К заседанию».
             </p>
         </div>
         {% endif %}
     </section>
 </div>
-
 {% endblock %}

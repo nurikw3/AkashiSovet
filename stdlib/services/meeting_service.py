@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 import stdlib.db as db
@@ -73,3 +74,20 @@ async def create_meeting_with_applications(
     if not updated:
         raise RuntimeError("meeting_create_with_apps: meeting missing after insert")
     return updated
+
+
+async def remove_application_from_meeting(meeting_id: int, app_id: int) -> bool:
+    """Убирает заявку из повестки заседания, не удаляя её из БД."""
+    row = await db.get_meeting_by_id(meeting_id)
+    if not row:
+        return False
+    meeting = Meeting.model_validate(row)
+    ids = [x for x in (meeting.application_ids or []) if x != app_id]
+    payload = json.dumps(ids, ensure_ascii=False)
+    async with db._pool_conn() as conn:
+        await conn.execute(
+            "UPDATE meetings SET application_ids = $1::jsonb WHERE id = $2",
+            payload,
+            meeting_id,
+        )
+    return True

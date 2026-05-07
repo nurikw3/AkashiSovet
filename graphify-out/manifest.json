@@ -68,15 +68,15 @@
     "hash": "32b1aaf93ab789a563ec19879c685827"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/pdf.py": {
-    "mtime": 1778041148.0162554,
-    "hash": "b3a33386577df0d0e279d307735bc1fb"
+    "mtime": 1778177853.4404263,
+    "hash": "0854eb101307df05e80c65e7521deb06"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/text_normalize.py": {
     "mtime": 1777914839.9164426,
     "hash": "851135f24c3091bf0eb60a466443956e"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/redis_client.py": {
-    "mtime": 1777310193.9978447,
+    "mtime": 1778169246.40515,
     "hash": "97523c0cb296a9ec6507adc81a71d1cd"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/schemas.py": {
@@ -144,8 +144,8 @@
     "hash": "6cc60f14741a05fabf643d8ceb172cb3"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/files.py": {
-    "mtime": 1778056028.5717452,
-    "hash": "6637ceab6b1368614242abf9b8442a2e"
+    "mtime": 1778177859.5199766,
+    "hash": "7dc76ebb0685daf9fc50de01138a08b0"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/cancel.py": {
     "mtime": 1777906891.8992448,
@@ -168,8 +168,8 @@
     "hash": "2e59154dfe2f76dde533f1e4077a8370"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/review.py": {
-    "mtime": 1778056037.878143,
-    "hash": "f68ba5150e8386d37ba6c8929cd58118"
+    "mtime": 1778177893.7518017,
+    "hash": "50898eade6837473c59294aa2994f126"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/handlers/user/start.py": {
     "mtime": 1778064514.9041786,
@@ -204,8 +204,8 @@
     "hash": "3fd7058fee6d47d79083943ecd0131e3"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/stdlib/services/application_service.py": {
-    "mtime": 1778050859.0218902,
-    "hash": "271f09cd3efa38bcf82e3336d55d7965"
+    "mtime": 1778177856.5970426,
+    "hash": "7c3ea7f6babf16206981c70a07374ae6"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/bot/config.py": {
     "mtime": 1778062281.2375636,
@@ -224,8 +224,16 @@
     "hash": "458ac6b8986941dd4c7d7faddea294b7"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/docker-compose.yaml": {
-    "mtime": 1778077458.1841476,
-    "hash": "590cf367297314686bc88150d511751a"
+    "mtime": 1778085413.2283614,
+    "hash": "7343800e74422baa05919e3e072755fc"
+  },
+  "/Users/nurasyk/Desktop/python/projects/AkashiSovet/ARCHITECTURE_PLAN.md": {
+    "mtime": 1778172775.6176689,
+    "hash": "e74fcb1d0b9da64851b7e343c8eaa1d0"
+  },
+  "/Users/nurasyk/Desktop/python/projects/AkashiSovet/UNIVERSAL_PORTAL_PLAN.md": {
+    "mtime": 1778173024.8625782,
+    "hash": "1ae7351f0c535f47407a1ac6f8fc30a3"
   },
   "/Users/nurasyk/Desktop/python/projects/AkashiSovet/PROJECT.MD": {
     "mtime": 1777906037.608375,

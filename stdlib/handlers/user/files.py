@@ -101,7 +101,9 @@ async def handle_file(message: Message, state: FSMContext):
         )
         return
 
-    await application_service.save_attachments_payload(app_id, attachments)
+    await application_service.save_attachments_payload(
+        app_id, attachments, user_id=user_id
+    )
     logger.info("File attached to S3 | app_id={} total={}", app_id, len(attachments))
 
     await message.answer(
@@ -138,7 +140,9 @@ async def on_file_delete(callback: CallbackQuery, state: FSMContext):
         return
 
     removed = attachments.pop(del_idx)
-    await application_service.save_attachments_payload(app_id, attachments)
+    await application_service.save_attachments_payload(
+        app_id, attachments, user_id=app.get("user_id")
+    )
     await callback.answer("Файл удалён.")
     await callback.message.answer(
         f"🗑 Удалён файл: {_attachment_name(removed, del_idx)}\n"

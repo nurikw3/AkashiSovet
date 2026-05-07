@@ -1,5 +1,6 @@
 # stdlib/handlers/user/review.py
 import json
+from time import perf_counter
 
 import stdlib.db as db
 import stdlib.keyboards as kb
@@ -30,7 +31,9 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
 
     # Сначала пробуем получить PDF-буфер через общую функцию
     try:
+        t0 = perf_counter()
         pdf_buf = await get_app_pdf_buffer(app_id)
+        t_pdf = (perf_counter() - t0) * 1000
 
         # Достаем данные для правильного имени файла
         full_name = await db.get_user_full_name(user_id)
@@ -46,6 +49,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             else message.message.answer_document
         )
 
+        t1 = perf_counter()
         await msg_func(
             document=BufferedInputFile(
                 pdf_buf.getvalue(),
@@ -53,6 +57,13 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             ),
             caption="📝 Проверьте PDF перед отправкой заявки.",
             reply_markup=kb.review_keyboard(tpl),
+        )
+        t_send = (perf_counter() - t1) * 1000
+        logger.info(
+            "Review PDF timings | app_id={} pdf_ms={:.0f} send_ms={:.0f}",
+            app_id,
+            t_pdf,
+            t_send,
         )
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 

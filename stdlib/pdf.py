@@ -22,6 +22,7 @@ from reportlab.platypus import (
     ListItem,
     PageBreak,
     KeepTogether,
+    Flowable,
     Image as RLImage,  # Импортируем Image для вставки прямо в текст
 )
 from reportlab.pdfbase import pdfmetrics
@@ -211,7 +212,7 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
     title = _normalize_pdf_user_text(title)
     body = _normalize_pdf_user_text(body)
     body = expand_numbered_newlines(body)
-    section_elements = [Paragraph(title, s["section_title"])]
+    section_elements = [_LogoPageMarker(), Paragraph(title, s["section_title"])]
     lines = [line.strip() for line in body.split("\n") if line.strip()]
 
     has_numbering = any(
@@ -256,7 +257,7 @@ def _parse_attachments_field(raw) -> list:
 
 # ─── Отрисовка фона ──────────────────────────────────────────────────────────
 def draw_background(canvas, doc):
-    """Логотип на всех страницах кроме последней."""
+    """Рисует логотип в шапке страницы."""
     width, height = A4
     canvas.saveState()
     if LOGO_PATH.exists():
@@ -274,11 +275,11 @@ def draw_background(canvas, doc):
     canvas.restoreState()
 
 
-def draw_last_page(canvas, doc):
-    """Логотип + футер — только на последней странице."""
+def draw_last_page(canvas, doc, *, include_logo: bool = True):
+    """Рисует оформление последней страницы (опциональный логотип + футер)."""
     width, height = A4
     canvas.saveState()
-    if LOGO_PATH.exists():
+    if include_logo and LOGO_PATH.exists():
         logo_w, logo_h = 320, 110
         canvas.drawImage(
             str(LOGO_PATH),
@@ -307,6 +308,11 @@ def draw_last_page(canvas, doc):
 async def _resolve_user_signature_bytes(user_id: int) -> bytes | None:
     """Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные."""
     ref = await db.get_user_signature(user_id)
+    return await _load_signature_for_ref(ref)
+
+
+async def _load_signature_for_ref(ref: str | bytes | bytearray | None) -> bytes | None:
+    """Загружает подпись по уже известному ref без дополнительного запроса в БД."""
     if not ref:
         return None
     if isinstance(ref, (bytes, bytearray)):
@@ -326,25 +332,39 @@ async def _resolve_user_signature_bytes(user_id: int) -> bytes | None:
     return None
 
 
+class _LogoPageMarker(Flowable):
+    """Невидимый маркер: страница считается «логотипной», если есть старт секции."""
+
+    def wrap(self, availWidth, availHeight):
+        return (0, 0)
+
+    def draw(self):
+        # Флаг считывается в _LastPageCanvas.save() для конкретной страницы.
+        self.canv._current_page_has_logo = True
+
+
 class _LastPageCanvas(Canvas):
     """Обычный Canvas, подпись теперь рисуется в самом тексте."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
+        self._current_page_has_logo = False
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
+        self._current_page_has_logo = False
         self._startPage()
 
     def save(self):
         total = len(self._saved_page_states)
         for i, state in enumerate(self._saved_page_states, start=1):
             self.__dict__.update(state)
-            if i < total:
+            include_logo = bool(getattr(self, "_current_page_has_logo", False))
+            if i < total and include_logo:
                 draw_background(self, None)
-            else:
-                draw_last_page(self, None)
+            elif i == total:
+                draw_last_page(self, None, include_logo=include_logo)
             super().showPage()
         super().save()
 
@@ -372,6 +392,8 @@ def _generate_pdf_sync(
 
     s = _styles()
     story = []
+    # Логотип рисуем на страницах, где начинается новый смысловой блок.
+    story.append(_LogoPageMarker())
 
     # ── Шапка ──
     story.append(Paragraph("Членам Правления", s["header"]))
@@ -414,6 +436,7 @@ def _generate_pdf_sync(
         attach_num = 5
 
     # ── Приложения ──
+    story.append(_LogoPageMarker())
     story.append(
         Paragraph(
             f"{attach_num}. Приложения / дополнительные материалы:",
@@ -440,6 +463,7 @@ def _generate_pdf_sync(
 
     # ── Подвал (подпись) ──
     story.append(PageBreak())
+    story.append(_LogoPageMarker())
     story.append(Spacer(1, 40))
 
     username = _normalize_pdf_user_text(
@@ -490,6 +514,7 @@ def _generate_pdf_sync(
 async def generate_pdf(
     data: dict,
     user_id: int | None = None,
+    signature_bytes: bytes | None = None,
     *,
     tpl: ApplicationTemplate | None = None,
     blocks_map: dict[str, str] | None = None,
@@ -503,8 +528,7 @@ async def generate_pdf(
         if not data:
             data = {}
 
-        signature_bytes: bytes | None = None
-        if user_id:
+        if signature_bytes is None and user_id:
             try:
                 signature_bytes = await _resolve_user_signature_bytes(user_id)
             except Exception:
@@ -535,7 +559,7 @@ def generate_pdf_filename(
     return f"{time_str}_{safe_name}_{safe_pos}.pdf"
 
 
-async def invalidate_pdf_cache(app_id: int) -> None:
+async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> None:
     """Сбрасывает Redis-токен и удаляет объект PDF в S3 для заявки."""
     r = redis_client_module.redis_client
     cache_key = PDF_CACHE_KEY_FMT.format(app_id=app_id)
@@ -545,10 +569,14 @@ async def invalidate_pdf_cache(app_id: int) -> None:
         except Exception as e:
             logger.warning("invalidate_pdf_cache redis delete app_id={}: {}", app_id, e)
 
-    row = await db.get_app(app_id)
-    if not row or not s3.is_s3_configured():
+    if not s3.is_s3_configured():
         return
-    uid = row["user_id"]
+    uid = user_id
+    if uid is None:
+        row = await db.get_app(app_id)
+        if not row:
+            return
+        uid = row["user_id"]
     key = s3.pdf_key(uid, app_id)
     try:
         await s3.delete_object(key, s3.BUCKET_PDF)
@@ -570,11 +598,13 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     except Exception:
         blocks = {}
 
-    tpl = await get_template()
-    full_name = await db.get_user_full_name(u_id)
-    position = await db.get_user_position(u_id)
-    sig_ref = await db.get_user_signature(u_id)
-    tpl_rev = await _get_pdf_template_revision()
+    tpl, full_name, position, sig_ref, tpl_rev = await asyncio.gather(
+        get_template(),
+        db.get_user_full_name(u_id),
+        db.get_user_position(u_id),
+        db.get_user_signature(u_id),
+        _get_pdf_template_revision(),
+    )
     token = _pdf_cache_token(app_raw, full_name, position, sig_ref, tpl, tpl_rev)
 
     r = redis_client_module.redis_client
@@ -614,7 +644,14 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
         "date": format_app_date_only(app_raw["created_at"]),
     }
 
-    buf = await generate_pdf(pdf_data, user_id=u_id, tpl=tpl, blocks_map=blocks)
+    signature_bytes = await _load_signature_for_ref(sig_ref)
+    buf = await generate_pdf(
+        pdf_data,
+        user_id=u_id,
+        signature_bytes=signature_bytes,
+        tpl=tpl,
+        blocks_map=blocks,
+    )
 
     if r and s3.is_s3_configured():
         try:

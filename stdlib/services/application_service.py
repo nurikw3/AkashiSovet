@@ -127,10 +127,12 @@ async def get_application_record(app_id: int) -> dict | None:
     return await db.get_app(app_id)
 
 
-async def save_attachments_payload(app_id: int, attachments: list) -> None:
+async def save_attachments_payload(
+    app_id: int, attachments: list, *, user_id: int | None = None
+) -> None:
     """Сохраняет список вложений как в БД (в т.ч. реестр файлов из Telegram до выгрузки в S3)."""
     await db.save_attachments(app_id, attachments)
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_cache(app_id, user_id=user_id)
 
 
 async def clear_application_chat_history(app_id: int) -> None:

@@ -377,7 +377,7 @@ def _generate_pdf_sync(
         leftMargin=3 * cm,
         rightMargin=2.5 * cm,
         topMargin=4.5 * cm,
-        bottomMargin=3.5 * cm,
+        bottomMargin=5.0 * cm,
     )
 
     s = _styles()

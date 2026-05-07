@@ -6,7 +6,6 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    BufferedInputFile,
 )
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
@@ -16,6 +15,7 @@ from stdlib.handlers.states import BotStates
 from stdlib.template import get_template
 from bot.logger import logger
 from stdlib.services import application_service
+from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import format_app_datetime
 
 router = Router()
@@ -216,10 +216,19 @@ async def cb_dl(callback: CallbackQuery):
     await callback.answer("⏳ Генерация...")
     app_id = int(callback.data.split("_")[-1])
     try:
+        app = await application_service.get_application_record(app_id)
+        if not app:
+            await callback.message.answer("❌ Заявка не найдена")
+            return
         buf = await get_app_pdf_buffer(app_id)
-        input_file = BufferedInputFile(file=buf.read(), filename=f"app_{app_id}.pdf")
-        await callback.message.answer_document(
-            document=input_file, caption=f"📄 #{app_id}"
+        await send_pdf_with_cache(
+            bot=callback.message.bot,
+            chat_id=callback.message.chat.id,
+            app_id=app_id,
+            pdf_file_id=app.get("pdf_file_id"),
+            pdf_buffer=buf,
+            filename=f"app_{app_id}.pdf",
+            caption=f"📄 #{app_id}",
         )
     except TelegramBadRequest as e:
         if "file is too big" in str(e).lower():

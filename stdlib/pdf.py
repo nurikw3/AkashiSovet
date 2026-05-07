@@ -546,6 +546,11 @@ async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> No
         except Exception as e:
             logger.warning("invalidate_pdf_cache redis delete app_id={}: {}", app_id, e)
 
+    try:
+        await db.set_pdf_file_id(app_id, None)
+    except Exception as e:
+        logger.warning("invalidate_pdf_cache clear pdf_file_id app_id={}: {}", app_id, e)
+
     if not s3.is_s3_configured():
         return
     uid = user_id
@@ -590,7 +595,11 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
                 pdf_key = s3.pdf_key(u_id, app_id)
                 pdf_bytes = await s3.download_bytes(pdf_key, s3.BUCKET_PDF)
                 if pdf_bytes:
-                    logger.debug("PDF cache hit app_id={}", app_id)
+                    logger.debug(
+                        "PDF cache hit app_id={} size_bytes={}",
+                        app_id,
+                        len(pdf_bytes),
+                    )
                     return BytesIO(pdf_bytes)
         except Exception as e:
             logger.warning("PDF cache read failed app_id={}: {}", app_id, e)
@@ -627,12 +636,25 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     if r and s3.is_s3_configured():
         try:
             body = buf.getvalue()
+            logger.info(
+                "PDF ready | app_id={} size_bytes={} size_kb={:.1f}",
+                app_id,
+                len(body),
+                len(body) / 1024,
+            )
             await s3.upload_bytes(
                 body, s3.pdf_key(u_id, app_id), s3.BUCKET_PDF, "application/pdf"
             )
             await r.set(cache_key, token, ex=PDF_CACHE_TTL_SEC)
         except Exception as e:
             logger.warning("PDF cache store failed app_id={}: {}", app_id, e)
+    else:
+        logger.info(
+            "PDF ready | app_id={} size_bytes={} size_kb={:.1f}",
+            app_id,
+            len(buf.getbuffer()),
+            len(buf.getbuffer()) / 1024,
+        )
 
     buf.seek(0)
     return buf

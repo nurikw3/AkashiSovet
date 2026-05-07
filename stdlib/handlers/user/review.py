@@ -7,10 +7,11 @@ import stdlib.keyboards as kb
 from stdlib.services import application_service
 from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, BufferedInputFile
+from aiogram.types import Message, CallbackQuery
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
 from stdlib.telegram_summary import INTRO_FALLBACK_NO_PDF_HTML, chunk_blocks_summary_html
 from stdlib.template import get_template
@@ -43,18 +44,15 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         custom_filename = generate_pdf_filename(full_name, position, created_at)
 
         # Отправляем документ
-        msg_func = (
-            message.answer_document
-            if isinstance(message, Message)
-            else message.message.answer_document
-        )
-
         t1 = perf_counter()
-        await msg_func(
-            document=BufferedInputFile(
-                pdf_buf.getvalue(),
-                filename=custom_filename,
-            ),
+        target_message = message if isinstance(message, Message) else message.message
+        await send_pdf_with_cache(
+            bot=target_message.bot,
+            chat_id=target_message.chat.id,
+            app_id=app_id,
+            pdf_file_id=app.get("pdf_file_id"),
+            pdf_buffer=pdf_buf,
+            filename=custom_filename,
             caption="📝 Проверьте PDF перед отправкой заявки.",
             reply_markup=kb.review_keyboard(tpl),
         )

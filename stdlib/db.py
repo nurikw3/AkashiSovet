@@ -195,6 +195,15 @@ async def update_status(
     logger.info("App {} status → {}", app_id, status)
 
 
+async def set_pdf_file_id(app_id: int, pdf_file_id: str | None) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            "UPDATE applications SET pdf_file_id = $1 WHERE id = $2",
+            pdf_file_id,
+            app_id,
+        )
+
+
 async def get_pending_apps() -> list[dict]:
     async with _pool_conn() as conn:
         rows = await conn.fetch(

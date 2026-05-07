@@ -90,7 +90,12 @@ async def submit_to_review(
 
 async def update_submission_pdf_reference(app_id: int, pdf_file_id: str) -> None:
     """Обновляет `pdf_file_id` у уже отправленной заявки (например после отправки PDF в Telegram)."""
-    await db.update_status(app_id, "pending", pdf_file_id=pdf_file_id)
+    await db.set_pdf_file_id(app_id, pdf_file_id)
+
+
+async def clear_pdf_reference(app_id: int) -> None:
+    """Сбрасывает сохраненный Telegram `pdf_file_id` для заявки."""
+    await db.set_pdf_file_id(app_id, None)
 
 
 async def approve(app_id: int) -> Application | None:

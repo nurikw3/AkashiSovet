@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, BufferedInputFile
 from bot.config import config
 from bot.logger import logger
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
 
 
@@ -92,18 +93,23 @@ async def finalize_and_notify(
 
     # 3. Достаем данные и формируем красивое имя файла ОДИН раз
     created_at = app.get("created_at") or now_app()
+    pdf_file_id = app.get("pdf_file_id")
 
     custom_filename = generate_pdf_filename(full_name, position, created_at)
 
     # 4. Отправляем копию пользователю
     try:
-        await callback.message.answer_document(
-            document=BufferedInputFile(
-                pdf_buffer.getvalue(),
-                filename=custom_filename,
-            ),
+        user_pdf_msg = await send_pdf_with_cache(
+            bot=callback.message.bot,
+            chat_id=callback.message.chat.id,
+            app_id=app_id,
+            pdf_file_id=pdf_file_id,
+            pdf_buffer=pdf_buffer,
+            filename=custom_filename,
             caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
         )
+        if user_pdf_msg.document and user_pdf_msg.document.file_id:
+            pdf_file_id = user_pdf_msg.document.file_id
     except TelegramBadRequest as e:
         if "file is too big" not in str(e).lower():
             raise
@@ -122,23 +128,21 @@ async def finalize_and_notify(
     # 5. Отправляем суперюзерам
     for su_id in config.SUPERUSER_IDS:
         try:
-            msg = await bot.send_document(
-                su_id,
-                document=BufferedInputFile(
-                    pdf_buffer.getvalue(),
-                    filename=custom_filename,
-                ),
+            su_pdf_msg = await send_pdf_with_cache(
+                bot=bot,
+                chat_id=su_id,
+                app_id=app_id,
+                pdf_file_id=pdf_file_id,
+                pdf_buffer=pdf_buffer,
+                filename=custom_filename,
                 caption=(
                     f"📋 Новая заявка #{app_id} от @{callback.from_user.username or callback.from_user.id}\n"
                     f"📎 Приложений: {len(attachments)}"
                 ),
                 reply_markup=kb.approve_reject_keyboard(app_id),
             )
-
-            # Сохраняем file_id отправленного PDF, чтобы не генерить его заново при скачивании
-            await application_service.update_submission_pdf_reference(
-                app_id, msg.document.file_id
-            )
+            if su_pdf_msg.document and su_pdf_msg.document.file_id:
+                pdf_file_id = su_pdf_msg.document.file_id
 
             # Пересылаем приложения: байты из S3 (раньше использовался только Telegram file_id)
             if attachments:

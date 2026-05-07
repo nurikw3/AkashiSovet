@@ -1,12 +1,9 @@
-"""
-PDF-генерация служебной записки через ReportLab с фоном из шаблона.
-"""
-
 import asyncio
 import hashlib
 import re
 import io
 import json
+import ast
 from io import BytesIO
 from pathlib import Path
 
@@ -21,8 +18,8 @@ from reportlab.platypus import (
     ListFlowable,
     ListItem,
     PageBreak,
-    Flowable,
-    Image as RLImage,  # Импортируем Image для вставки прямо в текст
+    Image as RLImage,
+    KeepTogether,  # Добавлено для склеивания блоков
 )
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -182,10 +179,9 @@ def _normalize_risk_placeholder(block_title: str, body_raw: str) -> str:
     return body_raw
 
 
-# Шрифт Times из assets не содержит некоторых Unicode-тире/дефисов → в PDF «квадратики».
 _PDF_UNSAFE_DASH = str.maketrans(
     {
-        "\u2011": "-",  # non-breaking hyphen
+        "\u2011": "-",
         "\u2010": "-",
         "\u2012": "-",
         "\u2013": "-",
@@ -211,8 +207,10 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
     title = _normalize_pdf_user_text(title)
     body = _normalize_pdf_user_text(body)
     body = expand_numbered_newlines(body)
-    story.append(_LogoPageMarker())
-    story.append(Paragraph(title, s["section_title"]))
+    
+    # Собираем элементы одного блока во временный массив
+    block_story = []
+    block_story.append(Paragraph(title, s["section_title"]))
     lines = [line.strip() for line in body.split("\n") if line.strip()]
 
     has_numbering = any(
@@ -228,28 +226,35 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
             clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
             bullet_items.append(ListItem(Paragraph(clean_line, s["body"])))
 
-        story.append(
+        block_story.append(
             ListFlowable(
                 bullet_items, bulletType="bullet", start="•", leftIndent=15
             )
         )
     else:
         for line in lines:
-            story.append(Paragraph(line, s["body"]))
-    story.append(Spacer(1, 6))
+            block_story.append(Paragraph(line, s["body"]))
+            
+    block_story.append(Spacer(1, 6))
+    
+    # Оборачиваем весь блок в KeepTogether, чтобы запретить разрыв на середине
+    story.append(KeepTogether(block_story))
 
 
 def _parse_attachments_field(raw) -> list:
     attachments = raw or []
     if isinstance(attachments, str):
         try:
-            valid_json_str = attachments.replace("'", '"')
-            attachments = json.loads(valid_json_str)
-        except Exception:
-            if attachments.strip() in ("[]", "", "[ ]"):
-                attachments = []
-            else:
-                attachments = [attachments]
+            # Безопасный парсинг (решает проблему одинарных кавычек внутри названий)
+            attachments = ast.literal_eval(attachments)
+        except (ValueError, SyntaxError):
+            try:
+                attachments = json.loads(attachments)
+            except Exception:
+                if attachments.strip() in ("[]", "", "[ ]"):
+                    attachments = []
+                else:
+                    attachments = [attachments]
     return attachments
 
 
@@ -304,13 +309,11 @@ def draw_last_page(canvas, doc, *, include_logo: bool = True):
 
 
 async def _resolve_user_signature_bytes(user_id: int) -> bytes | None:
-    """Берёт подпись пользователя: из S3 по ключу в БД либо устаревшие бинарные данные."""
     ref = await db.get_user_signature(user_id)
     return await _load_signature_for_ref(ref)
 
 
 async def _load_signature_for_ref(ref: str | bytes | bytearray | None) -> bytes | None:
-    """Загружает подпись по уже известному ref без дополнительного запроса в БД."""
     if not ref:
         return None
     if isinstance(ref, (bytes, bytearray)):
@@ -330,39 +333,29 @@ async def _load_signature_for_ref(ref: str | bytes | bytearray | None) -> bytes 
     return None
 
 
-class _LogoPageMarker(Flowable):
-    """Невидимый маркер: страница считается «логотипной», если есть старт секции."""
-
-    def wrap(self, availWidth, availHeight):
-        return (0, 0)
-
-    def draw(self):
-        # Флаг считывается в _LastPageCanvas.save() для конкретной страницы.
-        self.canv._current_page_has_logo = True
-
-
 class _LastPageCanvas(Canvas):
-    """Обычный Canvas, подпись теперь рисуется в самом тексте."""
+    """Рисует логотип на каждой странице, а футер — только на последней."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
-        self._current_page_has_logo = False
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
-        self._current_page_has_logo = False
         self._startPage()
 
     def save(self):
         total = len(self._saved_page_states)
         for i, state in enumerate(self._saved_page_states, start=1):
             self.__dict__.update(state)
-            include_logo = bool(getattr(self, "_current_page_has_logo", False))
-            if i < total and include_logo:
-                draw_background(self, None)
-            elif i == total:
-                draw_last_page(self, None, include_logo=include_logo)
+            
+            # Шапка рисуется ВСЕГДА
+            draw_background(self, None)
+            
+            # Подвал (футер) рисуется ТОЛЬКО на последней странице
+            if i == total:
+                draw_last_page(self, None, include_logo=False)
+                
             super().showPage()
         super().save()
 
@@ -374,7 +367,6 @@ def _generate_pdf_sync(
     blocks_map: dict[str, str] | None,
     signature_bytes: bytes | None,
 ) -> BytesIO:
-    """Синхронная сборка PDF (ReportLab). Вызывать через ``asyncio.to_thread``."""
     if not data:
         data = {}
 
@@ -390,8 +382,6 @@ def _generate_pdf_sync(
 
     s = _styles()
     story = []
-    # Логотип рисуем на страницах, где начинается новый смысловой блок.
-    story.append(_LogoPageMarker())
 
     # ── Шапка ──
     story.append(Paragraph("Членам Правления", s["header"]))
@@ -423,10 +413,7 @@ def _generate_pdf_sync(
         sections = [
             ("1. Краткое описание и суть вопроса:", data.get("description") or ""),
             ("2. Основание для вынесения:", data.get("basis") or ""),
-            (
-                "3. Предлагаемое решение / варианты решений:",
-                data.get("solution") or "",
-            ),
+            ("3. Предлагаемое решение / варианты решений:", data.get("solution") or ""),
             ("4. Риски и последствия (если актуально):", risks_text),
         ]
         for sec_title, body in sections:
@@ -434,8 +421,8 @@ def _generate_pdf_sync(
         attach_num = 5
 
     # ── Приложения ──
-    story.append(_LogoPageMarker())
-    story.append(
+    attach_story = []
+    attach_story.append(
         Paragraph(
             f"{attach_num}. Приложения / дополнительные материалы:",
             s["section_title"],
@@ -451,18 +438,22 @@ def _generate_pdf_sync(
             if str(name).strip()
         ]
         if items:
-            story.append(
+            attach_story.append(
                 ListFlowable(items, bulletType="bullet", start="•", leftIndent=15)
             )
         else:
-            story.append(Paragraph("(приложения не прикреплены)", s["body"]))
+            attach_story.append(Paragraph("(приложения не прикреплены)", s["body"]))
     else:
-        story.append(Paragraph("(приложения не прикреплены)", s["body"]))
+        attach_story.append(Paragraph("(приложения не прикреплены)", s["body"]))
+
+    # Склеиваем блок "Приложения", чтобы он не разрывался на страницы
+    story.append(KeepTogether(attach_story))
 
     # ── Подвал (подпись) ──
-    story.append(PageBreak())
-    story.append(_LogoPageMarker())
     story.append(Spacer(1, 40))
+    
+    # Собираем блок подписи целиком, чтобы он не отрывался от имени и даты
+    signature_story = []
 
     username = _normalize_pdf_user_text(
         str(
@@ -478,30 +469,27 @@ def _generate_pdf_sync(
     )
     date = str(data.get("date") or "__.__.____")
 
-    story.append(Paragraph(f"<b>{position}:</b>", s["body"]))
-
-    # Небольшой отступ после должности
-    story.append(Spacer(1, 5))
+    signature_story.append(Paragraph(f"<b>{position}:</b>", s["body"]))
+    signature_story.append(Spacer(1, 5))
 
     if signature_bytes:
         try:
             sig_stream = io.BytesIO(signature_bytes)
-            # Ограничиваем размер картинки
             sig_img = RLImage(sig_stream, width=4 * cm, height=2 * cm)
             sig_img.hAlign = "LEFT"
-            story.append(sig_img)
-
-            # 🔥 МАГИЯ: Отрицательный отступ! Подтягиваем линию ВВЕРХ под картинку
-            story.append(Spacer(1, -1 * cm))
+            signature_story.append(sig_img)
+            signature_story.append(Spacer(1, -1 * cm))
         except Exception as e:
             logger.warning("PDF: Ошибка вставки картинки подписи: {}", e)
-            story.append(Spacer(1, 1.5 * cm))
+            signature_story.append(Spacer(1, 1.5 * cm))
     else:
-        story.append(Spacer(1, 1.5 * cm))
+        signature_story.append(Spacer(1, 1.5 * cm))
 
-    story.append(Paragraph(f"________________ /{username}/", s["body"]))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(f"<b>Дата:</b> {date}", s["body"]))
+    signature_story.append(Paragraph(f"________________ /{username}/", s["body"]))
+    signature_story.append(Spacer(1, 10))
+    signature_story.append(Paragraph(f"<b>Дата:</b> {date}", s["body"]))
+
+    story.append(KeepTogether(signature_story))
 
     doc.build(story, canvasmaker=_LastPageCanvas)
 
@@ -517,11 +505,6 @@ async def generate_pdf(
     tpl: ApplicationTemplate | None = None,
     blocks_map: dict[str, str] | None = None,
 ) -> BytesIO:
-    """Генерирует PDF служебной записки с авто-подписью.
-
-    Заявка из БД: передайте ``tpl`` и ``blocks_map`` (ключи — ``str(block_id)``).
-    Локальные тесты: плоский ``data`` (topic, description, …) без ``tpl``.
-    """
     try:
         if not data:
             data = {}
@@ -541,7 +524,6 @@ async def generate_pdf(
     except Exception as e:
         logger.error("PDF generation failed for app_id={}: {}", data.get("app_id"), e)
         import traceback
-
         logger.error("Traceback: {}", traceback.format_exc())
         raise
 
@@ -549,16 +531,13 @@ async def generate_pdf(
 def generate_pdf_filename(
     full_name: str | None, position: str | None, dt: datetime
 ) -> str:
-    """Генерирует стандартизированное имя для PDF-файла."""
     safe_name = (full_name or "Сотрудник").replace(" ", "_")
     safe_pos = (position or "Должность").replace(" ", "_")
     time_str = ensure_app_tz(dt).strftime("%H-%M_%d-%m-%Y")
-
     return f"{time_str}_{safe_name}_{safe_pos}.pdf"
 
 
 async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> None:
-    """Сбрасывает Redis-токен и удаляет объект PDF в S3 для заявки."""
     r = redis_client_module.redis_client
     cache_key = PDF_CACHE_KEY_FMT.format(app_id=app_id)
     if r:
@@ -583,9 +562,6 @@ async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> No
 
 
 async def get_app_pdf_buffer(app_id: int) -> BytesIO:
-    """Универсальная функция подготовки и генерации PDF для заявки.
-    Единый источник истины для бота и веба."""
-
     app_raw = await db.get_app(app_id)
     if not app_raw:
         raise ValueError(f"App {app_id} not found")
@@ -619,20 +595,17 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
         except Exception as e:
             logger.warning("PDF cache read failed app_id={}: {}", app_id, e)
 
+    # В get_app_pdf_buffer используем ту же безопасную функцию для парсинга вложений
     raw_att = app_raw.get("attachments")
+    parsed_atts = _parse_attachments_field(raw_att)
     clean_atts = []
-    if raw_att:
-        if isinstance(raw_att, str):
-            try:
-                raw_att = json.loads(raw_att.replace("'", '"'))
-            except Exception:
-                raw_att = []
-        if isinstance(raw_att, list):
-            for f in raw_att:
-                if isinstance(f, dict):
-                    clean_atts.append(f.get("name") or f.get("file_name") or "Файл")
-                else:
-                    clean_atts.append(str(f))
+    
+    if isinstance(parsed_atts, list):
+        for f in parsed_atts:
+            if isinstance(f, dict):
+                clean_atts.append(f.get("name") or f.get("file_name") or "Файл")
+            else:
+                clean_atts.append(str(f))
 
     pdf_data = {
         "app_id": app_id,

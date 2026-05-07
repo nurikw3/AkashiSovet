@@ -5,6 +5,7 @@ import stdlib.keyboards as kb
 from stdlib.services import application_service, file_service
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, BufferedInputFile
 from bot.config import config
 from bot.logger import logger
@@ -95,13 +96,22 @@ async def finalize_and_notify(
     custom_filename = generate_pdf_filename(full_name, position, created_at)
 
     # 4. Отправляем копию пользователю
-    await callback.message.answer_document(
-        document=BufferedInputFile(
-            pdf_buffer.getvalue(),
-            filename=custom_filename,
-        ),
-        caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
-    )
+    try:
+        await callback.message.answer_document(
+            document=BufferedInputFile(
+                pdf_buffer.getvalue(),
+                filename=custom_filename,
+            ),
+            caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
+        )
+    except TelegramBadRequest as e:
+        if "file is too big" not in str(e).lower():
+            raise
+        logger.warning("User PDF too big for Telegram | app_id={} err={}", app_id, e)
+        await callback.message.answer(
+            "📤 Заявка отправлена на согласование.\n\n"
+            "⚠️ Копию PDF не удалось отправить в чат: файл слишком большой для Telegram."
+        )
 
     done_msg = await callback.message.answer(
         "Когда проверите, можно очистить служебные сообщения этой заявки:",

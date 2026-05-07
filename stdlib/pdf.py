@@ -21,7 +21,6 @@ from reportlab.platypus import (
     ListFlowable,
     ListItem,
     PageBreak,
-    KeepTogether,
     Flowable,
     Image as RLImage,  # Импортируем Image для вставки прямо в текст
 )
@@ -212,7 +211,8 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
     title = _normalize_pdf_user_text(title)
     body = _normalize_pdf_user_text(body)
     body = expand_numbered_newlines(body)
-    section_elements = [_LogoPageMarker(), Paragraph(title, s["section_title"])]
+    story.append(_LogoPageMarker())
+    story.append(Paragraph(title, s["section_title"]))
     lines = [line.strip() for line in body.split("\n") if line.strip()]
 
     has_numbering = any(
@@ -228,16 +228,14 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
             clean_line = re.sub(r"^\d+[\.\)]\s*", "", line)
             bullet_items.append(ListItem(Paragraph(clean_line, s["body"])))
 
-        section_elements.append(
+        story.append(
             ListFlowable(
                 bullet_items, bulletType="bullet", start="•", leftIndent=15
             )
         )
     else:
         for line in lines:
-            section_elements.append(Paragraph(line, s["body"]))
-
-    story.append(KeepTogether(section_elements))
+            story.append(Paragraph(line, s["body"]))
     story.append(Spacer(1, 6))
 
 

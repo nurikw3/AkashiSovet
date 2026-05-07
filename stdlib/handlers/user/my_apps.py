@@ -221,6 +221,15 @@ async def cb_dl(callback: CallbackQuery):
         await callback.message.answer_document(
             document=input_file, caption=f"📄 #{app_id}"
         )
+    except TelegramBadRequest as e:
+        if "file is too big" in str(e).lower():
+            logger.warning("My apps PDF too big for Telegram | app_id={} err={}", app_id, e)
+            await callback.message.answer(
+                "⚠️ PDF слишком большой для отправки через Telegram."
+            )
+            return
+        logger.error("PDF telegram err: {}", e)
+        await callback.message.answer("❌ Ошибка отправки PDF")
     except Exception as e:
         logger.error("PDF err: {}", e)
         await callback.message.answer("❌ Ошибка генерации PDF")

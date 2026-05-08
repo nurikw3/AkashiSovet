@@ -130,8 +130,6 @@ async def finalize_and_notify(
     superuser_text = (
         f"📋 <b>Новая заявка #{app_id}</b>\n"
         f"👤 От: @{callback.from_user.username or callback.from_user.id}\n | {full_name} | {position}"
-        f"📎 Приложений: {len(attachments)}\n"
-        f"🔗 Открыть в панели: {app_url or 'WEB_PUBLIC_URL не настроен'}"
     )
     for su_id in config.SUPERUSER_IDS:
         try:

@@ -75,7 +75,7 @@ def approve_reject_open_keyboard(
     if application_url:
         rows.insert(
             0,
-            [InlineKeyboardButton(text="🔗 Open In Web", url=application_url)],
+            [InlineKeyboardButton(text="🔗 Открыть заявку", url=application_url)],
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

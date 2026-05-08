@@ -62,6 +62,24 @@ def approve_reject_keyboard(app_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def approve_reject_open_keyboard(
+    app_id: int,
+    application_url: str | None = None,
+) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(text="✅ Approve", callback_data=f"approve_{app_id}"),
+            InlineKeyboardButton(text="❌ Reject", callback_data=f"reject_{app_id}"),
+        ]
+    ]
+    if application_url:
+        rows.insert(
+            0,
+            [InlineKeyboardButton(text="🔗 Open In Web", url=application_url)],
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def rework_keyboard(tpl: ApplicationTemplate, app_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
         [

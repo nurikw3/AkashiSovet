@@ -2,11 +2,11 @@ import json
 
 import stdlib.db as db
 import stdlib.keyboards as kb
-from stdlib.services import application_service, file_service
+from stdlib.services import application_service
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery, BufferedInputFile
+from aiogram.types import CallbackQuery
 from bot.config import config
 from bot.logger import logger
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
@@ -125,64 +125,30 @@ async def finalize_and_notify(
     )
     cleanup_ids.append(done_msg.message_id)
 
-    # 5. Отправляем суперюзерам
+    app_url = f"{config.WEB_PUBLIC_URL.rstrip('/')}/applications/{app_id}" if config.WEB_PUBLIC_URL else None
+    superuser_text = (
+        f"📋 <b>Новая заявка #{app_id}</b>\n"
+        f"👤 От: @{callback.from_user.username or callback.from_user.id}\n"
+        f"📎 Приложений: {len(attachments)}\n"
+        f"🔗 Открыть в панели: {app_url or 'WEB_PUBLIC_URL не настроен'}"
+    )
     for su_id in config.SUPERUSER_IDS:
         try:
-            su_pdf_msg = await send_pdf_with_cache(
-                bot=bot,
-                chat_id=su_id,
-                app_id=app_id,
-                pdf_file_id=pdf_file_id,
-                pdf_buffer=pdf_buffer,
-                filename=custom_filename,
-                caption=(
-                    f"📋 Новая заявка #{app_id} от @{callback.from_user.username or callback.from_user.id}\n"
-                    f"📎 Приложений: {len(attachments)}"
-                ),
-                reply_markup=kb.approve_reject_keyboard(app_id),
+            await bot.send_message(
+                su_id,
+                superuser_text,
+                reply_markup=kb.approve_reject_open_keyboard(app_id, app_url),
+                disable_web_page_preview=True,
             )
-            if su_pdf_msg.document and su_pdf_msg.document.file_id:
-                pdf_file_id = su_pdf_msg.document.file_id
-
-            # Пересылаем приложения: байты из S3 (раньше использовался только Telegram file_id)
-            if attachments:
-                await bot.send_message(su_id, "📁 Приложения к заявке:")
-                for att in attachments:
-                    if not isinstance(att, dict):
-                        continue
-                    file_name = att.get("name") or att.get("file_name") or "Приложение"
-                    s3_key = att.get("s3_key")
-                    if s3_key:
-                        body = await file_service.download_attachment(s3_key)
-                        if not body:
-                            logger.warning(
-                                "S3 attachment missing for superuser notify | app_id={} key={}",
-                                app_id,
-                                s3_key,
-                            )
-                            continue
-                        await bot.send_document(
-                            su_id,
-                            document=BufferedInputFile(body, filename=file_name),
-                            caption=file_name,
-                        )
-                    elif att.get("file_id"):
-                        await bot.send_document(
-                            su_id, document=att["file_id"], caption=file_name
-                        )
-                    else:
-                        logger.warning(
-                            "Attachment without s3_key/file_id, skip | app_id={} name={}",
-                            app_id,
-                            file_name,
-                        )
         except Exception as e:
             logger.error(
                 "Failed to notify superuser {} for app {}: {}", su_id, app_id, e
             )
 
     logger.info(
-        "App {} submitted for review | attachments={}", app_id, len(attachments)
+        "App {} submitted for review | attachments={} superuser_notify=url_only",
+        app_id,
+        len(attachments),
     )
     await state.set_state(None)
     await state.update_data(

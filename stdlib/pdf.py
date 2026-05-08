@@ -75,8 +75,8 @@ if not _font_registered:
 
 LOGO_PATH = ASSETS_DIR / "image1.png"
 FOOTER_PATH = (
-    ASSETS_DIR / "image2!.png"
-    if (ASSETS_DIR / "image2!.png").exists()
+    ASSETS_DIR / "image2_updated.png"
+    if (ASSETS_DIR / "image2_updated.png").exists()
     else ASSETS_DIR / "image2.png"
 )
 

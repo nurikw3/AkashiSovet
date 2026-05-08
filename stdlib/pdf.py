@@ -74,7 +74,11 @@ if not _font_registered:
     _FONT_BOLD_NAME = "Helvetica-Bold"
 
 LOGO_PATH = ASSETS_DIR / "image1.png"
-FOOTER_PATH = ASSETS_DIR / "image2.png"
+FOOTER_PATH = (
+    ASSETS_DIR / "image2!.png"
+    if (ASSETS_DIR / "image2!.png").exists()
+    else ASSETS_DIR / "image2.png"
+)
 
 # Redis хранит SHA256-токен версии PDF; байты лежат в S3 по `pdf_key(user_id, app_id)`.
 PDF_CACHE_KEY_FMT = "pdf_cache:{app_id}"

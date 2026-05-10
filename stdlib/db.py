@@ -2,10 +2,11 @@ import json
 import asyncpg
 from bot.config import config
 from bot.logger import logger
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 import random
 import string
 from passlib.context import CryptContext
+import bcrypt
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -669,8 +670,6 @@ async def extend_meeting_application_ids(meeting_id: int, app_ids: list[int]) ->
                 meeting_id,
             )
 
-
-import bcrypt
 
 
 async def update_user_password(user_id: int, password: str):

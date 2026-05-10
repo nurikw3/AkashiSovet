@@ -1,7 +1,3 @@
-"""
-Централизованная настройка Loguru.
-Импортируй `logger` из этого модуля во всех файлах вместо стандартного logging.
-"""
 from __future__ import annotations
 
 import os
@@ -23,7 +19,6 @@ def prepare_log_storage(
     clean_on_start: bool,
     max_total_mb: int,
 ) -> None:
-    """Готовит папку логов и при необходимости подчищает старые файлы."""
     os.makedirs(log_dir, exist_ok=True)
     if clean_on_start:
         for fp in _iter_log_files(log_dir):
@@ -40,7 +35,6 @@ def prepare_log_storage(
     if total <= max_bytes:
         return
 
-    # Удаляем самые старые, пока не уложимся в лимит.
     files.sort(key=lambda f: f.stat().st_mtime)
     for fp in files:
         if total <= max_bytes:
@@ -64,8 +58,7 @@ def setup_logging(
     errors_rotation_mb: int = 5,
     errors_retention_days: int = 30,
 ) -> None:
-    """Настроить форматы вывода. Вызвать один раз при старте бота."""
-    logger.remove()  # убрать дефолтный handler
+    logger.remove()
 
     fmt = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -74,13 +67,11 @@ def setup_logging(
         "<level>{message}</level>"
     )
 
-    # stdout — все уровни >= level
     logger.add(sys.stdout, format=fmt, level=level, colorize=True)
 
     app_log_path = str(Path(log_dir) / "bot.log")
     errors_log_path = str(Path(log_dir) / "errors.log")
 
-    # основной файл
     logger.add(
         app_log_path,
         format=fmt,
@@ -91,7 +82,6 @@ def setup_logging(
         colorize=False,
     )
 
-    # отдельный файл только для ошибок
     logger.add(
         errors_log_path,
         format=fmt,
@@ -103,9 +93,7 @@ def setup_logging(
     )
 
 
-# Перехватываем стандартный logging (aiogram, aiosqlite и т.д.)
 class InterceptHandler:
-    """Перенаправляет записи stdlib logging → loguru."""
 
     def write(self, message):
         pass

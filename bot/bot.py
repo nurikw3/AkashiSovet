@@ -1,15 +1,9 @@
-"""
-Точка входа Telegram-бота AKASHI Data Center PLC.
-Включает: AIogram 3.7+, Redis FSM (Manual Client), PostgreSQL, APScheduler (Казахстан UTC+5)
-"""
-
 import asyncio
 
 import redis.asyncio as redis
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
-# ✅ ИСПРАВЛЕНИЕ: Правильный импорт DefaultBotProperties в новых версиях Aiogram
 from aiogram.client.default import DefaultBotProperties
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -21,7 +15,6 @@ from stdlib import resources
 from stdlib.handlers import user, superuser
 from stdlib.timezone_util import APP_TIMEZONE
 
-# ─── Настройка логирования ────────────────────────────────────────────────────
 prepare_log_storage(
     log_dir=config.LOG_DIR,
     clean_on_start=config.LOG_CLEAN_ON_START,
@@ -39,12 +32,10 @@ setup_logging(
 )
 InterceptHandler.install()
 
-# ─── Планировщик и Таймзона ───────────────────────────────────────────────────
 scheduler = AsyncIOScheduler()
 
 
 async def send_daily_report(bot: Bot) -> None:
-    """Задача APScheduler: ежедневный отчет суперюзерам."""
     try:
         stats = await db.get_daily_stats()
 
@@ -69,10 +60,8 @@ async def send_daily_report(bot: Bot) -> None:
 
 
 async def main() -> None:
-    # Используем DefaultBotProperties для parse_mode
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
-    # ─── ВАРИАНТ 2: Ручное создание клиента Redis для FSM ─────────────────────
     fsm_redis_client = redis.from_url(
         config.REDIS_URL,
         db=1,
@@ -85,15 +74,12 @@ async def main() -> None:
     redis_storage = RedisStorage(redis=fsm_redis_client)
     dp = Dispatcher(storage=redis_storage)
 
-    # ─── Роутеры ──────────────────────────────────────────────────────────────
     dp.include_router(user.router)
     dp.include_router(superuser.router)
 
-    # ─── Инициализация сервисов ───────────────────────────────────────────────
     await resources.init_resources()
 
-    # ─── Настройка Планировщика (ТЕСТОВЫЙ РЕЖИМ: каждые 5 секунд) ─────────────
-    # ПОМНИ: Верни 'cron' перед продакшеном!
+    # test mode
     # scheduler.add_job(
     #     send_daily_report,
     #     trigger="interval",
@@ -103,7 +89,6 @@ async def main() -> None:
     #     replace_existing=True,
     # )
 
-    # Для продакшена раскомментируй это, а верхний блок закомментируй:
     scheduler.add_job(
         send_daily_report,
         trigger="cron",
@@ -121,7 +106,6 @@ async def main() -> None:
 
     logger.info("🤖 Bot starting… SUPERUSER_IDS={}", config.SUPERUSER_IDS)
 
-    # ─── Запуск Polling ───────────────────────────────────────────────────────
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

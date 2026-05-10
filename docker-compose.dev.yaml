@@ -1,7 +1,3 @@
-# Подключать при разработке: исходники с хоста + hot-reload веба (шаблоны и Python).
-# Запуск: docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up
-# Бот перезапускайте сами при смене кода бота; веб подхватывает web/ и stdlib/ без пересборки.
-
 services:
   web:
     volumes:

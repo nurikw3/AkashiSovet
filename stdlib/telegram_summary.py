@@ -6,8 +6,6 @@ from html import escape
 
 from stdlib.template import ApplicationTemplate
 
-# Текст «Полезно копировать» — заголовок блока жирным, значение в <pre> (monospace)
-
 ATTACHMENTS_FOOTER_HTML = (
     "<b>Приложения</b>\n"
     "Прикрепите файлы к заявке (договоры, расчёты, согласования и т.д.).\n"

@@ -6,16 +6,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgresql://akashi:${POSTGRES_PASSWORD}@postgres:5432/akashi
-      REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT_URL: http://minio:9000
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
-      S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
-      S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
-      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
+    ports:
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,20 +17,6 @@ services:
         condition: service_healthy
     command: uv run uvicorn web.main:app --host 0.0.0.0 --port 8000
 
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: akashi_nginx
-    restart: unless-stopped
-    ports:
-      - "8000:443"
-    volumes:
-      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-      - ./nginx/www:/var/www/certbot:ro
-    depends_on:
-      web:
-        condition: service_started
-
   bot:
     image: akashisovet:app
     pull_policy: never
@@ -46,16 +24,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgresql://akashi:${POSTGRES_PASSWORD}@postgres:5432/akashi
-      REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT_URL: http://minio:9000
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_BUCKET_ATTACHMENTS: ${S3_BUCKET_ATTACHMENTS:-attachments}
-      S3_BUCKET_PDF: ${S3_BUCKET_PDF:-pdf-documents}
-      S3_BUCKET_SIGNATURES: ${S3_BUCKET_SIGNATURES:-signatures}
-      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:8000}
     volumes:
       - ./logs:/app/logs
       - data:/app/data
@@ -72,16 +40,14 @@ services:
     image: postgres:16-alpine
     container_name: akashi_db
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: akashi
-      POSTGRES_USER: akashi
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - .env
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U akashi -d akashi" ]
+      test: ["CMD-SHELL", "pg_isready -U akashi -d akashi"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -104,12 +70,12 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
     volumes:
       - minio_data:/data
     healthcheck:
-      test: [ "CMD", "mc", "ready", "local" ]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5

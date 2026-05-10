@@ -17,9 +17,8 @@ from reportlab.platypus import (
     Spacer,
     ListFlowable,
     ListItem,
-    PageBreak,
     Image as RLImage,
-    KeepTogether,  # Добавлено для склеивания блоков
+    KeepTogether,  
 )
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -80,7 +79,7 @@ FOOTER_PATH = (
     else ASSETS_DIR / "image2.png"
 )
 
-# Redis хранит SHA256-токен версии PDF; байты лежат в S3 по `pdf_key(user_id, app_id)`.
+
 PDF_CACHE_KEY_FMT = "pdf_cache:{app_id}"
 PDF_CACHE_TTL_SEC = 7 * 24 * 3600
 
@@ -125,7 +124,6 @@ async def _get_pdf_template_revision() -> str:
         return "0"
 
 
-# ─── Стили ───────────────────────────────────────────────────────────────────
 def _styles() -> dict:
     return {
         "header": ParagraphStyle(
@@ -212,7 +210,6 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
     body = _normalize_pdf_user_text(body)
     body = expand_numbered_newlines(body)
     
-    # Собираем элементы одного блока во временный массив
     block_story = []
     block_story.append(Paragraph(title, s["section_title"]))
     lines = [line.strip() for line in body.split("\n") if line.strip()]
@@ -241,7 +238,6 @@ def _append_section_paragraphs(story: list, title: str, body: str, s: dict) -> N
             
     block_story.append(Spacer(1, 6))
     
-    # Оборачиваем весь блок в KeepTogether, чтобы запретить разрыв на середине
     story.append(KeepTogether(block_story))
 
 
@@ -249,7 +245,6 @@ def _parse_attachments_field(raw) -> list:
     attachments = raw or []
     if isinstance(attachments, str):
         try:
-            # Безопасный парсинг (решает проблему одинарных кавычек внутри названий)
             attachments = ast.literal_eval(attachments)
         except (ValueError, SyntaxError):
             try:

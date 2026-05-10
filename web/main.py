@@ -43,7 +43,6 @@ from stdlib.timezone_util import (
     format_app_datetime,
     wall_time_astana_to_utc,
 )
-from aiogram.types import BufferedInputFile
 
 _LOGIN_FAIL_MSG = "Неверный Telegram ID или код"
 HELP_TEXT_SETTINGS_KEY = "user_help_text"

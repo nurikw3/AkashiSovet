@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+from stdlib.pdf import get_app_pdf_buffer, invalidate_pdf_cache
+from stdlib.resources import init_resources, shutdown_resources
+
 import argparse
 import asyncio
 import math
-from pathlib import Path
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from statistics import mean
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from stdlib.pdf import get_app_pdf_buffer, invalidate_pdf_cache
-from stdlib.resources import init_resources, shutdown_resources
 
 
 @dataclass
@@ -89,7 +90,9 @@ async def single_run(index: int, app_id: int, cold_cache: bool) -> RunResult:
         if cold_cache:
             await invalidate_pdf_cache(app_id)
         await get_app_pdf_buffer(app_id)
-        return RunResult(index=index, app_id=app_id, ok=True, elapsed_s=time.perf_counter() - t0)
+        return RunResult(
+            index=index, app_id=app_id, ok=True, elapsed_s=time.perf_counter() - t0
+        )
     except Exception as exc:
         return RunResult(
             index=index,

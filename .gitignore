@@ -227,3 +227,5 @@ test.pdf
 .graphify/
 *.md
 *.pdf
+test_pdf.py
+graphify-out/

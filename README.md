@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/banner.png" alt="AkashiSovet Banner" width="100%">
 
-  # ✨ AkashiSovet
+  # AkashiSovet
 
   <p><strong>A modern, scalable corporate ecosystem powered by AI.</strong></p>
 

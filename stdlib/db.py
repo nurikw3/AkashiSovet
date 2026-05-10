@@ -196,6 +196,29 @@ async def update_status(
     logger.info("App {} status → {}", app_id, status)
 
 
+async def update_status_and_submit(
+    app_id: int,
+    status: str,
+    *,
+    pdf_file_id: str | None = None,
+) -> None:
+    """Смена статуса и фиксация времени подачи одним UPDATE (без гонки с t_submit)."""
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """UPDATE applications
+               SET status = $1,
+                   t_submit = $2,
+                   pdf_file_id = COALESCE($3, pdf_file_id),
+                   updated_at = NOW()
+               WHERE id = $4""",
+            status,
+            _now(),
+            pdf_file_id,
+            app_id,
+        )
+    logger.info("App {} status → {} (t_submit set)", app_id, status)
+
+
 async def set_pdf_file_id(app_id: int, pdf_file_id: str | None) -> None:
     async with _pool_conn() as conn:
         await conn.execute(
@@ -238,15 +261,6 @@ async def set_t_start(app_id: int) -> None:
     async with _pool_conn() as conn:
         await conn.execute(
             "UPDATE applications SET t_start = $1 WHERE id = $2 AND t_start IS NULL",
-            _now(),
-            app_id,
-        )
-
-
-async def set_t_submit(app_id: int) -> None:
-    async with _pool_conn() as conn:
-        await conn.execute(
-            "UPDATE applications SET t_submit = $1 WHERE id = $2",
             _now(),
             app_id,
         )

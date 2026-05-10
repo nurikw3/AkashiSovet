@@ -84,8 +84,7 @@ async def submit_to_review(
     app_id: int, *, pdf_file_id: str | None = None
 ) -> None:
     """Переводит заявку в `pending`, фиксирует время подачи."""
-    await db.update_status(app_id, "pending", pdf_file_id=pdf_file_id)
-    await db.set_t_submit(app_id)
+    await db.update_status_and_submit(app_id, "pending", pdf_file_id=pdf_file_id)
 
 
 async def update_submission_pdf_reference(app_id: int, pdf_file_id: str) -> None:

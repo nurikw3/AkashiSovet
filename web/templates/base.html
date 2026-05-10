@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="ru" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AKASHI Data Center — Control Panel</title>
+    <title>Akashi</title>
+    <link rel="icon" href="/static/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -21,12 +25,12 @@
                     },
                     colors: {
                         ak: {
-                            red:    '#C93528',
-                            'red-d':'#E03E38',
-                            bg:     '#EDE8DF',
-                            dark:   '#0C0C0C',
-                            surf:   '#141414',
-                            cream:  '#F7F4EF',
+                            red: '#C93528',
+                            'red-d': '#E03E38',
+                            bg: '#EDE8DF',
+                            dark: '#0C0C0C',
+                            surf: '#141414',
+                            cream: '#F7F4EF',
                         }
                     }
                 }
@@ -36,49 +40,49 @@
         /* ─── i18n ─────────────────────────────────────────── */
         const T = {
             ru: {
-                'nav.apps':       'Заявки',
-                'nav.meetings':   'Заседания',
-                'nav.settings':   'Настройки',
-                'nav.template':   'Шаблон',
-                'nav.logout':     'Выход',
-                'nav.theme':      'Тема',
+                'nav.apps': 'Заявки',
+                'nav.meetings': 'Заседания',
+                'nav.settings': 'Настройки',
+                'nav.template': 'Шаблон',
+                'nav.logout': 'Выход',
+                'nav.theme': 'Тема',
 
-                'dash.apps':      'Заявки',
-                'dash.filter':    'Фильтр',
-                'filter.all':     'Все',
-                'filter.draft':   'Черновик',
+                'dash.apps': 'Заявки',
+                'dash.filter': 'Фильтр',
+                'filter.all': 'Все',
+                'filter.draft': 'Черновик',
                 'filter.pending': 'На рассмотрении',
-                'filter.rework':  'На доработке',
-                'filter.approved':'Согласованы',
+                'filter.rework': 'На доработке',
+                'filter.approved': 'Согласованы',
 
-                'th.applicant':   'Заявитель',
-                'th.topic':       'Тема',
-                'th.status':      'Статус',
-                'th.date':        'Дата',
-                'th.files':       'Файлы',
-                'th.actions':     'Действия',
+                'th.applicant': 'Заявитель',
+                'th.topic': 'Тема',
+                'th.status': 'Статус',
+                'th.date': 'Дата',
+                'th.files': 'Файлы',
+                'th.actions': 'Действия',
 
-                'count.pending':  'На рассмотрении',
+                'count.pending': 'На рассмотрении',
                 'count.approved': 'Согласовано',
-                'count.rework':   'На доработке',
-                'count.total':    'Всего заявок',
+                'count.rework': 'На доработке',
+                'count.total': 'Всего заявок',
 
-                'btn.approve':    'Согласовать',
-                'btn.rework':     'На доработку',
-                'btn.cancel':     'Отменить',
-                'btn.send':       'Отправить',
+                'btn.approve': 'Согласовать',
+                'btn.rework': 'На доработку',
+                'btn.cancel': 'Отменить',
+                'btn.send': 'Отправить',
 
-                'meeting.new':    'Новое заседание',
-                'meeting.date':   'Дата и время',
-                'meeting.add':    'К заседанию',
-                'meeting.upcoming':'Предстоящие',
-                'meeting.past':   'Прошедшие',
-                'meeting.no_up':  'Нет предстоящих заседаний',
-                'meeting.no_past':'Прошедших заседаний пока нет',
-                'meeting.created':'✓ Заседание создано',
-                'meeting.deleted':'✓ Заседание удалено',
-                'meeting.open':   'Открыть →',
-                'meeting.view':   'Подробнее →',
+                'meeting.new': 'Новое заседание',
+                'meeting.date': 'Дата и время',
+                'meeting.add': 'К заседанию',
+                'meeting.upcoming': 'Предстоящие',
+                'meeting.past': 'Прошедшие',
+                'meeting.no_up': 'Нет предстоящих заседаний',
+                'meeting.no_past': 'Прошедших заседаний пока нет',
+                'meeting.created': '✓ Заседание создано',
+                'meeting.deleted': '✓ Заседание удалено',
+                'meeting.open': 'Открыть →',
+                'meeting.view': 'Подробнее →',
                 'meeting.basket': 'Отметьте согласованные заявки и укажите дату',
                 'meeting.apps_label': 'заявок',
                 'meeting.title': 'Заседания',
@@ -97,77 +101,77 @@
                 'meeting.hint_outro': '→ «К заседанию».',
 
                 'login.subtitle': 'Панель управления',
-                'login.otp':      'OTP из бота',
-                'login.tg_id':    'Telegram ID',
-                'login.code':     'Код / Пароль',
-                'login.submit':   'Войти',
-                'login.hint':     'Команда /web в боте — скопируйте ID и одноразовый код.',
-                'login.tg_ph':    'Из сообщения /web',
-                'login.code_ph':  '••••••',
+                'login.otp': 'OTP из бота',
+                'login.tg_id': 'Telegram ID',
+                'login.code': 'Код / Пароль',
+                'login.submit': 'Войти',
+                'login.hint': 'Команда /web в боте — скопируйте ID и одноразовый код.',
+                'login.tg_ph': 'Из сообщения /web',
+                'login.code_ph': '••••••',
 
                 'settings.title': 'Безопасность',
-                'settings.pw':    'Постоянный пароль',
-                'settings.pw_h':  'Необязательно — можно входить по OTP из /web',
-                'settings.save':  'Сохранить пароль',
-                'settings.min':   'Минимум 8 символов',
-                'settings.hint':  'Команда /web в боте выдаёт ID и одноразовый код.',
+                'settings.pw': 'Постоянный пароль',
+                'settings.pw_h': 'Необязательно — можно входить по OTP из /web',
+                'settings.save': 'Сохранить пароль',
+                'settings.min': 'Минимум 8 символов',
+                'settings.hint': 'Команда /web в боте выдаёт ID и одноразовый код.',
 
-                'app.back':       '← Назад',
-                'app.applications':'Заявки',
-                'app.topic':      'Тема',
-                'app.created':    'Создано',
-                'app.comment':    'Комментарий',
-                'app.files_hd':   'Файлы',
-                'app.no_files':   'Вложений нет',
-                'app.pdf':        'PDF отчёт',
+                'app.back': '← Назад',
+                'app.applications': 'Заявки',
+                'app.topic': 'Тема',
+                'app.created': 'Создано',
+                'app.comment': 'Комментарий',
+                'app.files_hd': 'Файлы',
+                'app.no_files': 'Вложений нет',
+                'app.pdf': 'PDF отчёт',
 
-                'rework.ph':          'Укажите замечания...',
+                'rework.ph': 'Укажите замечания...',
                 'rework.approved.ph': 'Причина возврата на доработку...',
             },
             en: {
-                'nav.apps':       'Applications',
-                'nav.meetings':   'Meetings',
-                'nav.settings':   'Settings',
-                'nav.template':   'Template',
-                'nav.logout':     'Logout',
-                'nav.theme':      'Theme',
+                'nav.apps': 'Applications',
+                'nav.meetings': 'Meetings',
+                'nav.settings': 'Settings',
+                'nav.template': 'Template',
+                'nav.logout': 'Logout',
+                'nav.theme': 'Theme',
 
-                'dash.apps':      'Applications',
-                'dash.filter':    'Filter',
-                'filter.all':     'All',
-                'filter.draft':   'Draft',
+                'dash.apps': 'Applications',
+                'dash.filter': 'Filter',
+                'filter.all': 'All',
+                'filter.draft': 'Draft',
                 'filter.pending': 'Pending',
-                'filter.rework':  'Rework',
-                'filter.approved':'Approved',
+                'filter.rework': 'Rework',
+                'filter.approved': 'Approved',
 
-                'th.applicant':   'Applicant',
-                'th.topic':       'Topic',
-                'th.status':      'Status',
-                'th.date':        'Date',
-                'th.files':       'Files',
-                'th.actions':     'Actions',
+                'th.applicant': 'Applicant',
+                'th.topic': 'Topic',
+                'th.status': 'Status',
+                'th.date': 'Date',
+                'th.files': 'Files',
+                'th.actions': 'Actions',
 
-                'count.pending':  'Pending',
+                'count.pending': 'Pending',
                 'count.approved': 'Approved',
-                'count.rework':   'Rework',
-                'count.total':    'Total',
+                'count.rework': 'Rework',
+                'count.total': 'Total',
 
-                'btn.approve':    'Approve',
-                'btn.rework':     'Rework',
-                'btn.cancel':     'Cancel',
-                'btn.send':       'Send',
+                'btn.approve': 'Approve',
+                'btn.rework': 'Rework',
+                'btn.cancel': 'Cancel',
+                'btn.send': 'Send',
 
-                'meeting.new':    'New Meeting',
-                'meeting.date':   'Date & Time',
-                'meeting.add':    'Add to Meeting',
-                'meeting.upcoming':'Upcoming',
-                'meeting.past':   'Past',
-                'meeting.no_up':  'No upcoming meetings',
-                'meeting.no_past':'No past meetings yet',
-                'meeting.created':'✓ Meeting created',
-                'meeting.deleted':'✓ Meeting deleted',
-                'meeting.open':   'Open →',
-                'meeting.view':   'View →',
+                'meeting.new': 'New Meeting',
+                'meeting.date': 'Date & Time',
+                'meeting.add': 'Add to Meeting',
+                'meeting.upcoming': 'Upcoming',
+                'meeting.past': 'Past',
+                'meeting.no_up': 'No upcoming meetings',
+                'meeting.no_past': 'No past meetings yet',
+                'meeting.created': '✓ Meeting created',
+                'meeting.deleted': '✓ Meeting deleted',
+                'meeting.open': 'Open →',
+                'meeting.view': 'View →',
                 'meeting.basket': 'Select approved applications and set date',
                 'meeting.apps_label': 'applications',
                 'meeting.title': 'Meetings',
@@ -186,31 +190,31 @@
                 'meeting.hint_outro': '→ Add to Meeting.',
 
                 'login.subtitle': 'Control Panel',
-                'login.otp':      'OTP from bot',
-                'login.tg_id':    'Telegram ID',
-                'login.code':     'Code / Password',
-                'login.submit':   'Authenticate',
-                'login.hint':     'Use /web in the bot to get your ID and one-time code.',
-                'login.tg_ph':    'From /web message',
-                'login.code_ph':  '••••••',
+                'login.otp': 'OTP from bot',
+                'login.tg_id': 'Telegram ID',
+                'login.code': 'Code / Password',
+                'login.submit': 'Authenticate',
+                'login.hint': 'Use /web in the bot to get your ID and one-time code.',
+                'login.tg_ph': 'From /web message',
+                'login.code_ph': '••••••',
 
                 'settings.title': 'Security',
-                'settings.pw':    'Permanent Password',
-                'settings.pw_h':  'Optional — you can always log in with OTP from /web',
-                'settings.save':  'Save Password',
-                'settings.min':   'Minimum 8 characters',
-                'settings.hint':  'Use /web in the bot to get your ID and a one-time code.',
+                'settings.pw': 'Permanent Password',
+                'settings.pw_h': 'Optional — you can always log in with OTP from /web',
+                'settings.save': 'Save Password',
+                'settings.min': 'Minimum 8 characters',
+                'settings.hint': 'Use /web in the bot to get your ID and a one-time code.',
 
-                'app.back':       '← Back',
-                'app.applications':'Applications',
-                'app.topic':      'Topic',
-                'app.created':    'Created',
-                'app.comment':    'Comment',
-                'app.files_hd':   'Files',
-                'app.no_files':   'No attachments',
-                'app.pdf':        'PDF Report',
+                'app.back': '← Back',
+                'app.applications': 'Applications',
+                'app.topic': 'Topic',
+                'app.created': 'Created',
+                'app.comment': 'Comment',
+                'app.files_hd': 'Files',
+                'app.no_files': 'No attachments',
+                'app.pdf': 'PDF Report',
 
-                'rework.ph':          'Enter feedback...',
+                'rework.ph': 'Enter feedback...',
                 'rework.approved.ph': 'Reason for returning to rework...',
             }
         };
@@ -293,146 +297,358 @@
     </script>
 
     <style>
-        body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-        .font-mono, [class*="font-mono"] { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+        body {
+            font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        }
+
+        .font-mono,
+        [class*="font-mono"] {
+            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        }
 
         /* ── Scrollbar ── */
-        ::-webkit-scrollbar { width: 3px; height: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #C93528; border-radius: 2px; }
+        ::-webkit-scrollbar {
+            width: 3px;
+            height: 3px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #C93528;
+            border-radius: 2px;
+        }
+
         input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
 
         /* ── Status badges ── */
         .s-badge {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 2px 9px; border-radius: 3px;
-            font-size: 9px; font-weight: 700;
-            letter-spacing: 0.1em; text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 9px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
             font-family: 'IBM Plex Mono', monospace;
         }
-        .s-pending  { background: rgba(202,138,4,.1);  color:#b45309; border:1px solid rgba(202,138,4,.25); }
-        .s-approved { background: rgba(22,163,74,.1);  color:#15803d; border:1px solid rgba(22,163,74,.25); }
-        .s-rework   { background: rgba(201,53,40,.1);  color:#C93528; border:1px solid rgba(201,53,40,.25); }
-        .s-draft    { background: rgba(148,163,184,.1);color:#64748b; border:1px solid rgba(148,163,184,.2);}
-        .dark .s-pending  { color:#fbbf24; border-color:rgba(251,191,36,.2); }
-        .dark .s-approved { color:#4ade80; border-color:rgba(74,222,128,.2); }
-        .dark .s-rework   { color:#E03E38; border-color:rgba(224,62,56,.2); }
-        .dark .s-draft    { color:#94a3b8; }
+
+        .s-pending {
+            background: rgba(202, 138, 4, .1);
+            color: #b45309;
+            border: 1px solid rgba(202, 138, 4, .25);
+        }
+
+        .s-approved {
+            background: rgba(22, 163, 74, .1);
+            color: #15803d;
+            border: 1px solid rgba(22, 163, 74, .25);
+        }
+
+        .s-rework {
+            background: rgba(201, 53, 40, .1);
+            color: #C93528;
+            border: 1px solid rgba(201, 53, 40, .25);
+        }
+
+        .s-draft {
+            background: rgba(148, 163, 184, .1);
+            color: #64748b;
+            border: 1px solid rgba(148, 163, 184, .2);
+        }
+
+        .dark .s-pending {
+            color: #fbbf24;
+            border-color: rgba(251, 191, 36, .2);
+        }
+
+        .dark .s-approved {
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, .2);
+        }
+
+        .dark .s-rework {
+            color: #E03E38;
+            border-color: rgba(224, 62, 56, .2);
+        }
+
+        .dark .s-draft {
+            color: #94a3b8;
+        }
 
         /* ── Animations ── */
-        .anim-fade { animation: fadeUp .3s ease forwards; }
-        @keyframes fadeUp {
-            from { opacity:0; transform:translateY(8px); }
-            to   { opacity:1; transform:translateY(0); }
+        .anim-fade {
+            animation: fadeUp .3s ease forwards;
         }
-        .anim-row { animation: rowIn .2s ease forwards; }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .anim-row {
+            animation: rowIn .2s ease forwards;
+        }
+
         @keyframes rowIn {
-            from { opacity:0; transform:translateX(-4px); }
-            to   { opacity:1; transform:translateX(0); }
+            from {
+                opacity: 0;
+                transform: translateX(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         /* ── Nav link ── */
         .nav-link {
-            display:block; padding:6px 10px; border-radius:4px;
-            font-size:11px; font-weight:600; letter-spacing:.04em;
-            color:#706860; text-decoration:none; transition:all .15s;
+            display: block;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .04em;
+            color: #706860;
+            text-decoration: none;
+            transition: all .15s;
         }
-        .nav-link:hover { color:#C93528; background:rgba(201,53,40,.07); }
-        .dark .nav-link { color:#706860; }
-        .dark .nav-link:hover { color:#E03E38; background:rgba(224,62,56,.08); }
-        .nav-link.active { color:#C93528; background:rgba(201,53,40,.08); }
-        .dark .nav-link.active { color:#E03E38; }
+
+        .nav-link:hover {
+            color: #C93528;
+            background: rgba(201, 53, 40, .07);
+        }
+
+        .dark .nav-link {
+            color: #706860;
+        }
+
+        .dark .nav-link:hover {
+            color: #E03E38;
+            background: rgba(224, 62, 56, .08);
+        }
+
+        .nav-link.active {
+            color: #C93528;
+            background: rgba(201, 53, 40, .08);
+        }
+
+        .dark .nav-link.active {
+            color: #E03E38;
+        }
 
         /* ── Lang toggle ── */
         .lang-btn {
-            font-size:9px; font-weight:700; letter-spacing:.08em;
-            font-family:'IBM Plex Mono',monospace;
-            padding:2px 6px; border-radius:2px; cursor:pointer;
-            color:#a09890; background:transparent; border:none;
-            transition:all .15s;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 2px 6px;
+            border-radius: 2px;
+            cursor: pointer;
+            color: #a09890;
+            background: transparent;
+            border: none;
+            transition: all .15s;
         }
-        .lang-btn:hover { color:#C93528; }
-        .lang-active { color:#C93528 !important; }
-        .dark .lang-active { color:#E03E38 !important; }
+
+        .lang-btn:hover {
+            color: #C93528;
+        }
+
+        .lang-active {
+            color: #C93528 !important;
+        }
+
+        .dark .lang-active {
+            color: #E03E38 !important;
+        }
 
         /* ── Theme toggle ── */
         .theme-btn {
-            width:100%; display:flex; align-items:center; gap:7px;
-            padding:6px 10px; border-radius:4px; border:none; cursor:pointer;
-            font-size:10px; font-weight:600; letter-spacing:.04em; text-align:left;
-            background:transparent; color:#a09890; transition:all .15s;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-align: left;
+            background: transparent;
+            color: #a09890;
+            transition: all .15s;
         }
-        .theme-btn:hover { color:#C93528; background:rgba(201,53,40,.07); }
-        .dark .theme-btn:hover { color:#E03E38; background:rgba(224,62,56,.08); }
+
+        .theme-btn:hover {
+            color: #C93528;
+            background: rgba(201, 53, 40, .07);
+        }
+
+        .dark .theme-btn:hover {
+            color: #E03E38;
+            background: rgba(224, 62, 56, .08);
+        }
 
         /* ── Table ── */
         .ak-table th {
-            font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
-            font-family:'IBM Plex Mono',monospace;
-            color:#a09890; padding:10px 16px; text-align:left;
-            border-bottom:1px solid #DDD8CE;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #a09890;
+            padding: 10px 16px;
+            text-align: left;
+            border-bottom: 1px solid #DDD8CE;
         }
-        .dark .ak-table th { border-color:#242424; }
-        .ak-table td { padding:12px 16px; border-bottom:1px solid #F0EBE3; }
-        .dark .ak-table td { border-bottom:1px solid #1e1e1e; }
-        .ak-table tr:last-child td { border-bottom:none; }
-        .ak-table tr:hover td { background:rgba(0,0,0,.018); }
-        .dark .ak-table tr:hover td { background:rgba(255,255,255,.018); }
+
+        .dark .ak-table th {
+            border-color: #242424;
+        }
+
+        .ak-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #F0EBE3;
+        }
+
+        .dark .ak-table td {
+            border-bottom: 1px solid #1e1e1e;
+        }
+
+        .ak-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .ak-table tr:hover td {
+            background: rgba(0, 0, 0, .018);
+        }
+
+        .dark .ak-table tr:hover td {
+            background: rgba(255, 255, 255, .018);
+        }
 
         /* ── Input ── */
         .ak-input {
-            width:100%;
-            background:#F7F4EF; border:1px solid #DDD8CE;
-            border-radius:4px; padding:9px 12px; font-size:13px;
-            outline:none; transition:border-color .15s;
-            font-family:'IBM Plex Sans',sans-serif;
+            width: 100%;
+            background: #F7F4EF;
+            border: 1px solid #DDD8CE;
+            border-radius: 4px;
+            padding: 9px 12px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color .15s;
+            font-family: 'IBM Plex Sans', sans-serif;
             height: 38px;
         }
-        .ak-input:focus { border-color:#C93528; }
-        .dark .ak-input {
-            background:#1A1A1A; border-color:#303030; color:#EDE8DF;
+
+        .ak-input:focus {
+            border-color: #C93528;
         }
-        .dark .ak-input:focus { border-color:#E03E38; }
+
+        .dark .ak-input {
+            background: #1A1A1A;
+            border-color: #303030;
+            color: #EDE8DF;
+        }
+
+        .dark .ak-input:focus {
+            border-color: #E03E38;
+        }
 
         /* ── Button ── */
         .ak-btn-red {
-            display:inline-flex; align-items:center; justify-content:center;
-            height: 38px; padding:0 18px; border-radius:4px; border:none; cursor:pointer;
-            font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-            font-family:'IBM Plex Mono',monospace;
-            background:#C93528; color:#fff; transition:opacity .15s, transform .1s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 38px;
+            padding: 0 18px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-family: 'IBM Plex Mono', monospace;
+            background: #C93528;
+            color: #fff;
+            transition: opacity .15s, transform .1s;
         }
-        .ak-btn-red:hover { opacity:.9; }
-        .ak-btn-red:active { transform:scale(.98); }
+
+        .ak-btn-red:hover {
+            opacity: .9;
+        }
+
+        .ak-btn-red:active {
+            transform: scale(.98);
+        }
 
         .ak-btn-ghost {
-            display:inline-flex; align-items:center; justify-content:center;
-            height: 38px; padding:0 16px; border-radius:4px; cursor:pointer;
-            font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-            font-family:'IBM Plex Mono',monospace;
-            background:transparent; border:1px solid #DDD8CE; color:#706860;
-            transition:all .15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 38px;
+            padding: 0 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            font-family: 'IBM Plex Mono', monospace;
+            background: transparent;
+            border: 1px solid #DDD8CE;
+            color: #706860;
+            transition: all .15s;
         }
-        .ak-btn-ghost:hover { border-color:#C93528; color:#C93528; }
-        .dark .ak-btn-ghost { border-color:#303030; color:#706860; }
-        .dark .ak-btn-ghost:hover { border-color:#E03E38; color:#E03E38; }
+
+        .ak-btn-ghost:hover {
+            border-color: #C93528;
+            color: #C93528;
+        }
+
+        .dark .ak-btn-ghost {
+            border-color: #303030;
+            color: #706860;
+        }
+
+        .dark .ak-btn-ghost:hover {
+            border-color: #E03E38;
+            color: #E03E38;
+        }
     </style>
 </head>
 
 <body class="bg-ak-bg dark:bg-ak-dark text-[#111111] dark:text-[#EDE8DF] h-screen flex overflow-hidden">
 
     <!-- ═══ SIDEBAR ═══════════════════════════════════════════ -->
-    <aside class="w-44 shrink-0 h-screen flex flex-col border-r border-[#DDD8CE] dark:border-[#1E1E1E] bg-[#F7F4EF] dark:bg-[#0E0E0E]">
+    <aside
+        class="w-44 shrink-0 h-screen flex flex-col border-r border-[#DDD8CE] dark:border-[#1E1E1E] bg-[#F7F4EF] dark:bg-[#0E0E0E]">
 
         <!-- Brand -->
         <a href="/" class="flex items-center gap-3 px-4 py-5 border-b border-[#DDD8CE] dark:border-[#1E1E1E] group">
-            <!-- AKASHI hex mark -->
-            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" class="shrink-0">
-                <polygon points="13,1 24,7 24,19 13,25 2,19 2,7" fill="#C93528"/>
-                <polygon points="13,7 19,10.5 19,17.5 13,21 7,17.5 7,10.5" fill="#1A1A1A"/>
-                <circle cx="13" cy="14" r="2.2" fill="white"/>
-            </svg>
+            <img src="/static/favicon.png"
+                 width="26" height="26" alt="Akashi" class="shrink-0">
             <div class="leading-tight">
                 <p class="text-[11px] font-bold tracking-[.12em] uppercase text-[#111111] dark:text-[#EDE8DF]">AKASHI</p>
                 <p class="text-[8px] font-mono tracking-[.15em] uppercase text-[#a09890] mt-0.5">DATA CENTER</p>
@@ -441,7 +657,9 @@
 
         <!-- Nav -->
         <nav class="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-            <p class="px-2 mb-2 text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#b0a8a0] dark:text-[#504840]">Menu</p>
+            <p
+                class="px-2 mb-2 text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#b0a8a0] dark:text-[#504840]">
+                Menu</p>
             <a href="/" class="nav-link" data-i18n="nav.apps">Заявки</a>
             <a href="/meetings" class="nav-link" data-i18n="nav.meetings">Заседания</a>
             <a href="/settings" class="nav-link" data-i18n="nav.settings">Настройки</a>
@@ -452,8 +670,14 @@
         <div class="px-2 py-3 border-t border-[#DDD8CE] dark:border-[#1E1E1E] space-y-1">
             <!-- Theme -->
             <button class="theme-btn" onclick="toggleTheme()" id="theme-toggle-btn">
-                <svg class="w-3 h-3 dark:hidden shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-                <svg class="w-3 h-3 hidden dark:block shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg class="w-3 h-3 dark:hidden shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+                <svg class="w-3 h-3 hidden dark:block shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
                 <span data-i18n="nav.theme" class="text-[10px]">Тема</span>
             </button>
 
@@ -466,7 +690,8 @@
             </div>
 
             <!-- Logout -->
-            <a href="/logout" class="nav-link text-[#C93528] hover:text-[#a52b20] dark:text-[#E03E38]" data-i18n="nav.logout">Выход</a>
+            <a href="/logout" class="nav-link text-[#C93528] hover:text-[#a52b20] dark:text-[#E03E38]"
+                data-i18n="nav.logout">Выход</a>
         </div>
     </aside>
 
@@ -478,4 +703,5 @@
     </main>
 
 </body>
+
 </html>

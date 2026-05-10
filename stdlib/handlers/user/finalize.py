@@ -13,6 +13,8 @@ from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
 
+import asyncio
+
 
 async def finalize_and_notify(
     callback: CallbackQuery,
@@ -31,9 +33,11 @@ async def finalize_and_notify(
         return
 
     user_id = callback.from_user.id
-    full_name = await db.get_user_full_name(user_id)
-    position = await db.get_user_position(user_id)
-    signature = await db.get_user_signature(user_id)
+    full_name, position, signature = await asyncio.gather(
+        db.get_user_full_name(user_id),
+        db.get_user_position(user_id),
+        db.get_user_signature(user_id),
+    )
     missing: list[str] = []
     if not full_name:
         missing.append("/register (ФИО)")
@@ -44,8 +48,7 @@ async def finalize_and_notify(
     if missing:
         txt = (
             "❌ Нельзя отправить заявку: не заполнен профиль.\n\n"
-            "Заполните обязательные данные:\n"
-            + "\n".join(f"• {x}" for x in missing)
+            "Заполните обязательные данные:\n" + "\n".join(f"• {x}" for x in missing)
         )
         msg = await callback.message.answer(txt)
         cleanup_ids.append(msg.message_id)
@@ -125,8 +128,12 @@ async def finalize_and_notify(
     )
     cleanup_ids.append(done_msg.message_id)
 
-    app_url = f"{config.WEB_PUBLIC_URL.rstrip('/')}/applications/{app_id}" if config.WEB_PUBLIC_URL else None
-    superuser_text = (  
+    app_url = (
+        f"{config.WEB_PUBLIC_URL.rstrip('/')}/applications/{app_id}"
+        if config.WEB_PUBLIC_URL
+        else None
+    )
+    superuser_text = (
         f"📋 <b>Новая заявка #{app_id}</b>\n"
         f"👤 От: @{callback.from_user.username or callback.from_user.id}\n | {full_name} | {position}"
     )

@@ -2,37 +2,33 @@
 {% block content %}
 <div class="min-h-screen flex items-center justify-center py-12">
     <div class="w-full max-w-sm">
-
         <!-- Brand mark -->
         <div class="flex flex-col items-center mb-10">
-            <svg width="44" height="44" viewBox="0 0 26 26" fill="none" class="mb-4">
-                <polygon points="13,1 24,7 24,19 13,25 2,19 2,7" fill="#C93528"/>
-                <polygon points="13,7 19,10.5 19,17.5 13,21 7,17.5 7,10.5" fill="#1A1A1A"/>
-                <circle cx="13" cy="14" r="2.2" fill="white"/>
-            </svg>
+            <img src="/static/favicon.png" width="44"
+                height="44" alt="Akashi" class="mb-4">
             <p class="text-[11px] font-bold tracking-[.2em] uppercase text-[#111111] dark:text-[#EDE8DF]">AKASHI</p>
             <p class="text-[8px] font-mono tracking-[.2em] uppercase text-[#a09890] mt-0.5">DATA CENTER</p>
             <div class="w-8 h-px bg-[#DDD8CE] dark:bg-[#282828] mt-4"></div>
-            <p class="text-[9px] font-mono tracking-[.12em] uppercase text-[#a09890] mt-3" data-i18n="login.subtitle">Панель управления</p>
+            <p class="text-[9px] font-mono tracking-[.12em] uppercase text-[#a09890] mt-3" data-i18n="login.subtitle">
+                Панель управления</p>
         </div>
-
         {% if error %}
-        <div class="mb-5 px-4 py-3 rounded border border-ak-red/25 bg-ak-red/5 text-ak-red text-[9px] font-mono font-bold tracking-wide text-center uppercase">
+        <div
+            class="mb-5 px-4 py-3 rounded border border-ak-red/25 bg-ak-red/5 text-ak-red text-[9px] font-mono font-bold tracking-wide text-center uppercase">
             {{ error }}
         </div>
         {% endif %}
-
         <form action="/login" method="post" class="space-y-4">
             <div>
-                <label class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5" data-i18n="login.tg_id">Telegram ID</label>
-                <input type="text" name="tg_id" inputmode="numeric" pattern="[0-9]*" required
-                    data-i18n-ph="login.tg_ph" placeholder="Из сообщения /web"
-                    class="ak-input font-mono">
+                <label class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5"
+                    data-i18n="login.tg_id">Telegram ID</label>
+                <input type="text" name="tg_id" inputmode="numeric" pattern="[0-9]*" required data-i18n-ph="login.tg_ph"
+                    placeholder="Из сообщения /web" class="ak-input font-mono">
             </div>
             <div>
-                <label class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5" data-i18n="login.code">Код / Пароль</label>
-                <input type="password" name="code" required
-                    data-i18n-ph="login.code_ph" placeholder="••••••"
+                <label class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5"
+                    data-i18n="login.code">Код / Пароль</label>
+                <input type="password" name="code" required data-i18n-ph="login.code_ph" placeholder="••••••"
                     class="ak-input font-mono tracking-[.4em] text-center">
                 <p class="text-[8px] font-mono text-[#b0a8a0] mt-2 text-center leading-relaxed" data-i18n="login.hint">
                     Команда /web в боте — скопируйте ID и одноразовый код.
@@ -40,7 +36,6 @@
             </div>
             <button type="submit" class="ak-btn-red w-full mt-2" data-i18n="login.submit">Войти</button>
         </form>
-
         <!-- Bottom meta -->
         <p class="text-center text-[8px] font-mono text-[#c0b8b0] mt-8 tracking-widest uppercase">
             AKASHI DATA CENTER · CONTROL PANEL

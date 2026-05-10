@@ -78,7 +78,7 @@ The system leverages state-of-the-art AI models via LangChain, utilizing secure 
 | **Telegram Bot** | <img src="https://img.shields.io/badge/Aiogram-2CA5E0?style=flat-square&logo=telegram" alt="Aiogram"> |
 | **Databases** | <img src="https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL"> <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis"> |
 | **Storage** | <img src="https://img.shields.io/badge/MinIO-C7202C?style=flat-square&logo=minio&logoColor=white" alt="MinIO"> |
-| **AI / ML** | <img src="https://img.shields.io/badge/LangChain-121212?style=flat-square&logo=langchain&logoColor=white" alt="LangChain"> <img src="https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI"> |
+| **AI / ML** | <img src="https://img.shields.io/badge/LangChain-121212?style=flat-square&logo=langchain&logoColor=white" alt="LangChain"> <img src="https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI"> <img src="https://img.shields.io/badge/Langfuse-121212?style=flat-square&logo=langfuse&logoColor=white" alt="Langfuse"> |
 | **DevOps & Tools**| <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"> <img src="https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana"> <img src="https://img.shields.io/badge/uv-000000?style=flat-square&logo=python&logoColor=white" alt="uv"> |
 
 <br/>

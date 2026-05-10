@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     await resources.shutdown_resources()
     await app.state.tg_bot.session.close()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
 
 _static_dir = Path(__file__).resolve().parent / "static"

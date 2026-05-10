@@ -120,6 +120,7 @@ async def notify_user_application_rework(
                         document=app_row["pdf_file_id"],
                         caption=f"📄 Актуальная версия заявки #{app_id}.",
                     )
+                    logger.debug("Rework PDF source=file_id app_id={}", app_id)
                     pdf_sent = True
                 except Exception:
                     # file_id протух — идём на S3
@@ -134,11 +135,14 @@ async def notify_user_application_rework(
                 )
 
                 # S3 есть — используем, нет — генерируем
+                source = "s3"
                 pdf_buf = (
                     io.BytesIO(pdf_bytes)
                     if pdf_bytes
                     else await get_app_pdf_buffer(app_id)
                 )
+                if not pdf_bytes:
+                    source = "generated"
                 created_at = app_row.get("created_at") or now_app()
                 custom_filename = generate_pdf_filename(full_name, position, created_at)
 
@@ -150,6 +154,7 @@ async def notify_user_application_rework(
                     ),
                     caption=f"📄 Актуальная версия заявки #{app_id}.",
                 )
+                logger.debug("Rework PDF source={} app_id={}", source, app_id)
                 pdf_sent = True
 
                 # сохраняем свежий file_id для следующего раза

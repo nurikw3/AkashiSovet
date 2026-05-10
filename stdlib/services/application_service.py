@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import stdlib.db as db
 from stdlib.models import Application, ApplicationAttachment
-from stdlib.pdf import invalidate_pdf_cache
+from stdlib.pdf import invalidate_pdf_content_cache
 
 
 async def list_applications(
@@ -35,17 +35,17 @@ async def mark_application_started(app_id: int) -> None:
 async def reset_draft_for_new_session(app_id: int) -> None:
     """Чистый черновик для нового /start или «Начать заново» (без контекста старого режима)."""
     await db.reset_draft_content(app_id)
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_content_cache(app_id)
 
 
 async def save_block(app_id: int, block_num: int | str, text: str) -> None:
     await db.save_block(app_id, block_num, text)
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_content_cache(app_id)
 
 
 async def save_all_blocks(app_id: int, blocks: dict) -> None:
     await db.save_all_blocks(app_id, blocks)
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_content_cache(app_id)
 
 
 async def get_chat_history(app_id: int) -> list:
@@ -64,7 +64,7 @@ async def get_last_rework_application(user_id: int) -> Application | None:
 
 
 async def invalidate_application_pdf_cache(app_id: int) -> None:
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_content_cache(app_id)
 
 
 async def get_application(app_id: int) -> Application | None:
@@ -109,7 +109,6 @@ async def send_for_rework(app_id: int, feedback: str) -> Application | None:
     await db.update_status(app_id, "rework", feedback=feedback)
     await db.set_t_decision(app_id)
     await db.increment_reject_count(app_id)
-    await invalidate_pdf_cache(app_id)
     return await get_application(app_id)
 
 
@@ -122,7 +121,7 @@ async def append_attachments(
         raise ValueError(f"application {app_id} not found")
     merged = [*app.attachments, new]
     await db.save_attachments(app_id, [a.model_dump() for a in merged])
-    await invalidate_pdf_cache(app_id)
+    await invalidate_pdf_content_cache(app_id)
     return merged
 
 
@@ -136,7 +135,7 @@ async def save_attachments_payload(
 ) -> None:
     """Сохраняет список вложений как в БД (в т.ч. реестр файлов из Telegram до выгрузки в S3)."""
     await db.save_attachments(app_id, attachments)
-    await invalidate_pdf_cache(app_id, user_id=user_id)
+    await invalidate_pdf_content_cache(app_id, user_id=user_id)
 
 
 async def clear_application_chat_history(app_id: int) -> None:

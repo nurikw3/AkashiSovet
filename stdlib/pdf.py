@@ -94,14 +94,14 @@ def _pdf_cache_token(
 ) -> str:
     blocks = app_raw.get("blocks") or ""
     attachments = app_raw.get("attachments") or ""
-    updated_at = str(app_raw.get("updated_at") or "")
     tpl_json = json.dumps(
         [b.model_dump(mode="json") for b in tpl.blocks],
         sort_keys=True,
         ensure_ascii=False,
     )
+    # В токен включаем только поля, влияющие на PDF-контент.
+    # workflow-переходы (approved/rework) не должны ломать reuse кэша.
     parts = [
-        updated_at,
         str(blocks),
         str(attachments),
         full_name or "",
@@ -537,6 +537,24 @@ def generate_pdf_filename(
 
 
 async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> None:
+    """Backwards-compatible alias for full content cache invalidation."""
+    await invalidate_pdf_content_cache(app_id, user_id=user_id)
+
+
+async def invalidate_pdf_delivery_cache(app_id: int) -> None:
+    """Сбрасывает только Telegram file_id (без удаления S3/Redis-кэша)."""
+    try:
+        await db.set_pdf_file_id(app_id, None)
+    except Exception as e:
+        logger.warning(
+            "invalidate_pdf_delivery_cache clear pdf_file_id app_id={}: {}",
+            app_id,
+            e,
+        )
+
+
+async def invalidate_pdf_content_cache(app_id: int, *, user_id: int | None = None) -> None:
+    """Полный сброс PDF-кэша для случаев изменения контента заявки."""
     r = redis_client_module.redis_client
     cache_key = PDF_CACHE_KEY_FMT.format(app_id=app_id)
     if r:
@@ -545,10 +563,7 @@ async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> No
         except Exception as e:
             logger.warning("invalidate_pdf_cache redis delete app_id={}: {}", app_id, e)
 
-    try:
-        await db.set_pdf_file_id(app_id, None)
-    except Exception as e:
-        logger.warning("invalidate_pdf_cache clear pdf_file_id app_id={}: {}", app_id, e)
+    await invalidate_pdf_delivery_cache(app_id)
 
     if not s3.is_s3_configured():
         return
@@ -600,6 +615,11 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
                         len(pdf_bytes),
                     )
                     return BytesIO(pdf_bytes)
+                logger.debug("PDF cache miss app_id={} reason=s3_missing", app_id)
+            elif cached:
+                logger.debug("PDF cache miss app_id={} reason=token_mismatch", app_id)
+            else:
+                logger.debug("PDF cache miss app_id={} reason=redis_empty", app_id)
         except Exception as e:
             logger.warning("PDF cache read failed app_id={}: {}", app_id, e)
 

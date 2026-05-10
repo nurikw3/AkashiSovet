@@ -13,6 +13,7 @@ import stdlib.db as db
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from stdlib.template import get_template
 from stdlib.timezone_util import now_app
+from stdlib.timing import timed_task
 
 
 async def _blocks_preview_html(blocks_raw, limit: int = 2600) -> str:
@@ -50,6 +51,7 @@ async def _blocks_preview_html(blocks_raw, limit: int = 2600) -> str:
     return txt
 
 
+@timed_task("notify_user_application_approved")
 async def notify_user_application_approved(
     bot: Bot,
     user_id: int,
@@ -93,6 +95,7 @@ async def broadcast_superusers_html(bot: Bot, text: str) -> None:
             logger.error("Failed to broadcast to superuser {}: {}", su_id, e)
 
 
+@timed_task("notify_user_application_rework")
 async def notify_user_application_rework(
     bot: Bot,
     user_id: int,

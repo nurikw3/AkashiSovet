@@ -12,6 +12,7 @@ from bot.config import config
 from stdlib import resources
 from web.templating import templates
 from web.dependencies import limiter
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 from web.routers import auth, settings, apps, meetings
@@ -30,6 +31,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
+
+Instrumentator().instrument(app).expose(app)
 
 _static_dir = Path(__file__).resolve().parent / "static"
 if _static_dir.is_dir():

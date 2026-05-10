@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
+import io
 import json
 
 from aiogram import Bot
@@ -10,6 +12,7 @@ from aiogram.types import BufferedInputFile
 from bot.config import config
 from bot.logger import logger
 import stdlib.db as db
+import stdlib.s3 as s3
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from stdlib.template import get_template
 from stdlib.timezone_util import now_app
@@ -61,7 +64,7 @@ async def notify_user_application_approved(
 ) -> None:
     """
     Уведомляет автора о согласовании.
-    Если передан `pdf_file_id` — отправляет документ как в боте; иначе короткое HTML-сообщение (как из веб-панели).
+    Если передан pdf_file_id — отправляет документ; иначе короткое HTML-сообщение.
     """
     try:
         if pdf_file_id:
@@ -80,14 +83,12 @@ async def notify_user_application_approved(
     except Exception as e:
         logger.error(
             "Failed to notify user {} about approval for app {}: {}",
-            user_id,
-            app_id,
-            e,
+            user_id, app_id, e,
         )
 
 
 async def broadcast_superusers_html(bot: Bot, text: str) -> None:
-    """Рассылает HTML всем суперпользователям (например при ошибке генерации PDF)."""
+    """Рассылает HTML всем суперпользователям."""
     for su_id in config.SUPERUSER_IDS:
         try:
             await bot.send_message(su_id, text, parse_mode="HTML")
@@ -108,24 +109,40 @@ async def notify_user_application_rework(
     """Уведомляет автора о возврате на доработку."""
     app_row = await db.get_app(app_id)
     pdf_sent = False
+
     if app_row:
         try:
-            # 1) Предпочтительно отправляем уже готовый Telegram file_id (самый надёжный путь).
+            # 1) Есть живой file_id — отправляем мгновенно
             if app_row.get("pdf_file_id"):
-                await bot.send_document(
-                    user_id,
-                    document=app_row["pdf_file_id"],
-                    caption=f"📄 Актуальная версия заявки #{app_id}.",
-                )
-                pdf_sent = True
-            # 2) Если file_id отсутствует — генерируем PDF заново.
+                try:
+                    await bot.send_document(
+                        user_id,
+                        document=app_row["pdf_file_id"],
+                        caption=f"📄 Актуальная версия заявки #{app_id}.",
+                    )
+                    pdf_sent = True
+                except Exception:
+                    # file_id протух — идём на S3
+                    logger.debug("file_id expired for app {}, falling back to S3", app_id)
+
+            # 2) file_id нет или протух — S3 + данные пользователя параллельно
             if not pdf_sent:
-                pdf_buf = await get_app_pdf_buffer(app_id)
-                full_name = await db.get_user_full_name(user_id)
-                position = await db.get_user_position(user_id)
+                pdf_bytes, full_name, position = await asyncio.gather(
+                    s3.download_bytes(s3.pdf_key(user_id, app_id), s3.BUCKET_PDF),
+                    db.get_user_full_name(user_id),
+                    db.get_user_position(user_id),
+                )
+
+                # S3 есть — используем, нет — генерируем
+                pdf_buf = (
+                    io.BytesIO(pdf_bytes)
+                    if pdf_bytes
+                    else await get_app_pdf_buffer(app_id)
+                )
                 created_at = app_row.get("created_at") or now_app()
                 custom_filename = generate_pdf_filename(full_name, position, created_at)
-                await bot.send_document(
+
+                sent = await bot.send_document(
                     user_id,
                     document=BufferedInputFile(
                         pdf_buf.getvalue(),
@@ -134,15 +151,20 @@ async def notify_user_application_rework(
                     caption=f"📄 Актуальная версия заявки #{app_id}.",
                 )
                 pdf_sent = True
+
+                # сохраняем свежий file_id для следующего раза
+                if sent.document:
+                    await db.set_pdf_file_id(app_id, sent.document.file_id)
+                    logger.debug("Saved new file_id for app {}", app_id)
+
         except Exception as e:
             logger.warning(
                 "Failed to send rework PDF to user {} for app {}: {}",
-                user_id,
-                app_id,
-                e,
+                user_id, app_id, e,
             )
 
     preview_html = await _blocks_preview_html(app_row.get("blocks") if app_row else None)
+
     if web_wording:
         text = (
             f"❌ <b>Заявка #{app_id} возвращена на доработку.</b>\n\n"
@@ -157,6 +179,7 @@ async def notify_user_application_rework(
             f"<b>Текущая версия текста:</b>\n{preview_html}\n\n"
             "Выберите блок для редактирования:"
         )
+
     try:
         await bot.send_message(
             user_id,
@@ -167,7 +190,5 @@ async def notify_user_application_rework(
     except Exception as e:
         logger.error(
             "Failed to notify user {} about rework for app {}: {}",
-            user_id,
-            app_id,
-            e,
+            user_id, app_id, e,
         )

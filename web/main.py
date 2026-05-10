@@ -20,7 +20,7 @@ from web.routers import auth, settings, apps, meetings
 async def lifespan(app: FastAPI):
     if not (config.WEB_SESSION_SECRET or "").strip():
         logger.warning(
-            "WEB_SESSION_SECRET не задан — cookie сессии без подписи. "
+            "WEB_SESSION_SECRET is not set session cookies will not be signed"
         )
     await resources.init_resources()
     app.state.tg_bot = Bot(token=config.BOT_TOKEN)

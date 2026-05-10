@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -20,18 +21,21 @@ def prepare_log_storage(
     max_total_mb: int,
 ) -> None:
     os.makedirs(log_dir, exist_ok=True)
+    
     if clean_on_start:
         for fp in _iter_log_files(log_dir):
             try:
                 fp.unlink(missing_ok=True)
-            except Exception:
-                continue
+            except Exception as e:
+                print(f"Warning: Failed to delete {fp}: {e}", file=sys.stderr)
 
     max_bytes = max(0, int(max_total_mb)) * 1024 * 1024
     if max_bytes == 0:
         return
+        
     files = _iter_log_files(log_dir)
-    total = sum(f.stat().st_size for f in files if f.exists())
+    total = sum(f.stat().st_size for f in files)
+    
     if total <= max_bytes:
         return
 
@@ -43,8 +47,8 @@ def prepare_log_storage(
             size = fp.stat().st_size
             fp.unlink(missing_ok=True)
             total -= size
-        except Exception:
-            continue
+        except Exception as e:
+            print(f"Warning: Failed to rotate {fp}: {e}", file=sys.stderr)
 
 
 def setup_logging(
@@ -69,8 +73,8 @@ def setup_logging(
 
     logger.add(sys.stdout, format=fmt, level=level, colorize=True)
 
-    app_log_path = str(Path(log_dir) / "bot.log")
-    errors_log_path = str(Path(log_dir) / "errors.log")
+    app_log_path = Path(log_dir) / "bot.log"
+    errors_log_path = Path(log_dir) / "errors.log"
 
     logger.add(
         app_log_path,
@@ -80,6 +84,7 @@ def setup_logging(
         retention=f"{max(1, int(retention_days))} days",
         encoding="utf-8",
         colorize=False,
+        enqueue=True,
     )
 
     logger.add(
@@ -90,30 +95,31 @@ def setup_logging(
         retention=f"{max(1, int(errors_retention_days))} days",
         encoding="utf-8",
         colorize=False,
+        enqueue=True,
     )
 
+    InterceptHandler.install()
 
-class InterceptHandler:
 
-    def write(self, message):
-        pass
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = str(record.levelno)
 
-    @staticmethod
-    def install():
-        import logging
+        frame, depth = logging.currentframe(), 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
 
-        class _Handler(logging.Handler):
-            def emit(self, record: logging.LogRecord) -> None:
-                try:
-                    level = logger.level(record.levelname).name
-                except ValueError:
-                    level = record.levelno
-                frame, depth = sys._getframe(6), 6
-                while frame and frame.f_code.co_filename == logging.__file__:
-                    frame = frame.f_back
-                    depth += 1
-                logger.opt(depth=depth, exception=record.exc_info).log(
-                    level, record.getMessage()
-                )
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
-        logging.basicConfig(handlers=[_Handler()], level=0, force=True)
+    @classmethod
+    def install(cls) -> None:
+        logging.basicConfig(handlers=[cls()], level=0, force=True)
+        for name in logging.root.manager.loggerDict.keys():
+            logging.getLogger(name).handlers = [cls()]
+            logging.getLogger(name).propagate = False

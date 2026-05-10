@@ -42,6 +42,7 @@ def _parse_app(a: dict) -> dict:
 async def _render_row(request: Request, app_id: int, *, meeting_basket: bool = False):
     app = await application_service.get_application(app_id)
     if not app:
+        logger.warning("Failed to render row: application {} not found", app_id)
         raise HTTPException(status_code=404)
     row = app.model_dump()
     row["full_name"] = await db.get_user_full_name(app.user_id)
@@ -117,14 +118,19 @@ async def approve_app(
     admin_id=Depends(get_admin),
 ):
     row = await application_service.approve(app_id)
-    if row and row.user_id:
-        background_tasks.add_task(
-            notify_user_application_approved,
-            request.app.state.tg_bot,
-            row.user_id,
-            app_id,
-            pdf_file_id=None,
-        )
+    if row:
+        logger.info("Admin {} approved application {}", admin_id, app_id)
+        if row.user_id:
+            background_tasks.add_task(
+                notify_user_application_approved,
+                request.app.state.tg_bot,
+                row.user_id,
+                app_id,
+                pdf_file_id=None,
+            )
+    else:
+        logger.warning("Admin {} tried to approve application {}, but it failed", admin_id, app_id)
+        
     return await _render_row(request, app_id)
 
 
@@ -138,6 +144,7 @@ async def reject_app(
 ):
     row = await application_service.send_for_rework(app_id, feedback)
     if row:
+        logger.info("Admin {} sent application {} for rework. Feedback len: {}", admin_id, app_id, len(feedback))
         tpl = await get_template()
         background_tasks.add_task(
             notify_user_application_rework,
@@ -148,6 +155,9 @@ async def reject_app(
             reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
         )
+    else:
+        logger.warning("Admin {} failed to reject application {}", admin_id, app_id)
+        
     return await _render_row(request, app_id)
 
 
@@ -161,9 +171,12 @@ async def rework_approved_app(
 ):
     app_row = await application_service.get_application(app_id)
     if not app_row or app_row.status != "approved":
+        logger.warning("Admin {} tried to rework app {} but status was {}", admin_id, app_id, app_row.status if app_row else 'NOT_FOUND')
         raise HTTPException(status_code=409, detail="Неверный статус")
+        
     row = await application_service.send_for_rework(app_id, feedback.strip())
     if row:
+        logger.info("Admin {} returned APPROVED application {} to rework", admin_id, app_id)
         tpl = await get_template()
         background_tasks.add_task(
             notify_user_application_rework,
@@ -185,6 +198,7 @@ async def application_detail_page(
 ):
     app = await application_service.get_application(app_id)
     if not app:
+        logger.warning("Admin {} requested details for non-existent application {}", admin_id, app_id)
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
     full_name, tpl = await asyncio.gather(
@@ -208,13 +222,17 @@ async def application_detail_page(
 async def download_report(app_id: int, admin_id=Depends(get_admin)):
     app_row = await application_service.get_application(app_id)
     if not app_row:
+        logger.warning("Admin {} tried to download report for non-existent application {}", admin_id, app_id)
         raise HTTPException(status_code=404)
+        
     pdf_buf, full_name, position = await asyncio.gather(
         get_app_pdf_buffer(app_id),
         db.get_user_full_name(app_row.user_id),
         db.get_user_position(app_row.user_id),
     )
     custom_filename = generate_pdf_filename(full_name, position, app_row.created_at)
+    
+    logger.info("Admin {} downloaded PDF report for application {}", admin_id, app_id)
     return StreamingResponse(
         pdf_buf,
         media_type="application/pdf",
@@ -227,10 +245,15 @@ async def download_report(app_id: int, admin_id=Depends(get_admin)):
 @router.get("/download_attachment/{s3_key:path}")
 async def download_file(s3_key: str, admin_id=Depends(get_admin)):
     if not s3_key or not s3_keys.is_allowed_attachment_download_key(s3_key.strip()):
+        logger.warning("Admin {} requested empty or invalid S3 key: {}", admin_id, s3_key)
         raise HTTPException(status_code=400, detail="Недопустимый ключ")
+        
     buf = await file_service.download_attachment_bytesio(s3_key)
     if not buf:
+        logger.warning("Admin {}: S3 attachment not found: {}", admin_id, s3_key)
         raise HTTPException(status_code=404, detail="Не найден")
+        
+    logger.info("Admin {} downloaded S3 attachment: {}", admin_id, s3_key)
     return StreamingResponse(
         buf,
         media_type="application/octet-stream",
@@ -244,6 +267,7 @@ async def download_file(s3_key: str, admin_id=Depends(get_admin)):
 async def download_archive(app_id: int, request: Request, admin_id=Depends(get_admin)):
     app_row = await application_service.get_application(app_id)
     if not app_row:
+        logger.warning("Admin {} tried to download archive for non-existent application {}", admin_id, app_id)
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
     bot: Bot = request.app.state.tg_bot
@@ -314,6 +338,8 @@ async def download_archive(app_id: int, request: Request, admin_id=Depends(get_a
     headers = {
         "Content-Disposition": f"attachment; filename*=utf-8''{quote(f'application_{app_id}_files.zip')}"
     }
+    
+    logger.info("Admin {} generated and downloaded ZIP archive for application {}", admin_id, app_id)
     return StreamingResponse(zip_buf, media_type="application/zip", headers=headers)
 
 
@@ -326,25 +352,32 @@ async def download_tg_attachment(
 ):
     """Скачивание файла по Telegram file_id (вложения, загруженные в боте до S3)."""
     if not file_id or not file_id.strip():
+        logger.warning("Admin {} requested Telegram attachment with empty file_id", admin_id)
         raise HTTPException(status_code=400, detail="Пустой file_id")
+        
     bot: Bot = request.app.state.tg_bot
     try:
         tg_file = await bot.get_file(file_id.strip())
     except Exception as e:
         logger.warning(
-            "Telegram get_file failed | file_id prefix={} err={}", file_id[:16], e
+            "Telegram get_file failed for admin {} | file_id prefix={} err={}", admin_id, file_id[:16], e
         )
         raise HTTPException(
             status_code=404,
             detail="Файл недоступен (истёк срок хранения в Telegram или неверный идентификатор).",
         ) from e
+        
     if not tg_file.file_path:
+        logger.warning("Admin {}: Telegram file path is missing for file_id {}", admin_id, file_id[:16])
         raise HTTPException(status_code=404, detail="Нет пути к файлу в Telegram")
+        
     buf = BytesIO()
     await bot.download_file(tg_file.file_path, destination=buf)
     buf.seek(0)
     fname = (name or "attachment").strip() or "attachment"
     headers = {"Content-Disposition": f"attachment; filename*=utf-8''{quote(fname)}"}
+    
+    logger.info("Admin {} downloaded Telegram attachment: {}", admin_id, file_id[:16])
     return StreamingResponse(
         buf, media_type="application/octet-stream", headers=headers
     )

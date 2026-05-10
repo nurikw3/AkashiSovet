@@ -77,24 +77,30 @@ async def settings_page(request: Request, admin_id=Depends(get_admin)):
 @router.post("/password", response_class=HTMLResponse)
 async def set_password(request: Request, password: str = Form(...), admin_id=Depends(get_admin)):
     if len(password) < 8:
+        logger.warning("Admin {} attempted to set a password with less than 8 characters", admin_id)
         return HTMLResponse('<p class="text-akashi-red text-[10px] font-black text-center">⚠ Минимум 8 символов</p>')
+        
     await db.update_user_password(admin_id, password)
-    logger.info("Password updated for admin {}", admin_id)
+    logger.info("Password successfully updated for admin {}", admin_id)
     return HTMLResponse('<p class="text-green-500 text-[10px] font-black text-center">✓ Пароль сохранён</p>')
 
 @router.post("/help-text", response_class=HTMLResponse)
 async def set_help_text(help_text: str = Form(...), admin_id=Depends(get_admin)):
     text = (help_text or "").strip()
     if not text:
+        logger.warning("Admin {} tried to save empty help text", admin_id)
         return HTMLResponse('<p class="text-akashi-red text-[10px] font-black text-center">⚠ Текст не должен быть пустым</p>', status_code=400)
+        
     await db.upsert_setting(HELP_TEXT_SETTINGS_KEY, {"text": text})
-    logger.info("help text updated by admin {}", admin_id)
+    logger.info("Help text updated by admin {}", admin_id)
     return HTMLResponse('<p class="text-green-500 text-[10px] font-black text-center">✓ Инструкция сохранена</p>')
 
 @router.post("/help-text/reset", response_class=HTMLResponse)
 async def reset_help_text(admin_id=Depends(get_admin)):
     default_text = _default_help_text()
     await db.upsert_setting(HELP_TEXT_SETTINGS_KEY, {"text": default_text})
+    logger.info("Help text reset to default by admin {}", admin_id)
+    
     escaped = html.escape(default_text)
     return HTMLResponse(
         '<p class="text-green-500 text-[10px] font-black text-center">✓ Сброшено на дефолт</p>'
@@ -106,7 +112,9 @@ async def template_editor_page(request: Request, admin_id=Depends(get_admin)):
     try:
         tpl = await get_template()
     except RuntimeError as e:
+        logger.error("Admin {} failed to load template editor: {}", admin_id, str(e))
         return templates.TemplateResponse(request=request, name="template_editor_error.html", context={"message": str(e)})
+        
     return templates.TemplateResponse(request=request, name="template_editor.html", context={"blocks": tpl.blocks})
 
 @router.get("/template/new-row", response_class=HTMLResponse)
@@ -128,6 +136,7 @@ async def template_editor_save(
 ):
     n = len(block_id)
     if n == 0:
+        logger.warning("Admin {} tried to save template with 0 blocks", admin_id)
         return HTMLResponse('<p class="text-akashi-red text-[10px]">Нужен хотя бы один блок</p>', status_code=400)
     
     desc_list = block_desc or []
@@ -145,8 +154,16 @@ async def template_editor_save(
 
     try:
         app_tpl = ApplicationTemplate.model_validate({"blocks": rows})
+    except ValidationError as e:
+        msg = _template_validation_message(e)
+        logger.warning("Admin {} submitted invalid template schema: {}", admin_id, msg)
+        return HTMLResponse(f'<p class="text-akashi-red text-[10px]">Ошибка валидации: {html.escape(msg)}</p>', status_code=400)
+
+    try:
         await persist_template(app_tpl)
+        logger.info("Application template successfully updated and cached by admin {}", admin_id)
     except Exception as e:
-        return HTMLResponse(f'<p class="text-akashi-red text-[10px]">Ошибка: {html.escape(str(e))}</p>', status_code=500)
+        logger.exception("Admin {} triggered DB error while saving template: {}", admin_id, str(e))
+        return HTMLResponse(f'<p class="text-akashi-red text-[10px]">Ошибка базы данных: {html.escape(str(e))}</p>', status_code=500)
 
     return HTMLResponse('<p class="text-green-500 text-[10px] font-black">✓ Шаблон сохранён</p>')

@@ -5,11 +5,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import stdlib.db as db
 from stdlib.services import meeting_service
-from bot.logger import logger
 from web.templating import templates
 from web.dependencies import get_admin
 from web.routers.apps import _parse_app
 from stdlib.timezone_util import wall_time_astana_to_utc
+
+from bot.logger import logger
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -48,6 +49,7 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
     err_base = _meeting_form_err_prefix(form)
     scheduled = _parse_meeting_schedule(form)
     if not scheduled:
+        logger.warning("Admin {} tried to create a meeting without a valid schedule", admin_id)
         return RedirectResponse(
             url=f"{err_base}{quote('Укажите дату и время заседания')}", status_code=303
         )
@@ -56,11 +58,14 @@ async def meetings_create(request: Request, admin_id=Depends(get_admin)):
     try:
         if not app_ids:
             await meeting_service.create_meeting(scheduled, admin_id)
+            logger.info("Meeting created by admin {} at {}", admin_id, scheduled)
         else:
             await meeting_service.create_meeting_with_applications(
                 scheduled, admin_id, app_ids
             )
+            logger.info("Meeting created by admin {} with applications: {} at {}", admin_id, app_ids, scheduled)
     except Exception as e:
+        logger.exception("Error creating meeting by admin {}: {}", admin_id, str(e))
         return RedirectResponse(
             url=f"/meetings?meeting_err={quote(str(e))}", status_code=303
         )
@@ -102,7 +107,9 @@ async def meeting_detail_page(
 ):
     meeting = await meeting_service.get_by_id(meeting_id)
     if not meeting:
+        logger.warning("Admin {} requested non-existent meeting: {}", admin_id, meeting_id)
         raise HTTPException(status_code=404, detail="Заседание не найдено")
+        
     apps = [
         _parse_app(a) for a in await db.get_applications_by_ids(meeting.application_ids)
     ]
@@ -125,24 +132,35 @@ async def meeting_update_schedule(
     form = await request.form()
     scheduled = _parse_meeting_schedule(form)
     if not scheduled:
+        logger.warning("Admin {} failed to update meeting {} schedule: invalid date format", admin_id, meeting_id)
         return RedirectResponse(
             url=f"/meetings/{meeting_id}?schedule_err={quote('Укажите дату и время')}",
             status_code=303,
         )
+        
     if not await meeting_service.set_scheduled_at(meeting_id, scheduled):
+        logger.warning("Admin {} tried to reschedule non-existent meeting {}", admin_id, meeting_id)
         raise HTTPException(status_code=404)
+        
+    logger.info("Meeting {} rescheduled to {} by admin {}", meeting_id, scheduled, admin_id)
     return RedirectResponse(url=f"/meetings/{meeting_id}?updated=1", status_code=303)
 
 
 @router.post("/{meeting_id}/remove_app/{app_id}")
 async def meeting_remove_app(meeting_id: int, app_id: int, admin_id=Depends(get_admin)):
     if not await meeting_service.remove_application_from_meeting(meeting_id, app_id):
+        logger.warning("Admin {} failed to remove app {} from meeting {} (meeting or app not found)", admin_id, app_id, meeting_id)
         raise HTTPException(status_code=404)
+        
+    logger.info("Admin {} removed application {} from meeting {}", admin_id, app_id, meeting_id)
     return RedirectResponse(url=f"/meetings/{meeting_id}", status_code=303)
 
 
 @router.post("/{meeting_id}/delete")
 async def meeting_delete(meeting_id: int, admin_id=Depends(get_admin)):
     if not await meeting_service.delete_meeting(meeting_id):
+        logger.warning("Admin {} failed to delete meeting {} (not found)", admin_id, meeting_id)
         raise HTTPException(status_code=404)
+        
+    logger.info("Meeting {} was deleted by admin {}", meeting_id, admin_id)
     return RedirectResponse(url="/meetings?deleted=1", status_code=303)

@@ -226,6 +226,7 @@ test.pdf
 .cursor/
 .graphify/
 *.md
+!README.md
 *.pdf
 test_pdf.py
 graphify-out/

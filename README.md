@@ -1,6 +1,5 @@
 <div align="center">
-  <!-- Place your logo or banner image here -->
-  <img src="https://via.placeholder.com/800x200/000000/FFFFFF/?text=AkashiSovet+Banner" alt="AkashiSovet Banner" width="100%">
+  <img src="assets/banner.png" alt="AkashiSovet Banner" width="100%">
 
   # ✨ AkashiSovet
 
@@ -158,9 +157,3 @@ AkashiSovet/
 ├── pyproject.toml      # Project dependencies managed by uv
 └── README.md           # You are here!
 ```
-
----
-
-<div align="center">
-  <p>Built with ❤️ by <a href="https://github.com/your-username">Your Name/Team</a></p>
-</div>

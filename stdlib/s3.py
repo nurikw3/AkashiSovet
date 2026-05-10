@@ -18,6 +18,7 @@ from bot.config import config
 from bot.logger import logger
 
 _s3_session: aiobotocore.session.AioSession | None = None
+_s3_client_instance = None
 
 BUCKET_ATTACHMENTS = "attachments"
 BUCKET_PDF = "pdf-documents"
@@ -31,8 +32,10 @@ _S3_BOTOCORE_CONFIG = Config(
 )
 
 
+# ── Сессия и клиент ───────────────────────────────────────────────────────────
+
 def get_s3_session() -> aiobotocore.session.AioSession:
-    """Общая сессия aiobotocore; создаётся при первом обращении или после `reset_s3_session`."""
+    """Общая сессия aiobotocore; создаётся при первом обращении или после reset_s3_session."""
     global _s3_session
     if _s3_session is None:
         _s3_session = aiobotocore.session.get_session()
@@ -40,7 +43,7 @@ def get_s3_session() -> aiobotocore.session.AioSession:
 
 
 def reset_s3_session() -> None:
-    """Сброс сессии при остановке приложения (клиенты S3 при этом контекстные — см. `_s3_client`)."""
+    """Сброс сессии при остановке приложения."""
     global _s3_session
     _s3_session = None
 
@@ -56,22 +59,56 @@ def is_s3_configured() -> bool:
     return _s3_configured()
 
 
-@asynccontextmanager
-async def _s3_client():
-    if not _s3_configured():
-        raise RuntimeError("S3 is not configured (set S3_ENDPOINT_URL, S3_ACCESS_KEY, S3_SECRET_KEY)")
-    async with get_s3_session().create_client(
-        "s3",
+def _make_client_kwargs() -> dict:
+    return dict(
         endpoint_url=config.S3_ENDPOINT_URL,
         aws_access_key_id=config.S3_ACCESS_KEY,
         aws_secret_access_key=config.S3_SECRET_KEY,
         region_name="us-east-1",
         config=_S3_BOTOCORE_CONFIG,
-    ) as client:
+    )
+
+
+async def init_s3_client() -> None:
+    """Создаёт постоянный клиент при старте приложения. Вызвать в init_resources."""
+    global _s3_client_instance
+    if not _s3_configured():
+        logger.warning("S3: init skipped — credentials not configured")
+        return
+    _s3_client_instance = await get_s3_session().create_client(
+        "s3", **_make_client_kwargs()
+    ).__aenter__()
+    logger.info("S3: persistent client initialized")
+
+
+async def close_s3_client() -> None:
+    """Закрывает постоянный клиент при остановке приложения. Вызвать в shutdown_resources."""
+    global _s3_client_instance
+    if _s3_client_instance is not None:
+        await _s3_client_instance.__aexit__(None, None, None)
+        _s3_client_instance = None
+        logger.info("S3: persistent client closed")
+
+
+@asynccontextmanager
+async def _s3_client():
+    """
+    Переиспользует persistent клиент если инициализирован.
+    Fallback: создаёт временный клиент (например в bot-процессе).
+    """
+    if not _s3_configured():
+        raise RuntimeError(
+            "S3 is not configured (set S3_ENDPOINT_URL, S3_ACCESS_KEY, S3_SECRET_KEY)"
+        )
+    if _s3_client_instance is not None:
+        yield _s3_client_instance
+        return
+    async with get_s3_session().create_client("s3", **_make_client_kwargs()) as client:
         yield client
 
 
 # ── Ключи ─────────────────────────────────────────────────────────────────────
+
 def pdf_key(user_id: int, app_id: int) -> str:
     return f"pdf/{user_id}/{app_id}.pdf"
 
@@ -116,12 +153,13 @@ def _app_attachments_prefix(user_id: int, app_id: int) -> str:
     return f"attachments/{user_id}/{app_id}/"
 
 
-# ── Инициализация ─────────────────────────────────────────────────────────────
+# ── Инициализация бакетов ─────────────────────────────────────────────────────
+
 async def ensure_buckets() -> None:
-    """Создаёт бакеты если их нет. Вызвать в lifespan."""
+    """Создаёт бакеты если их нет. Вызвать в lifespan после init_s3_client."""
     if not _s3_configured():
         logger.warning(
-            "S3 skipped: set S3_ENDPOINT_URL, S3_ACCESS_KEY, S3_SECRET_KEY (e.g. in .env or compose)"
+            "S3 skipped: set S3_ENDPOINT_URL, S3_ACCESS_KEY, S3_SECRET_KEY"
         )
         return
     async with _s3_client() as s3:
@@ -134,6 +172,7 @@ async def ensure_buckets() -> None:
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
+
 async def upload_bytes(
     data: bytes,
     key: str,
@@ -152,6 +191,7 @@ async def upload_bytes(
 
 
 # ── Download ──────────────────────────────────────────────────────────────────
+
 async def download_bytes(key: str, bucket: str) -> bytes | None:
     async with _s3_client() as s3:
         try:
@@ -170,6 +210,7 @@ async def download_to_bytesio(key: str, bucket: str) -> io.BytesIO | None:
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
+
 async def delete_object(key: str, bucket: str) -> None:
     async with _s3_client() as s3:
         await s3.delete_object(Bucket=bucket, Key=key)
@@ -200,6 +241,7 @@ async def delete_user_files(user_id: int) -> None:
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 async def _list_keys(prefix: str, bucket: str) -> list[str]:
     keys = []
     async with _s3_client() as s3:

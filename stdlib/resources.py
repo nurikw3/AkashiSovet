@@ -12,16 +12,15 @@ import stdlib.s3 as s3
 
 
 async def init_resources() -> None:
-    """Поднимает PostgreSQL, Redis (кэш/служебное) и проверяет бакеты S3."""
     await db.init_db()
     await redis_client.init_redis()
+    await s3.init_s3_client()
     await s3.ensure_buckets()
 
-
 async def shutdown_resources() -> None:
-    """Закрывает пул БД и Redis; S3 — сброс кэшированной сессии."""
     await db.close_db()
     await redis_client.close_redis()
+    await s3.close_s3_client()  
     s3.reset_s3_session()
 
 

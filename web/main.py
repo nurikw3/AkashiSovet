@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import zipfile
 import json
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Response, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from fastapi.templating import Jinja2Templates
@@ -43,6 +43,7 @@ from stdlib.timezone_util import (
     format_app_datetime,
     wall_time_astana_to_utc,
 )
+import asyncio
 
 _LOGIN_FAIL_MSG = "Неверный Telegram ID или код"
 HELP_TEXT_SETTINGS_KEY = "user_help_text"
@@ -495,31 +496,72 @@ async def dashboard(
     return templates.TemplateResponse(request=request, name=tpl, context=ctx)
 
 
+# @app.post("/approve/{app_id}")
+# async def approve_app(request: Request, app_id: int, admin_id=Depends(get_admin)):
+#     row = await application_service.approve(app_id)
+#     if row and row.user_id:
+#         await notify_user_application_approved(
+#             request.app.state.tg_bot,
+#             row.user_id,
+#             app_id,
+#             pdf_file_id=None,
+#         )
+
+#     return await _render_row(request, app_id)
+
 @app.post("/approve/{app_id}")
-async def approve_app(request: Request, app_id: int, admin_id=Depends(get_admin)):
+async def approve_app(
+    request: Request,
+    app_id: int,
+    background_tasks: BackgroundTasks,
+    admin_id=Depends(get_admin),
+):
     row = await application_service.approve(app_id)
     if row and row.user_id:
-        await notify_user_application_approved(
+        background_tasks.add_task(
+            notify_user_application_approved,
             request.app.state.tg_bot,
             row.user_id,
             app_id,
             pdf_file_id=None,
         )
-
     return await _render_row(request, app_id)
 
+
+# @app.post("/reject/{app_id}")
+# async def reject_app(
+#     request: Request,
+#     app_id: int,
+#     feedback: str = Form(...),
+#     admin_id=Depends(get_admin),
+# ):
+#     row = await application_service.send_for_rework(app_id, feedback)
+#     if row:
+#         tpl = await get_template()
+#         await notify_user_application_rework(
+#             request.app.state.tg_bot,
+#             row.user_id,
+#             app_id,
+#             feedback,
+#             reply_markup=kb.rework_keyboard(tpl, app_id),
+#             web_wording=True,
+#         )
+
+#     return await _render_row(request, app_id)
 
 @app.post("/reject/{app_id}")
 async def reject_app(
     request: Request,
     app_id: int,
+    background_tasks: BackgroundTasks,
     feedback: str = Form(...),
     admin_id=Depends(get_admin),
 ):
     row = await application_service.send_for_rework(app_id, feedback)
     if row:
         tpl = await get_template()
-        await notify_user_application_rework(
+        background_tasks.add_task(
+            notify_user_application_rework,
             request.app.state.tg_bot,
             row.user_id,
             app_id,
@@ -527,18 +569,61 @@ async def reject_app(
             reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
         )
-
     return await _render_row(request, app_id)
+
+
+# @app.post("/rework-approved/{app_id}")
+# async def rework_approved_app(
+#     request: Request,
+#     app_id: int,
+#     feedback: str = Form(...),
+#     admin_id=Depends(get_admin),
+# ):
+#     """Возвращает уже согласованную заявку на доработку (только суперпользователь)."""
+#     app_row = await application_service.get_application(app_id)
+#     if not app_row:
+#         raise HTTPException(status_code=404, detail="Заявка не найдена")
+#     if app_row.status != "approved":
+#         raise HTTPException(
+#             status_code=409,
+#             detail=f"Ожидается статус 'approved', получен '{app_row.status}'",
+#         )
+
+#     row = await application_service.send_for_rework(app_id, feedback.strip())
+#     logger.info(
+#         "App {} returned to rework from approved by admin {} | feedback_len={}",
+#         app_id,
+#         admin_id,
+#         len(feedback),
+#     )
+
+#     if row:
+#         tpl = await get_template()
+#         await notify_user_application_rework(
+#             request.app.state.tg_bot,
+#             row.user_id,
+#             app_id,
+#             feedback.strip(),
+#             reply_markup=kb.rework_keyboard(tpl, app_id),
+#             web_wording=True,
+#         )
+
+#     # Определяем meeting_basket по URL страницы, с которой пришёл HTMX-запрос:
+#     # на вкладке ?status=approved таблица имеет колонку чекбоксов — строка должна
+#     # содержать такое же количество <td>, иначе колонки сместятся.
+#     current_url = request.headers.get("hx-current-url", "")
+#     _meeting_basket = "status=approved" in current_url
+#     return await _render_row(request, app_id, meeting_basket=_meeting_basket)
 
 
 @app.post("/rework-approved/{app_id}")
 async def rework_approved_app(
     request: Request,
     app_id: int,
+    background_tasks: BackgroundTasks,
     feedback: str = Form(...),
     admin_id=Depends(get_admin),
 ):
-    """Возвращает уже согласованную заявку на доработку (только суперпользователь)."""
     app_row = await application_service.get_application(app_id)
     if not app_row:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
@@ -558,7 +643,8 @@ async def rework_approved_app(
 
     if row:
         tpl = await get_template()
-        await notify_user_application_rework(
+        background_tasks.add_task(
+            notify_user_application_rework,
             request.app.state.tg_bot,
             row.user_id,
             app_id,
@@ -567,13 +653,9 @@ async def rework_approved_app(
             web_wording=True,
         )
 
-    # Определяем meeting_basket по URL страницы, с которой пришёл HTMX-запрос:
-    # на вкладке ?status=approved таблица имеет колонку чекбоксов — строка должна
-    # содержать такое же количество <td>, иначе колонки сместятся.
     current_url = request.headers.get("hx-current-url", "")
     _meeting_basket = "status=approved" in current_url
     return await _render_row(request, app_id, meeting_basket=_meeting_basket)
-
 
 @app.get("/download_tg_attachment")
 async def download_tg_attachment(
@@ -614,12 +696,12 @@ async def download_report(app_id: int, admin_id=Depends(get_admin)):
     if not app_row:
         raise HTTPException(status_code=404)
 
-    pdf_buf = await get_app_pdf_buffer(app_id)
-    u_id = app_row.user_id
-    full_name = await db.get_user_full_name(u_id)
-    position = await db.get_user_position(u_id)
+    pdf_buf, full_name, position = await asyncio.gather(
+        get_app_pdf_buffer(app_id),
+        db.get_user_full_name(app_row.user_id),
+        db.get_user_position(app_row.user_id),
+    )
     custom_filename = generate_pdf_filename(full_name, position, app_row.created_at)
-
     headers = {
         "Content-Disposition": f"inline; filename*=utf-8''{quote(custom_filename)}"
     }
@@ -654,51 +736,122 @@ async def download_file(s3_key: str, admin_id=Depends(get_admin)):
     )
 
 
+# @app.get("/download_archive/{app_id}")
+# async def download_archive(app_id: int, request: Request, admin_id=Depends(get_admin)):
+#     """ZIP со всеми файлами заявки (PDF + приложения)."""
+#     app_row = await application_service.get_application(app_id)
+#     if not app_row:
+#         raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+#     zip_buf = BytesIO()
+#     missed_files: list[str] = []
+#     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+#         # Всегда добавляем PDF самой заявки.
+#         pdf_buf = await get_app_pdf_buffer(app_id)
+#         full_name = await db.get_user_full_name(app_row.user_id)
+#         position = await db.get_user_position(app_row.user_id)
+#         pdf_name = generate_pdf_filename(full_name, position, app_row.created_at)
+#         zf.writestr(Path(pdf_name).name or f"application_{app_id}.pdf", pdf_buf.getvalue())
+
+#         for idx, att in enumerate(app_row.attachments, start=1):
+#             file_name = Path((att.name or "").strip() or f"attachment_{idx}").name
+#             try:
+#                 if att.s3_key:
+#                     file_buf = await file_service.download_attachment_bytesio(att.s3_key)
+#                     if not file_buf:
+#                         raise RuntimeError("S3 object is missing")
+#                     zf.writestr(file_name, file_buf.getvalue())
+#                 elif att.file_id:
+#                     bot: Bot = request.app.state.tg_bot
+#                     tg_file = await bot.get_file(att.file_id)
+#                     if not tg_file.file_path:
+#                         raise RuntimeError("Telegram file path is missing")
+#                     tg_buf = BytesIO()
+#                     await bot.download_file(tg_file.file_path, destination=tg_buf)
+#                     tg_buf.seek(0)
+#                     zf.writestr(file_name, tg_buf.getvalue())
+#                 else:
+#                     missed_files.append(file_name)
+#             except Exception as e:
+#                 logger.warning(
+#                     "Archive item skipped | app_id={} file={} err={}",
+#                     app_id,
+#                     file_name,
+#                     e,
+#                 )
+#                 missed_files.append(file_name)
+
+#         if missed_files:
+#             zf.writestr(
+#                 "_archive_warnings.txt",
+#                 "Не удалось добавить в архив файлы:\n- " + "\n- ".join(missed_files),
+#             )
+
+#     zip_buf.seek(0)
+#     headers = {
+#         "Content-Disposition": f"attachment; filename*=utf-8''{quote(f'application_{app_id}_files.zip')}"
+#     }
+#     return StreamingResponse(zip_buf, media_type="application/zip", headers=headers)
+
 @app.get("/download_archive/{app_id}")
 async def download_archive(app_id: int, request: Request, admin_id=Depends(get_admin)):
-    """ZIP со всеми файлами заявки (PDF + приложения)."""
     app_row = await application_service.get_application(app_id)
     if not app_row:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
+    bot: Bot = request.app.state.tg_bot
+
+    async def _fetch_attachment(idx: int, att):
+        file_name = Path((att.name or "").strip() or f"attachment_{idx}").name
+        try:
+            if att.s3_key:
+                buf = await file_service.download_attachment_bytesio(att.s3_key)
+                if not buf:
+                    raise RuntimeError("S3 object is missing")
+                return file_name, buf.getvalue()
+            elif att.file_id:
+                tg_file = await bot.get_file(att.file_id)
+                if not tg_file.file_path:
+                    raise RuntimeError("Telegram file path is missing")
+                tg_buf = BytesIO()
+                await bot.download_file(tg_file.file_path, destination=tg_buf)
+                return file_name, tg_buf.getvalue()
+            else:
+                return file_name, None
+        except Exception as e:
+            logger.warning(
+                "Archive item skipped | app_id={} file={} err={}",
+                app_id, file_name, e,
+            )
+            return file_name, None
+
+    # все запросы параллельно: PDF + имя + должность + все вложения
+    results = await asyncio.gather(
+        get_app_pdf_buffer(app_id),
+        db.get_user_full_name(app_row.user_id),
+        db.get_user_position(app_row.user_id),
+        *[_fetch_attachment(i, att) for i, att in enumerate(app_row.attachments, start=1)],
+    )
+
+    pdf_buf = results[0]
+    full_name = results[1]
+    position = results[2]
+    att_results = results[3:]  # list of (file_name, data | None)
+
+    pdf_name = generate_pdf_filename(full_name, position, app_row.created_at)
     zip_buf = BytesIO()
     missed_files: list[str] = []
+
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        # Всегда добавляем PDF самой заявки.
-        pdf_buf = await get_app_pdf_buffer(app_id)
-        full_name = await db.get_user_full_name(app_row.user_id)
-        position = await db.get_user_position(app_row.user_id)
-        pdf_name = generate_pdf_filename(full_name, position, app_row.created_at)
-        zf.writestr(Path(pdf_name).name or f"application_{app_id}.pdf", pdf_buf.getvalue())
-
-        for idx, att in enumerate(app_row.attachments, start=1):
-            file_name = Path((att.name or "").strip() or f"attachment_{idx}").name
-            try:
-                if att.s3_key:
-                    file_buf = await file_service.download_attachment_bytesio(att.s3_key)
-                    if not file_buf:
-                        raise RuntimeError("S3 object is missing")
-                    zf.writestr(file_name, file_buf.getvalue())
-                elif att.file_id:
-                    bot: Bot = request.app.state.tg_bot
-                    tg_file = await bot.get_file(att.file_id)
-                    if not tg_file.file_path:
-                        raise RuntimeError("Telegram file path is missing")
-                    tg_buf = BytesIO()
-                    await bot.download_file(tg_file.file_path, destination=tg_buf)
-                    tg_buf.seek(0)
-                    zf.writestr(file_name, tg_buf.getvalue())
-                else:
-                    missed_files.append(file_name)
-            except Exception as e:
-                logger.warning(
-                    "Archive item skipped | app_id={} file={} err={}",
-                    app_id,
-                    file_name,
-                    e,
-                )
+        zf.writestr(
+            Path(pdf_name).name or f"application_{app_id}.pdf",
+            pdf_buf.getvalue(),
+        )
+        for file_name, data in att_results:
+            if data is not None:
+                zf.writestr(file_name, data)
+            else:
                 missed_files.append(file_name)
-
         if missed_files:
             zf.writestr(
                 "_archive_warnings.txt",
@@ -927,11 +1080,14 @@ async def application_detail_page(
     app = await application_service.get_application(app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
-    row = app.model_dump()
-    row["full_name"] = await db.get_user_full_name(app.user_id)
 
-    # Подгружаем шаблон, чтобы отобразить вопросы для каждого ответа
-    tpl = await get_template()
+    full_name, tpl = await asyncio.gather(
+        db.get_user_full_name(app.user_id),
+        get_template(),
+    )
+
+    row = app.model_dump()
+    row["full_name"] = full_name
     tpl_blocks_map = {str(b.id): b for b in tpl.blocks}
 
     return templates.TemplateResponse(

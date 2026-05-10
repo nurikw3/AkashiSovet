@@ -80,6 +80,12 @@
                    class="inline-flex items-center gap-2 text-[9px] font-mono font-bold tracking-wide uppercase text-ak-red dark:text-ak-red-d hover:underline">
                     📄 <span data-i18n="app.pdf">PDF отчёт</span>
                 </a>
+                {% if app.parsed_attachments|length > 0 %}
+                <a href="/download_archive/{{ app.id }}" target="_blank"
+                class="inline-flex items-center gap-2 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-ak-red dark:hover:text-ak-red-d">
+                    🗜️ Скачать архив
+                </a>
+                {% endif %}
                 {% for f in app.parsed_attachments %}
                 {% if f.s3_key %}
                 <a href="/download_attachment/{{ f.s3_key }}" target="_blank"

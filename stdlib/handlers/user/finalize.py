@@ -33,18 +33,15 @@ async def finalize_and_notify(
         return
 
     user_id = callback.from_user.id
-    full_name, position, signature = await asyncio.gather(
+    full_name, position = await asyncio.gather(
         db.get_user_full_name(user_id),
         db.get_user_position(user_id),
-        db.get_user_signature(user_id),
     )
     missing: list[str] = []
     if not full_name:
         missing.append("/register (ФИО)")
     if not position:
         missing.append("/position (должность)")
-    if not signature:
-        missing.append("/sign (подпись)")
     if missing:
         txt = (
             "❌ Нельзя отправить заявку: не заполнен профиль.\n\n"

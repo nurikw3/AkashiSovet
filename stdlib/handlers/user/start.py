@@ -20,9 +20,8 @@ def _default_help_text() -> str:
     return (
         "📘 <b>Как пользоваться ботом AKASHI</b>\n\n"
         "1) Заполните профиль:\n"
-        "• /register — ФИО\n"
-        "• /position — должность\n"
-        "• /sign — подпись\n\n"
+        "• /register — ФИО и должность\n"
+        "\n"
         "2) Создайте заявку: /start\n"
         "3) Заполните блоки, добавьте файлы и отправьте на согласование.\n\n"
         "Полезные команды:\n"
@@ -52,22 +51,12 @@ async def _ensure_profile_complete(message: Message) -> bool:
     user_id = message.from_user.id
     full_name = await db.get_user_full_name(user_id)
     position = await db.get_user_position(user_id)
-    signature = await db.get_user_signature(user_id)
 
-    missing: list[str] = []
-    if not full_name:
-        missing.append("/register — Ф.И.О.")
-    if not position:
-        missing.append("/position — должность")
-    if not signature:
-        missing.append("/sign — подпись")
-
-    if not missing:
+    if full_name and position:
         return True
 
     await message.answer(
-        "Перед созданием заявки заполните профиль:\n\n"
-        + "\n".join(f"• {x}" for x in missing)
+        "Перед созданием заявки заполните профиль командой /register."
     )
     return False
 
@@ -151,6 +140,7 @@ async def cmd_mode(message: Message):
 
 @router.message(Command("register"))
 async def cmd_register(message: Message, state: FSMContext):
+    await state.update_data(register_flow=True)
     await state.set_state(BotStates.REGISTERING)
     await message.answer(
         "Пожалуйста, введите ваше полное Ф.И.О. (например: Иванов Иван Иванович):"
@@ -160,16 +150,21 @@ async def cmd_register(message: Message, state: FSMContext):
 @router.message(BotStates.REGISTERING, F.text)
 async def process_register(message: Message, state: FSMContext):
     full_name = message.text.strip()
-    await db.set_user_full_name(message.from_user.id, full_name)
-    await state.clear()
+    if not full_name:
+        await message.answer("Ф.И.О. не может быть пустым. Введите Ф.И.О. ещё раз.")
+        return
+
+    await state.update_data(full_name=full_name, register_flow=True)
+    await state.set_state(BotStates.REGISTERING_POSITION)
     await message.answer(
-        f"✅ Ф.И.О. успешно сохранено: <b>{full_name}</b>\n",
+        "✅ Ф.И.О. принято.\n\nТеперь введите вашу должность:",
         parse_mode="HTML",
     )
 
 
 @router.message(Command("position"))
 async def cmd_position(message: Message, state: FSMContext):
+    await state.update_data(register_flow=False)
     await state.set_state(BotStates.REGISTERING_POSITION)
     await message.answer(
         "📝 Пожалуйста, введите вашу должность (например: Руководитель отдела ИИ):"
@@ -179,6 +174,31 @@ async def cmd_position(message: Message, state: FSMContext):
 @router.message(BotStates.REGISTERING_POSITION, F.text)
 async def process_position(message: Message, state: FSMContext):
     position = message.text.strip()
+    if not position:
+        await message.answer("Должность не может быть пустой. Введите должность ещё раз.")
+        return
+
+    data = await state.get_data()
+    if data.get("register_flow"):
+        full_name = (data.get("full_name") or "").strip()
+        if not full_name:
+            await state.set_state(BotStates.REGISTERING)
+            await message.answer(
+                "Не удалось найти Ф.И.О. в текущей сессии. Введите Ф.И.О. заново:"
+            )
+            return
+        await db.set_user_full_name(message.from_user.id, full_name)
+        await db.set_user_position(message.from_user.id, position)
+        await state.clear()
+        await message.answer(
+            "✅ Профиль успешно заполнен.\n\n"
+            f"Ф.И.О.: <b>{full_name}</b>\n"
+            f"Должность: <b>{position}</b>\n\n"
+            "Теперь можно создавать заявку через /start.",
+            parse_mode="HTML",
+        )
+        return
+
     await db.set_user_position(message.from_user.id, position)
     await state.clear()
     await message.answer(

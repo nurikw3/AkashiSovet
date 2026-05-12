@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
+import json
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +13,7 @@ from bot.logger import logger
 from bot.config import config
 from stdlib import resources
 from stdlib.services.realtime_events import (
+    APPLICATION_EVENTS_CHANNEL,
     ApplicationChangedEvent,
     subscribe_application_events,
     unsubscribe_application_events,
@@ -33,11 +36,51 @@ async def lifespan(app: FastAPI):
     app.state.tg_bot = Bot(token=config.BOT_TOKEN)
     app.state.admin_ws_hub = AdminWsHub()
 
+    stop_realtime_listener = asyncio.Event()
+
     async def _broadcast_application_event(event: ApplicationChangedEvent) -> None:
         await app.state.admin_ws_hub.broadcast_application_changed(event)
 
+    async def _redis_realtime_listener() -> None:
+        redis_client = resources.get_redis()
+        if not redis_client:
+            logger.warning("Realtime redis listener is disabled: redis is not available")
+            return
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(APPLICATION_EVENTS_CHANNEL)
+        logger.info("Realtime redis listener subscribed: {}", APPLICATION_EVENTS_CHANNEL)
+        try:
+            while not stop_realtime_listener.is_set():
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if not message or message.get("type") != "message":
+                    continue
+                data = message.get("data")
+                if not data:
+                    continue
+                try:
+                    payload = json.loads(data)
+                    event = ApplicationChangedEvent(
+                        app_id=int(payload.get("app_id")),
+                        status=payload.get("status"),
+                        event_type=str(payload.get("event_type") or "updated"),
+                        ts=str(payload.get("ts") or ""),
+                    )
+                    await _broadcast_application_event(event)
+                except Exception as exc:
+                    logger.warning("Invalid realtime event payload: {}", exc)
+        finally:
+            await pubsub.unsubscribe(APPLICATION_EVENTS_CHANNEL)
+            await pubsub.close()
+
     subscribe_application_events(_broadcast_application_event)
+    redis_listener_task = asyncio.create_task(_redis_realtime_listener())
     yield
+    stop_realtime_listener.set()
+    redis_listener_task.cancel()
+    try:
+        await redis_listener_task
+    except asyncio.CancelledError:
+        pass
     unsubscribe_application_events(_broadcast_application_event)
     await resources.shutdown_resources()
     await app.state.tg_bot.session.close()

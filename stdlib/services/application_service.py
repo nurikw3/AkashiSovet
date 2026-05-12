@@ -26,7 +26,13 @@ async def list_user_applications(user_id: int) -> list[dict]:
 
 
 async def delete_application(app_id: int) -> None:
+    app = await get_application(app_id)
     await db.delete_app(app_id)
+    await publish_application_changed(
+        app_id,
+        status=app.status if app else None,
+        event_type="deleted",
+    )
 
 
 async def mark_application_started(app_id: int) -> None:

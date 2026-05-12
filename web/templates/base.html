@@ -307,9 +307,13 @@
             const existing = document.getElementById(rowId);
             if (existing) {
                 existing.outerHTML = rowHtml;
+                const replaced = document.getElementById(rowId);
+                if (replaced && window.htmx) window.htmx.process(replaced);
                 return;
             }
             tbody.insertAdjacentHTML('afterbegin', rowHtml);
+            const inserted = document.getElementById(rowId);
+            if (inserted && window.htmx) window.htmx.process(inserted);
         }
 
         async function syncDashboardBody(urlSearch) {
@@ -326,6 +330,7 @@
             });
             if (!response.ok) return;
             tbody.innerHTML = await response.text();
+            if (window.htmx) window.htmx.process(tbody);
             applyI18n(tbody);
         }
 

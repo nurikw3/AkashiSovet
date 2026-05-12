@@ -79,7 +79,7 @@ async def finalize_and_notify(
     )
     if queued:
         queued_msg = await callback.message.answer(
-            "📤 Заявка отправлена на согласование.\n\n⏳ Генерация PDF..."
+            "📤 Заявка отправлена на согласование.\n"
         )
         cleanup_ids.append(queued_msg.message_id)
     else:

@@ -12,7 +12,59 @@
             <h1 class="text-2xl font-bold tracking-tight text-[#111111] dark:text-[#EDE8DF]">Заявка #{{ app.id }}</h1>
             <p class="text-[9px] font-mono font-bold tracking-wide uppercase text-[#a09890] mt-1">{{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}</p>
         </div>
-        <span class="s-badge s-{{ app.status }}">{{ app.status }}</span>
+        <div class="flex flex-col items-end gap-2">
+            <span class="s-badge s-{{ app.status }}">{{ app.status }}</span>
+            {% if app.status == 'pending' %}
+            <div id="actions-{{ app.id }}" class="flex items-center gap-2">
+                <form method="post" action="/approve/{{ app.id }}">
+                    <button type="submit"
+                        class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
+                        data-i18n="btn.approve">Согласовать</button>
+                </form>
+                <button type="button" onclick="showRejectForm({{ app.id }})"
+                    class="ak-btn-ghost border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
+                    data-i18n="btn.rework">На доработку</button>
+            </div>
+            <div id="reject-form-{{ app.id }}" class="hidden w-full max-w-sm">
+                <form method="post" action="/reject/{{ app.id }}" class="flex flex-col gap-2 items-end">
+                    <textarea name="feedback" required rows="2"
+                        data-i18n-ph="rework.ph"
+                        placeholder="Укажите замечания..."
+                        class="ak-input w-full text-xs resize-none"></textarea>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="hideRejectForm({{ app.id }})"
+                            class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                            data-i18n="btn.cancel">Отменить</button>
+                        <button type="submit" class="ak-btn-red text-[9px]" data-i18n="btn.send">Отправить</button>
+                    </div>
+                </form>
+            </div>
+            {% elif app.status == 'approved' %}
+            <div id="actions-approved-{{ app.id }}" class="flex flex-col items-end gap-2">
+                <button type="button" onclick="showReworkApprovedForm({{ app.id }})"
+                    class="ak-btn-ghost border-amber-500/30 text-amber-600 hover:border-amber-500 hover:text-amber-600 dark:text-amber-400 dark:border-amber-400/30"
+                    title="Вернуть на доработку">↩ Rework</button>
+                <div id="rework-approved-form-{{ app.id }}" class="hidden w-full max-w-sm">
+                    <form method="post" action="/rework-approved/{{ app.id }}" class="flex flex-col gap-2 items-end">
+                        <textarea name="feedback" required rows="2"
+                            data-i18n-ph="rework.approved.ph"
+                            placeholder="Причина возврата на доработку..."
+                            class="ak-input w-full text-xs resize-none"></textarea>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="hideReworkApprovedForm({{ app.id }})"
+                                class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                                data-i18n="btn.cancel">Отменить</button>
+                            <button type="submit" class="ak-btn-red text-[9px]" data-i18n="btn.send">Отправить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% elif app.status == 'rework' %}
+            <span class="text-[9px] font-mono text-ak-red dark:text-ak-red-d font-bold">↩ Rework</span>
+            {% elif app.status == 'draft' %}
+            <span class="text-[9px] font-mono text-[#a09890] font-bold">✎ Draft</span>
+            {% endif %}
+        </div>
     </div>
 
     <!-- View Configurator -->

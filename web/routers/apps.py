@@ -57,6 +57,14 @@ async def _render_row(request: Request, app_id: int, *, meeting_basket: bool = F
     )
 
 
+def _is_htmx_request(request: Request) -> bool:
+    return "hx-request" in request.headers
+
+
+def _redirect_to_detail(app_id: int) -> RedirectResponse:
+    return RedirectResponse(url=f"/applications/{app_id}", status_code=303)
+
+
 @router.get("/partials/counters", response_class=HTMLResponse)
 async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admin)):
     counts = await application_service.get_status_counts()
@@ -131,7 +139,9 @@ async def approve_app(
     else:
         logger.warning("Admin {} tried to approve application {}, but it failed", admin_id, app_id)
         
-    return await _render_row(request, app_id)
+    if _is_htmx_request(request):
+        return await _render_row(request, app_id)
+    return _redirect_to_detail(app_id)
 
 
 @router.post("/reject/{app_id}")
@@ -158,7 +168,9 @@ async def reject_app(
     else:
         logger.warning("Admin {} failed to reject application {}", admin_id, app_id)
         
-    return await _render_row(request, app_id)
+    if _is_htmx_request(request):
+        return await _render_row(request, app_id)
+    return _redirect_to_detail(app_id)
 
 
 @router.post("/rework-approved/{app_id}")
@@ -188,8 +200,10 @@ async def rework_approved_app(
             web_wording=True,
         )
 
-    _meeting_basket = "status=approved" in request.headers.get("hx-current-url", "")
-    return await _render_row(request, app_id, meeting_basket=_meeting_basket)
+    if _is_htmx_request(request):
+        _meeting_basket = "status=approved" in request.headers.get("hx-current-url", "")
+        return await _render_row(request, app_id, meeting_basket=_meeting_basket)
+    return _redirect_to_detail(app_id)
 
 
 @router.get("/applications/{app_id}", response_class=HTMLResponse)

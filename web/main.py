@@ -10,9 +10,15 @@ from aiogram import Bot
 from bot.logger import logger
 from bot.config import config
 from stdlib import resources
+from stdlib.services.realtime_events import (
+    ApplicationChangedEvent,
+    subscribe_application_events,
+    unsubscribe_application_events,
+)
 from web.templating import templates
 from web.dependencies import limiter
 from prometheus_fastapi_instrumentator import Instrumentator
+from web.realtime_ws import AdminWsHub
 
 
 from web.routers import auth, settings, apps, meetings
@@ -25,7 +31,14 @@ async def lifespan(app: FastAPI):
         )
     await resources.init_resources()
     app.state.tg_bot = Bot(token=config.BOT_TOKEN)
+    app.state.admin_ws_hub = AdminWsHub()
+
+    async def _broadcast_application_event(event: ApplicationChangedEvent) -> None:
+        await app.state.admin_ws_hub.broadcast_application_changed(event)
+
+    subscribe_application_events(_broadcast_application_event)
     yield
+    unsubscribe_application_events(_broadcast_application_event)
     await resources.shutdown_resources()
     await app.state.tg_bot.session.close()
 

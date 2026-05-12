@@ -4,8 +4,17 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
-from fastapi import APIRouter, Request, Form, Depends, HTTPException, BackgroundTasks
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi import (
+    APIRouter,
+    Request,
+    Form,
+    Depends,
+    HTTPException,
+    BackgroundTasks,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, Response
 from aiogram import Bot
 
 import stdlib.db as db
@@ -19,7 +28,10 @@ from stdlib.services.notification_service import (
     notify_user_application_rework,
 )
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from bot.config import config
 from bot.logger import logger
+from web.auth_session import parse_admin_session
+from web.realtime_ws import AdminWsHub
 from web.templating import templates
 from web.dependencies import get_admin
 
@@ -65,6 +77,43 @@ def _redirect_to_detail(app_id: int) -> RedirectResponse:
     return RedirectResponse(url=f"/applications/{app_id}", status_code=303)
 
 
+def _valid_status_filter(status: str | None) -> str | None:
+    return status if status in ("draft", "pending", "rework", "approved") else None
+
+
+async def _matches_filters(
+    app: Application,
+    *,
+    status_filter: str | None,
+    search_query: str,
+) -> bool:
+    if status_filter and app.status != status_filter:
+        return False
+    if search_query:
+        full_name = (await db.get_user_full_name(app.user_id) or "").strip()
+        if search_query.lower() not in full_name.lower():
+            return False
+    return True
+
+
+@router.websocket("/ws/admin/applications")
+async def applications_ws(websocket: WebSocket):
+    admin_id = parse_admin_session(websocket.cookies.get("admin_session"))
+    if admin_id is None or admin_id not in config.SUPERUSER_IDS:
+        await websocket.close(code=1008)
+        return
+
+    hub: AdminWsHub = websocket.app.state.admin_ws_hub
+    await hub.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await hub.disconnect(websocket)
+
+
 @router.get("/partials/counters", response_class=HTMLResponse)
 async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admin)):
     counts = await application_service.get_status_counts()
@@ -72,6 +121,73 @@ async def dashboard_counters_partial(request: Request, admin_id=Depends(get_admi
         request=request,
         name="dashboard_counters.html",
         context={"request": request, "counts": counts},
+    )
+
+
+@router.get("/partials/row/{app_id}", response_class=HTMLResponse)
+async def dashboard_row_partial(
+    request: Request,
+    app_id: int,
+    status: str | None = None,
+    q: str | None = None,
+    admin_id=Depends(get_admin),
+):
+    app = await application_service.get_application(app_id)
+    if not app:
+        return Response(status_code=204)
+
+    status_filter = _valid_status_filter(status)
+    search_query = (q or "").strip()
+    if not await _matches_filters(app, status_filter=status_filter, search_query=search_query):
+        return Response(status_code=204)
+
+    row = app.model_dump()
+    row["full_name"] = await db.get_user_full_name(app.user_id)
+    meeting_basket = status_filter == "approved"
+    return templates.TemplateResponse(
+        request=request,
+        name="row.html",
+        context={
+            "request": request,
+            "app": _parse_app(row),
+            "meeting_basket": meeting_basket,
+        },
+    )
+
+
+@router.get("/partials/application-meta/{app_id}", response_class=HTMLResponse)
+async def application_meta_partial(
+    request: Request,
+    app_id: int,
+    admin_id=Depends(get_admin),
+):
+    app = await application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    row = app.model_dump()
+    row["full_name"] = await db.get_user_full_name(app.user_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="application_detail_meta.html",
+        context={"request": request, "app": _parse_app(row)},
+    )
+
+
+@router.get("/partials/application-feedback/{app_id}", response_class=HTMLResponse)
+async def application_feedback_partial(
+    request: Request,
+    app_id: int,
+    admin_id=Depends(get_admin),
+):
+    app = await application_service.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    row = app.model_dump()
+    row["full_name"] = await db.get_user_full_name(app.user_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="application_detail_feedback.html",
+        context={"request": request, "app": _parse_app(row)},
     )
 
 
@@ -95,9 +211,7 @@ async def dashboard(
         dest = "/" + ("?" + urlencode(query_params) if query_params else "")
         return RedirectResponse(url=dest, status_code=302)
 
-    status_filter = (
-        status if status in ("draft", "pending", "rework", "approved") else None
-    )
+    status_filter = _valid_status_filter(status)
     search_query = (q or "").strip()
     raw_apps = await application_service.list_applications(status_filter, search_query)
 

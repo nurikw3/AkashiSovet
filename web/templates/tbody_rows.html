@@ -2,7 +2,7 @@
 {% include "row.html" %}
 {% endfor %}
 {% if not apps %}
-<tr>
+<tr data-empty-state="1">
     <td colspan="{{ 8 if meeting_basket else 7 }}" class="px-5 py-16 text-center border-b border-[#F0EBE3] dark:border-[#1E1E1E]">
         <div class="flex flex-col items-center justify-center">
             <div class="text-3xl mb-4 opacity-50">📭</div>

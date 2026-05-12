@@ -5,6 +5,7 @@ from __future__ import annotations
 import stdlib.db as db
 from stdlib.models import Application, ApplicationAttachment
 from stdlib.pdf import invalidate_pdf_content_cache
+from stdlib.services.realtime_events import publish_application_changed
 
 
 async def list_applications(
@@ -85,6 +86,11 @@ async def submit_to_review(
 ) -> None:
     """Переводит заявку в `pending`, фиксирует время подачи."""
     await db.update_status_and_submit(app_id, "pending", pdf_file_id=pdf_file_id)
+    await publish_application_changed(
+        app_id,
+        status="pending",
+        event_type="created",
+    )
 
 
 async def update_submission_pdf_reference(app_id: int, pdf_file_id: str) -> None:
@@ -101,7 +107,13 @@ async def approve(app_id: int) -> Application | None:
     """Согласование заявки."""
     await db.update_status(app_id, "approved")
     await db.set_t_decision(app_id)
-    return await get_application(app_id)
+    app = await get_application(app_id)
+    await publish_application_changed(
+        app_id,
+        status=app.status if app else "approved",
+        event_type="status_changed",
+    )
+    return app
 
 
 async def send_for_rework(app_id: int, feedback: str) -> Application | None:
@@ -109,7 +121,13 @@ async def send_for_rework(app_id: int, feedback: str) -> Application | None:
     await db.update_status(app_id, "rework", feedback=feedback)
     await db.set_t_decision(app_id)
     await db.increment_reject_count(app_id)
-    return await get_application(app_id)
+    app = await get_application(app_id)
+    await publish_application_changed(
+        app_id,
+        status=app.status if app else "rework",
+        event_type="status_changed",
+    )
+    return app
 
 
 async def append_attachments(

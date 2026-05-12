@@ -294,6 +294,186 @@
 
         /* Re-apply i18n after HTMX swaps */
         document.addEventListener('htmx:afterSettle', e => applyI18n(e.detail.elt));
+
+        async function fetchText(url) {
+            const response = await fetch(url, { credentials: 'same-origin' });
+            const text = await response.text();
+            return { response, text };
+        }
+
+        function upsertRowIntoTable(tbody, rowHtml, rowId) {
+            const oldEmpty = tbody.querySelector('tr[data-empty-state="1"]');
+            if (oldEmpty) oldEmpty.remove();
+            const existing = document.getElementById(rowId);
+            if (existing) {
+                existing.outerHTML = rowHtml;
+                return;
+            }
+            tbody.insertAdjacentHTML('afterbegin', rowHtml);
+        }
+
+        async function syncDashboardBody(urlSearch) {
+            const tbody = document.getElementById('app-table-body');
+            if (!tbody) return;
+            const query = urlSearch ? `?${urlSearch}` : '';
+            const url = `/${query}`;
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                headers: {
+                    'HX-Request': 'true',
+                    'HX-Target': 'app-table-body',
+                },
+            });
+            if (!response.ok) return;
+            tbody.innerHTML = await response.text();
+            applyI18n(tbody);
+        }
+
+        async function refreshDashboardCounters() {
+            const counters = document.getElementById('dashboard-counters');
+            if (!counters) return;
+            const response = await fetch('/partials/counters', { credentials: 'same-origin' });
+            if (!response.ok) return;
+            counters.innerHTML = await response.text();
+            applyI18n(counters);
+        }
+
+        async function handleDashboardRealtime(eventData) {
+            const tbody = document.getElementById('app-table-body');
+            if (!tbody) return;
+            const appId = eventData.app_id;
+            const params = new URLSearchParams(window.location.search);
+            const status = params.get('status') || '';
+            const q = params.get('q') || '';
+            const rowUrl =
+                `/partials/row/${encodeURIComponent(appId)}?status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}`;
+            const { response, text } = await fetchText(rowUrl);
+            const rowId = `row-${appId}`;
+            const existing = document.getElementById(rowId);
+            if (response.status === 204) {
+                if (existing) existing.remove();
+            } else if (response.ok && text.trim()) {
+                upsertRowIntoTable(tbody, text, rowId);
+            }
+            const hasDataRows = !!tbody.querySelector('tr[id^="row-"]');
+            if (!hasDataRows) {
+                await syncDashboardBody(params.toString());
+            }
+            await refreshDashboardCounters();
+        }
+
+        async function handleDetailRealtime(eventData) {
+            const root = document.getElementById('application-detail-root');
+            if (!root) return;
+            const pageAppId = Number(root.dataset.appId || '0');
+            if (!pageAppId || pageAppId !== Number(eventData.app_id)) return;
+
+            const meta = document.getElementById('app-detail-meta');
+            if (meta) {
+                const { response, text } = await fetchText(`/partials/application-meta/${pageAppId}`);
+                if (response.ok && text.trim()) {
+                    meta.outerHTML = text;
+                }
+            }
+
+            const feedback = document.getElementById('app-detail-feedback');
+            if (feedback) {
+                const { response, text } = await fetchText(`/partials/application-feedback/${pageAppId}`);
+                if (response.ok && text.trim()) {
+                    feedback.outerHTML = text;
+                }
+            }
+        }
+
+        async function handleMeetingRealtime(eventData) {
+            const root = document.getElementById('meeting-detail-root');
+            const tbody = document.getElementById('meeting-app-table-body');
+            if (!root || !tbody) return;
+            const meetingId = Number(root.dataset.meetingId || '0');
+            const appId = Number(eventData.app_id);
+            if (!meetingId || !appId) return;
+
+            const { response, text } = await fetchText(
+                `/meetings/partials/app_row/${appId}?meeting_id=${meetingId}`
+            );
+            const rowId = `meeting-row-${appId}`;
+            const existing = document.getElementById(rowId);
+            if (response.status === 204) {
+                if (existing) existing.remove();
+                return;
+            }
+            if (response.ok && text.trim()) {
+                if (existing) existing.outerHTML = text;
+                else tbody.insertAdjacentHTML('beforeend', text);
+            }
+        }
+
+        function initRealtimeSocket() {
+            if (window.__akRealtimeSocketStarted) return;
+            window.__akRealtimeSocketStarted = true;
+            let ws = null;
+            let retryMs = 1000;
+            let heartbeat = null;
+            let polling = null;
+
+            const startFallbackPolling = () => {
+                if (polling) return;
+                polling = setInterval(() => {
+                    refreshDashboardCounters();
+                    syncDashboardBody(new URLSearchParams(window.location.search).toString());
+                }, 30000);
+            };
+
+            const stopFallbackPolling = () => {
+                if (!polling) return;
+                clearInterval(polling);
+                polling = null;
+            };
+
+            const connect = () => {
+                const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                ws = new WebSocket(`${proto}://${window.location.host}/ws/admin/applications`);
+
+                ws.addEventListener('open', () => {
+                    retryMs = 1000;
+                    stopFallbackPolling();
+                    heartbeat = setInterval(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+                    }, 20000);
+                });
+
+                ws.addEventListener('message', async (evt) => {
+                    let payload = null;
+                    try {
+                        payload = JSON.parse(evt.data);
+                    } catch (_) {
+                        return;
+                    }
+                    if (!payload || payload.type !== 'application_changed') return;
+                    await handleDashboardRealtime(payload);
+                    await handleDetailRealtime(payload);
+                    await handleMeetingRealtime(payload);
+                });
+
+                ws.addEventListener('close', () => {
+                    if (heartbeat) {
+                        clearInterval(heartbeat);
+                        heartbeat = null;
+                    }
+                    startFallbackPolling();
+                    setTimeout(connect, retryMs);
+                    retryMs = Math.min(retryMs * 2, 30000);
+                });
+
+                ws.addEventListener('error', () => {
+                    if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+                });
+            };
+
+            connect();
+        }
+
+        document.addEventListener('DOMContentLoaded', initRealtimeSocket);
     </script>
 
     <style>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="anim-fade max-w-4xl mx-auto pb-8">
+<div id="meeting-detail-root" data-meeting-id="{{ meeting.id }}" class="anim-fade max-w-4xl mx-auto pb-8">
     <nav class="mb-6">
         <a href="/meetings"
             class="text-[8px] font-mono tracking-widest uppercase text-[#a09890] hover:text-ak-red transition-colors"
@@ -70,35 +70,9 @@
         {% if apps %}
         <div class="border border-[#DDD8CE] dark:border-[#242424] rounded overflow-hidden bg-white dark:bg-[#141414]">
             <table class="w-full ak-table">
-                <tbody>
+                <tbody id="meeting-app-table-body">
                     {% for app in apps %}
-                    <tr
-                        class="hover:bg-[#FDFAF7] dark:hover:bg-[#181818] transition-colors group border-b border-[#F0EBE3] dark:border-[#1E1E1E] last:border-0">
-                        <td class="px-5 py-4 w-12 text-[9px] font-mono text-[#b0a8a0]">#{{ app.id }}</td>
-                        <td class="px-5 py-4">
-                            <a href="/applications/{{ app.id }}"
-                                class="block font-bold text-sm text-[#111111] dark:text-[#EDE8DF] hover:text-ak-red dark:hover:text-ak-red-d transition-colors leading-snug">
-                                {{ app.topic }}
-                            </a>
-                            <p class="text-[8px] font-mono text-[#a09890] mt-1.5 uppercase tracking-wide">
-                                {{ app.display_name }}{% if app.position %} · {{ app.position }}{% endif %}
-                            </p>
-                        </td>
-                        <td class="px-5 py-4 w-32 text-right whitespace-nowrap">
-                            <span class="s-badge s-{{ app.status }} block mb-2">{{ app.status }}</span>
-                            <a href="/download/{{ app.id }}" target="_blank"
-                                class="inline-block text-[8px] font-mono font-bold tracking-widest uppercase text-ak-red dark:text-ak-red-d hover:underline">📄
-                                PDF</a>
-                            <form method="post" action="/meetings/{{ meeting.id }}/remove_app/{{ app.id }}"
-                                onsubmit="return confirmRemoveFromMeeting({{ app.id }})" class="mt-2">
-                                <button type="submit"
-                                    class="text-[8px] font-mono tracking-widest text-[#b0a8a0] hover:text-ak-red transition-colors"
-                                    data-i18n="meeting.remove">
-                                    ✕ убрать
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
+                    {% include "meeting_detail_app_row.html" %}
                     {% endfor %}
                 </tbody>
             </table>

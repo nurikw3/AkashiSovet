@@ -125,6 +125,30 @@ async def meeting_detail_page(
     )
 
 
+@router.get("/partials/app_row/{app_id}", response_class=HTMLResponse)
+async def meeting_app_row_partial(
+    request: Request,
+    app_id: int,
+    meeting_id: int,
+    admin_id=Depends(get_admin),
+):
+    meeting = await meeting_service.get_by_id(meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Заседание не найдено")
+    if app_id not in meeting.application_ids:
+        return HTMLResponse(status_code=204, content="")
+
+    app_raw = await db.get_app(app_id)
+    if not app_raw:
+        return HTMLResponse(status_code=204, content="")
+    app = _parse_app(app_raw)
+    return templates.TemplateResponse(
+        request=request,
+        name="meeting_detail_app_row.html",
+        context={"request": request, "meeting": meeting, "app": app},
+    )
+
+
 @router.post("/{meeting_id}/schedule")
 async def meeting_update_schedule(
     request: Request, meeting_id: int, admin_id=Depends(get_admin)

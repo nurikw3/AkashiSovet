@@ -1,0 +1,1 @@
+{"input":{"task_type":"format_text","raw":"Сделать отчет побыстрее","context_blocks":{"1":"Цель проекта: оптимизация отчетности"},"block_number":1,"generate":false},"expected_output":"Подготовить отчет в сокращенные сроки.","metadata":{"suite":"smoke","scenario":"business-style-rewrite"}}

@@ -142,6 +142,51 @@ uv run python -m bot.bot
 ```
 *(Note: You will still need the database, Redis, and MinIO running locally or via `docker-compose.yaml` without the bot/web services).*
 
+### LLM-as-Judge Eval Pipeline
+
+You can run LLM evaluation experiments through Langfuse with a dedicated CLI:
+
+```sh
+# Run on a local JSONL dataset
+uv run python scripts/run_langfuse_eval.py \
+  --data-file scripts/eval_sample.jsonl \
+  --experiment-name akashisovet-llm-eval
+```
+
+```sh
+# Run on an existing Langfuse dataset
+uv run python scripts/run_langfuse_eval.py \
+  --dataset-name akashisovet-format-text \
+  --experiment-name akashisovet-llm-eval
+```
+
+Expected input item format (`jsonl` or `json` list):
+
+```json
+{
+  "input": {
+    "task_type": "format_text",
+    "raw": "Сделать отчет побыстрее",
+    "context_blocks": {
+      "1": "Цель проекта: оптимизация отчетности"
+    },
+    "block_number": 1,
+    "generate": false
+  },
+  "expected_output": "Подготовить отчет в сокращенные сроки.",
+  "metadata": {
+    "suite": "smoke"
+  }
+}
+```
+
+Judge behavior is configured through:
+- `LANGFUSE_EVAL_JUDGE_MODEL`
+- `LANGFUSE_EVAL_JUDGE_TEMPERATURE`
+- `LANGFUSE_EVAL_PASS_THRESHOLD`
+- `LANGFUSE_EVAL_MAX_CONCURRENCY`
+- `LANGFUSE_EVAL_MAX_TOKENS`
+
 <br/>
 
 ## 📂 Project Structure

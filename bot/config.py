@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str = ""
     LANGFUSE_SECRET_KEY: str = ""
     LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
+    LANGFUSE_EVAL_JUDGE_MODEL: str = "gpt-4o-mini"
+    LANGFUSE_EVAL_JUDGE_TEMPERATURE: float = 0.0
+    LANGFUSE_EVAL_PASS_THRESHOLD: float = 0.7
+    LANGFUSE_EVAL_MAX_CONCURRENCY: int = 5
+    LANGFUSE_EVAL_MAX_TOKENS: int = 800
 
     # Logging
     LOG_DIR: str = "logs"

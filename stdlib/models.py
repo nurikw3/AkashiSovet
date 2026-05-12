@@ -1,4 +1,4 @@
-"""Централизованные Pydantic-модели домена (заявки, пользователи, шаблон, заседания)."""
+"""Централизованные Pydantic-модели домена и eval-контура."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from stdlib.template import ApplicationTemplate, BlockDefinition
+from stdlib.template import ApplicationTemplate
 
 ApplicationStatus = Literal["draft", "pending", "approved", "rework"]
+EvalTaskType = Literal["format_text", "free_form"]
 
 
 class ApplicationAttachment(BaseModel):
@@ -161,3 +162,60 @@ class Meeting(BaseModel):
         if not isinstance(raw, list):
             return []
         return [int(x) for x in raw]
+
+
+class EvalTaskInput(BaseModel):
+    """Вход одного eval-кейса для целевого LLM-сценария."""
+
+    task_type: EvalTaskType = "format_text"
+    raw: str = ""
+    context_blocks: dict[str, str] = Field(default_factory=dict)
+    user_id: int | None = None
+    app_id: int | None = None
+    block_number: int | None = None
+    generate: bool = False
+    history: list[ChatMessage] = Field(default_factory=list)
+
+    @field_validator("context_blocks", mode="before")
+    @classmethod
+    def _parse_context_blocks(cls, v: Any) -> dict[str, str]:
+        if v is None or v == "":
+            return {}
+        if isinstance(v, str):
+            data = json.loads(v)
+        else:
+            data = v
+        if not isinstance(data, dict):
+            return {}
+        return {str(k): str(val) for k, val in data.items() if val is not None}
+
+
+class EvalDatasetItem(BaseModel):
+    """Полный eval-кейс для прогона через Langfuse experiment."""
+
+    id: str | None = None
+    input: EvalTaskInput
+    expected_output: str | dict[str, Any] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMJudgeScore(BaseModel):
+    """Структурированный вердикт judge-модели по одному кейсу."""
+
+    score: float = Field(ge=0.0, le=1.0)
+    passed: bool
+    reasoning: str
+    strengths: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    suggested_fix: str | None = None
+
+
+class EvalRunSummary(BaseModel):
+    """Сводка eval-прогона для CLI-вывода."""
+
+    experiment_name: str
+    run_name: str
+    item_count: int
+    average_score: float | None = None
+    pass_rate: float | None = None
+    dataset_run_url: str | None = None

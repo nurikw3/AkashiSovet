@@ -29,6 +29,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     send_fn = (
         message.answer if isinstance(message, Message) else message.message.answer
     )
+    progress_message = await send_fn("⏳ Генерация PDF...")
 
     # Сначала пробуем получить PDF-буфер через общую функцию
     try:
@@ -63,10 +64,18 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             t_pdf,
             t_send,
         )
+        try:
+            await progress_message.delete()
+        except Exception:
+            pass
         return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
 
     except Exception as e:
         logger.warning("PDF fallback: {}", e)
+        try:
+            await progress_message.delete()
+        except Exception:
+            pass
         # Если что-то пошло не так — текстом тем же форматом, что и сводка к файлам
 
     # --- ФОЛЛБЕК: PDF недоступен ---

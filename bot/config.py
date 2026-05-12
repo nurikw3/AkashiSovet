@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     LOG_ERRORS_RETENTION_DAYS: int = 30
     LOG_CLEAN_ON_START: bool = False
     LOG_MAX_TOTAL_MB: int = 1024
+    # Telegram send_document throttling / retries (for burst load)
+    TG_SEND_DOCUMENT_MAX_CONCURRENCY: int = 6
+    TG_SEND_DOCUMENT_MAX_RETRIES: int = 4
+    TG_SEND_DOCUMENT_MAX_BACKOFF_SEC: float = 10.0
+    TG_SEND_DOCUMENT_JITTER_SEC: float = 0.2
+    TG_PDF_QUEUE_KEY: str = "queue:pdf_delivery"
+    TG_PDF_QUEUE_WORKERS: int = 1
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

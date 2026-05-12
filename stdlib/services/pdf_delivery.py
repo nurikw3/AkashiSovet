@@ -1,14 +1,54 @@
 from __future__ import annotations
 
+import asyncio
+import random
 from io import BytesIO
 from time import perf_counter
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import BufferedInputFile, Message
 
+from bot.config import config
 from bot.logger import logger
 from stdlib.services import application_service
+
+_SEND_DOCUMENT_SEMAPHORE = asyncio.Semaphore(
+    max(1, config.TG_SEND_DOCUMENT_MAX_CONCURRENCY)
+)
+
+
+async def _send_document_throttled(*, bot: Bot, **kwargs) -> Message:
+    """Отправка документа с ограничением параллелизма и ретраями на TelegramRetryAfter."""
+    max_retries = max(1, int(config.TG_SEND_DOCUMENT_MAX_RETRIES))
+    max_backoff = max(0.1, float(config.TG_SEND_DOCUMENT_MAX_BACKOFF_SEC))
+    jitter_sec = max(0.0, float(config.TG_SEND_DOCUMENT_JITTER_SEC))
+
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            async with _SEND_DOCUMENT_SEMAPHORE:
+                return await bot.send_document(**kwargs)
+        except TelegramRetryAfter as exc:
+            retry_after = float(getattr(exc, "retry_after", 1.0) or 1.0)
+            wait_sec = min(max_backoff, max(0.1, retry_after))
+            if jitter_sec > 0:
+                wait_sec += random.uniform(0.0, jitter_sec)
+            if attempt >= max_retries:
+                logger.warning(
+                    "PDF send rate-limited; retries exhausted | attempts={} wait_sec={:.2f}",
+                    attempt,
+                    wait_sec,
+                )
+                raise
+            logger.warning(
+                "PDF send rate-limited; retrying | attempt={}/{} wait_sec={:.2f}",
+                attempt,
+                max_retries,
+                wait_sec,
+            )
+            await asyncio.sleep(wait_sec)
 
 
 async def send_pdf_with_cache(
@@ -25,7 +65,8 @@ async def send_pdf_with_cache(
     if pdf_file_id:
         try:
             started_at = perf_counter()
-            message = await bot.send_document(
+            message = await _send_document_throttled(
+                bot=bot,
                 chat_id=chat_id,
                 document=pdf_file_id,
                 caption=caption,
@@ -49,7 +90,8 @@ async def send_pdf_with_cache(
 
     payload = pdf_buffer.getvalue()
     started_at = perf_counter()
-    message = await bot.send_document(
+    message = await _send_document_throttled(
+        bot=bot,
         chat_id=chat_id,
         document=BufferedInputFile(payload, filename=filename),
         caption=caption,

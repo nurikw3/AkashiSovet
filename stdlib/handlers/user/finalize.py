@@ -11,6 +11,7 @@ from bot.config import config
 from bot.logger import logger
 from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
 from stdlib.services.pdf_delivery import send_pdf_with_cache
+from stdlib.services.pdf_delivery_queue import enqueue_pdf_delivery
 from stdlib.timezone_util import now_app
 
 import asyncio
@@ -52,8 +53,6 @@ async def finalize_and_notify(
         await state.update_data(cleanup_bot_message_ids=cleanup_ids[-120:])
         return
 
-    blocks = json.loads(app.get("blocks") or "{}")
-
     raw_att = app.get("attachments")
     try:
         attachments = (
@@ -64,60 +63,46 @@ async def finalize_and_notify(
     except Exception:
         attachments = []
 
-    # 1. Генерируем PDF через нашу общую функцию
-    try:
-        pdf_buffer = await get_app_pdf_buffer(app_id)
-    except Exception as e:
-        logger.error("PDF generation error for app_id={}: {}", app_id, e)
-        text_fallback = (
-            f"⚠️ <b>Новая заявка #{app_id}</b> (PDF не сгенерирован)\n\n"
-            + "\n".join(f"<b>Блок {k}:</b> {v}" for k, v in blocks.items())
-        )
-        for su_id in config.SUPERUSER_IDS:
-            await bot.send_message(su_id, text_fallback, parse_mode="HTML")
-
-        await application_service.submit_to_review(app_id)
-        err_msg = await callback.message.answer(
-            "📤 Заявка отправлена (без PDF — техническая ошибка)."
-        )
-        cleanup_ids.append(err_msg.message_id)
-        await state.set_state(None)
-        await state.update_data(
-            cleanup_bot_message_ids=cleanup_ids[-120:],
-            cleanup_app_id=app_id,
-        )
-        return
-
-    # 2. Переводим в pending (время подачи)
+    # 1. Переводим в pending (время подачи)
     await application_service.submit_to_review(app_id)
 
-    # 3. Достаем данные и формируем красивое имя файла ОДИН раз
+    # 2. Достаем данные для имени файла в fallback-ветке
     created_at = app.get("created_at") or now_app()
-    pdf_file_id = app.get("pdf_file_id")
-
     custom_filename = generate_pdf_filename(full_name, position, created_at)
 
-    # 4. Отправляем копию пользователю
-    try:
-        user_pdf_msg = await send_pdf_with_cache(
-            bot=callback.message.bot,
-            chat_id=callback.message.chat.id,
-            app_id=app_id,
-            pdf_file_id=pdf_file_id,
-            pdf_buffer=pdf_buffer,
-            filename=custom_filename,
-            caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
+    # 3. Отправляем копию пользователю через очередь (не блокируем update-loop)
+    queued = await enqueue_pdf_delivery(
+        app_id=app_id,
+        chat_id=callback.message.chat.id,
+        filename=custom_filename,
+        caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
+    )
+    if queued:
+        queued_msg = await callback.message.answer(
+            "📤 Заявка отправлена на согласование.\n\n⏳ Генерация PDF..."
         )
-        if user_pdf_msg.document and user_pdf_msg.document.file_id:
-            pdf_file_id = user_pdf_msg.document.file_id
-    except TelegramBadRequest as e:
-        if "file is too big" not in str(e).lower():
-            raise
-        logger.warning("User PDF too big for Telegram | app_id={} err={}", app_id, e)
-        await callback.message.answer(
-            "📤 Заявка отправлена на согласование.\n\n"
-            "⚠️ Копию PDF не удалось отправить в чат: файл слишком большой для Telegram."
-        )
+        cleanup_ids.append(queued_msg.message_id)
+    else:
+        # Fallback, если Redis временно недоступен.
+        try:
+            pdf_buffer = await get_app_pdf_buffer(app_id)
+            await send_pdf_with_cache(
+                bot=callback.message.bot,
+                chat_id=callback.message.chat.id,
+                app_id=app_id,
+                pdf_file_id=app.get("pdf_file_id"),
+                pdf_buffer=pdf_buffer,
+                filename=custom_filename,
+                caption="📤 Заявка успешно сформирована и отправлена на согласование. Копия приложена выше.",
+            )
+        except TelegramBadRequest as e:
+            if "file is too big" not in str(e).lower():
+                raise
+            logger.warning("User PDF too big for Telegram | app_id={} err={}", app_id, e)
+            await callback.message.answer(
+                "📤 Заявка отправлена на согласование.\n\n"
+                "⚠️ Копию PDF не удалось отправить в чат: файл слишком большой для Telegram."
+            )
 
     done_msg = await callback.message.answer(
         "Когда проверите, можно очистить служебные сообщения этой заявки:",

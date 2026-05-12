@@ -13,6 +13,10 @@ from bot.logger import logger, setup_logging, InterceptHandler, prepare_log_stor
 import stdlib.db as db
 from stdlib import resources
 from stdlib.handlers import user, superuser
+from stdlib.services.pdf_delivery_queue import (
+    start_pdf_delivery_workers,
+    stop_pdf_delivery_workers,
+)
 from stdlib.timezone_util import APP_TIMEZONE
 
 prepare_log_storage(
@@ -78,6 +82,7 @@ async def main() -> None:
     dp.include_router(superuser.router)
 
     await resources.init_resources()
+    pdf_queue_tasks, pdf_queue_stop = start_pdf_delivery_workers(bot)
 
     # test mode
     # scheduler.add_job(
@@ -111,6 +116,7 @@ async def main() -> None:
     finally:
         logger.info("🛑 Shutting down...")
         scheduler.shutdown(wait=False)
+        await stop_pdf_delivery_workers(pdf_queue_tasks, pdf_queue_stop)
         await dp.storage.close()
         await resources.shutdown_resources()
         await bot.session.close()

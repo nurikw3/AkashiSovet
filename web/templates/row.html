@@ -91,15 +91,17 @@
     <td class="px-4 py-3 text-right">
         {% if app.status == 'pending' %}
         <div id="actions-{{ app.id }}" class="flex items-center justify-end gap-2">
-            <button hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
-                class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
-                data-i18n="btn.approve">Согласовать</button>
+            <form method="post" action="/approve/{{ app.id }}" hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML">
+                <button
+                    class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
+                    data-i18n="btn.approve">Согласовать</button>
+            </form>
             <button onclick="showRejectForm({{ app.id }})"
                 class="ak-btn-ghost border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
                 data-i18n="btn.rework">На доработку</button>
         </div>
         <div id="reject-form-{{ app.id }}" class="hidden mt-2">
-            <form hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
+            <form method="post" action="/reject/{{ app.id }}" hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
                   class="flex flex-col gap-2 items-end">
                 <textarea name="feedback" required rows="2"
                     data-i18n-ph="rework.ph"
@@ -123,7 +125,7 @@
                     title="Вернуть на доработку">↩ Rework</button>
             </div>
             <div id="rework-approved-form-{{ app.id }}" class="hidden mt-2">
-                <form hx-post="/rework-approved/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
+                <form method="post" action="/rework-approved/{{ app.id }}" hx-post="/rework-approved/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
                       class="flex flex-col gap-2 items-end">
                     <textarea name="feedback" required rows="2"
                         data-i18n-ph="rework.approved.ph"

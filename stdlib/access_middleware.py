@@ -12,7 +12,8 @@ class AccessControlMiddleware(BaseMiddleware):
     """Пропускает только SUPERUSER_IDS и пользователей из allowlist в БД."""
 
     async def __call__(self, handler, event: TelegramObject, data: dict):
-        user = getattr(event, "from_user", None)
+        # Для update-level middleware aiogram передаёт пользователя в data["event_from_user"].
+        user = data.get("event_from_user") or getattr(event, "from_user", None)
         user_id = getattr(user, "id", None)
 
         # Фейлим "закрыто": без user_id update не обрабатываем.

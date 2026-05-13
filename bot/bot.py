@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bot.config import config
 from bot.logger import logger, setup_logging, InterceptHandler, prepare_log_storage
 import stdlib.db as db
+from stdlib.access_middleware import AccessControlMiddleware
 from stdlib import resources
 from stdlib.handlers import user, superuser
 from stdlib.services.pdf_delivery_queue import (
@@ -77,6 +78,7 @@ async def main() -> None:
 
     redis_storage = RedisStorage(redis=fsm_redis_client)
     dp = Dispatcher(storage=redis_storage)
+    dp.update.outer_middleware(AccessControlMiddleware())
 
     dp.include_router(user.router)
     dp.include_router(superuser.router)

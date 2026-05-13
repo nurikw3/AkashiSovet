@@ -50,6 +50,12 @@ async def init_db() -> None:
                 login       TEXT UNIQUE,
                 hashed_password TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS allowed_telegram_users (
+                user_id     BIGINT PRIMARY KEY,
+                added_by    BIGINT,
+                created_at  TIMESTAMPTZ DEFAULT NOW()
+            );
         """)
     logger.info("Database initialized: {}", config.DATABASE_URL)
 
@@ -316,6 +322,65 @@ async def set_user_mode(user_id: int, mode: str) -> None:
         await conn.execute(
             "UPDATE users SET mode = $1 WHERE user_id = $2", mode, user_id
         )
+
+
+# ─── Access control ───────────────────────────────────────────────────────────
+
+
+async def is_user_allowed(user_id: int) -> bool:
+    async with _pool_conn() as conn:
+        exists = await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM allowed_telegram_users WHERE user_id = $1)",
+            user_id,
+        )
+    return bool(exists)
+
+
+async def add_allowed_user(user_id: int, added_by: int | None = None) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """
+            INSERT INTO allowed_telegram_users (user_id, added_by)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE SET added_by = EXCLUDED.added_by
+            """,
+            user_id,
+            added_by,
+        )
+
+
+async def add_allowed_users(user_ids: list[int], added_by: int | None = None) -> int:
+    unique_ids = sorted({int(uid) for uid in user_ids if int(uid) > 0})
+    if not unique_ids:
+        return 0
+
+    async with _pool_conn() as conn:
+        await conn.executemany(
+            """
+            INSERT INTO allowed_telegram_users (user_id, added_by)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE SET added_by = EXCLUDED.added_by
+            """,
+            [(uid, added_by) for uid in unique_ids],
+        )
+    return len(unique_ids)
+
+
+async def remove_allowed_user(user_id: int) -> bool:
+    async with _pool_conn() as conn:
+        row = await conn.fetchrow(
+            "DELETE FROM allowed_telegram_users WHERE user_id = $1 RETURNING user_id",
+            user_id,
+        )
+    return row is not None
+
+
+async def list_allowed_users() -> list[int]:
+    async with _pool_conn() as conn:
+        rows = await conn.fetch(
+            "SELECT user_id FROM allowed_telegram_users ORDER BY created_at ASC"
+        )
+    return [int(r["user_id"]) for r in rows]
 
 
 # ─── Chat History ─────────────────────────────────────────────────────────────

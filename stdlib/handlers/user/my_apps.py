@@ -10,7 +10,7 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
 import stdlib.keyboards as kb
-from stdlib.pdf import get_app_pdf_buffer
+from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from stdlib.handlers.states import BotStates
 from stdlib.template import get_template
 from bot.logger import logger
@@ -220,6 +220,13 @@ async def cb_dl(callback: CallbackQuery):
         if not app:
             await callback.message.answer("❌ Заявка не найдена")
             return
+        created_at = app.get("created_at")
+        file_name = resolve_application_pdf_filename(
+            app,
+            full_name=None,
+            position=None,
+            dt=created_at,
+        )
         buf = await get_app_pdf_buffer(app_id)
         await send_pdf_with_cache(
             bot=callback.message.bot,
@@ -227,7 +234,7 @@ async def cb_dl(callback: CallbackQuery):
             app_id=app_id,
             pdf_file_id=app.get("pdf_file_id"),
             pdf_buffer=buf,
-            filename=f"app_{app_id}.pdf",
+            filename=file_name,
             caption=f"📄 #{app_id}",
         )
     except TelegramBadRequest as e:

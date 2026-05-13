@@ -13,7 +13,7 @@ from bot.config import config
 from bot.logger import logger
 import stdlib.db as db
 import stdlib.s3 as s3
-from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from stdlib.template import get_template
 from stdlib.timezone_util import now_app
 from stdlib.timing import timed_task
@@ -144,7 +144,12 @@ async def notify_user_application_rework(
                 if not pdf_bytes:
                     source = "generated"
                 created_at = app_row.get("created_at") or now_app()
-                custom_filename = generate_pdf_filename(full_name, position, created_at)
+                custom_filename = resolve_application_pdf_filename(
+                    app_row,
+                    full_name=full_name,
+                    position=position,
+                    dt=created_at,
+                )
 
                 sent = await bot.send_document(
                     user_id,

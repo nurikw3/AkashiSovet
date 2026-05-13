@@ -51,3 +51,20 @@ async def upload_signature_image(
         image_bytes, key, s3.BUCKET_SIGNATURES, content_type=content_type
     )
     return key
+
+
+async def upload_main_pdf(
+    user_id: int, app_id: int, pdf_bytes: bytes, filename: str
+) -> tuple[str, str]:
+    """Загружает пользовательский основной PDF и возвращает (s3_key, display_name)."""
+    display = PurePosixPath(filename).name.strip() or "application.pdf"
+    key = s3.uploaded_main_pdf_key(
+        user_id, app_id, _object_key_component(display)
+    )
+    await s3.upload_bytes(pdf_bytes, key, s3.BUCKET_PDF, "application/pdf")
+    return key, display
+
+
+async def download_main_pdf(key: str) -> bytes | None:
+    """Скачивает пользовательский основной PDF из pdf-бакета."""
+    return await s3.download_bytes(key, s3.BUCKET_PDF)

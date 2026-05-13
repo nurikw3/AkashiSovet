@@ -3,6 +3,7 @@ import mimetypes
 
 import stdlib.keyboards as kb
 import stdlib.s3 as s3
+from stdlib.pdf import invalidate_pdf_delivery_cache
 from stdlib.services import application_service, file_service
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -36,7 +37,15 @@ def _attachment_name(att: dict, idx: int) -> str:
 
 def _files_keyboard_for(attachments: list[dict]):
     names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
-    return kb.files_keyboard(names)
+    return kb.files_keyboard_with_main_pdf(names)
+
+
+def _files_keyboard_for_app(raw_app: dict, attachments: list[dict]):
+    names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
+    return kb.files_keyboard_with_main_pdf(
+        names,
+        has_main_pdf=bool(raw_app.get("main_pdf_s3_key")),
+    )
 
 
 @router.message(BotStates.FILLING, F.document | F.photo)
@@ -56,7 +65,7 @@ async def handle_file(message: Message, state: FSMContext):
         await message.answer(
             "❌ Загрузка файлов недоступна: не настроено объектное хранилище (S3). "
             "Обратитесь к администратору.",
-            reply_markup=_files_keyboard_for(attachments),
+            reply_markup=_files_keyboard_for_app(app, attachments),
         )
         return
 
@@ -90,14 +99,14 @@ async def handle_file(message: Message, state: FSMContext):
         logger.error("S3 upload failed | app_id={} err={}", app_id, e)
         await message.answer(
             "❌ Не удалось сохранить файл в хранилище. Попробуйте позже или обратитесь к администратору.",
-            reply_markup=_files_keyboard_for(attachments),
+            reply_markup=_files_keyboard_for_app(app, attachments),
         )
         return
     except Exception as e:
         logger.exception("Attachment upload failed | app_id={}", app_id)
         await message.answer(
             "❌ Ошибка при загрузке файла. Попробуйте ещё раз.",
-            reply_markup=_files_keyboard_for(attachments),
+            reply_markup=_files_keyboard_for_app(app, attachments),
         )
         return
 
@@ -108,7 +117,7 @@ async def handle_file(message: Message, state: FSMContext):
 
     await message.answer(
         f"✅ Файл принят. Всего приложений: {len(attachments)}",
-        reply_markup=_files_keyboard_for(attachments),
+        reply_markup=_files_keyboard_for_app(app, attachments),
     )
 
 
@@ -147,7 +156,55 @@ async def on_file_delete(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(
         f"🗑 Удалён файл: {_attachment_name(removed, del_idx)}\n"
         f"Осталось приложений: {len(attachments)}",
-        reply_markup=_files_keyboard_for(attachments),
+        reply_markup=_files_keyboard_for_app(app, attachments),
+    )
+
+
+@router.callback_query(BotStates.FILLING, F.data == "main_pdf_replace")
+async def on_main_pdf_replace(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("current_block") != "files":
+        await callback.answer("Опция доступна на шаге приложений.", show_alert=True)
+        return
+    await callback.answer()
+    await state.set_state(BotStates.WAITING_MAIN_PDF)
+    await callback.message.answer(
+        "📄 Отправьте новый PDF, чтобы заменить текущий основной документ."
+    )
+
+
+@router.callback_query(BotStates.FILLING, F.data == "main_pdf_delete")
+async def on_main_pdf_delete(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("current_block") != "files":
+        await callback.answer("Опция доступна на шаге приложений.", show_alert=True)
+        return
+
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Черновик не найден.", show_alert=True)
+        return
+
+    app = await application_service.get_application_record(app_id)
+    if not app or not app.get("main_pdf_s3_key"):
+        await callback.answer("Основной PDF уже удалён.", show_alert=True)
+        return
+
+    old_key = app.get("main_pdf_s3_key")
+    await application_service.clear_main_pdf(app_id)
+    await invalidate_pdf_delivery_cache(app_id)
+    if old_key and s3.is_s3_configured():
+        try:
+            await s3.delete_object(old_key, s3.BUCKET_PDF)
+        except Exception:
+            logger.warning("Failed to delete uploaded main PDF | app_id={} key={}", app_id, old_key)
+
+    refreshed = await application_service.get_application_record(app_id)
+    attachments = _load_attachments((refreshed or app).get("attachments"))
+    await callback.answer("Основной PDF удалён.")
+    await callback.message.answer(
+        "🗑 Основной PDF удалён. Можно добавить новый PDF или продолжить с приложениями.",
+        reply_markup=_files_keyboard_for_app((refreshed or app), attachments),
     )
 
 

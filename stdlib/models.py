@@ -42,6 +42,8 @@ class Application(BaseModel):
     attachments: list[ApplicationAttachment] = Field(default_factory=list)
     feedback: str | None = None
     pdf_file_id: str | None = None
+    main_pdf_s3_key: str | None = None
+    main_pdf_filename: str | None = None
     chat_history: list[ChatMessage] = Field(default_factory=list)
     t_start: datetime | None = None
     t_submit: datetime | None = None

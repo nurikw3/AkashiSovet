@@ -27,7 +27,7 @@ from stdlib.services.notification_service import (
     notify_user_application_approved,
     notify_user_application_rework,
 )
-from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from bot.config import config
 from bot.logger import logger
 from web.auth_session import parse_admin_session
@@ -358,7 +358,12 @@ async def download_report(app_id: int, admin_id=Depends(get_admin)):
         db.get_user_full_name(app_row.user_id),
         db.get_user_position(app_row.user_id),
     )
-    custom_filename = generate_pdf_filename(full_name, position, app_row.created_at)
+    custom_filename = resolve_application_pdf_filename(
+        app_row.model_dump(),
+        full_name=full_name,
+        position=position,
+        dt=app_row.created_at,
+    )
     
     logger.info("Admin {} downloaded PDF report for application {}", admin_id, app_id)
     return StreamingResponse(
@@ -442,7 +447,12 @@ async def download_archive(app_id: int, request: Request, admin_id=Depends(get_a
     position = results[2]
     att_results = results[3:]  # list of (file_name, data | None)
 
-    pdf_name = generate_pdf_filename(full_name, position, app_row.created_at)
+    pdf_name = resolve_application_pdf_filename(
+        app_row.model_dump(),
+        full_name=full_name,
+        position=position,
+        dt=app_row.created_at,
+    )
     zip_buf = BytesIO()
     missed_files: list[str] = []
 

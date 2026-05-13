@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 from bot.config import config
 from bot.logger import logger
-from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.services.pdf_delivery_queue import enqueue_pdf_delivery
 from stdlib.timezone_util import now_app
@@ -68,7 +68,12 @@ async def finalize_and_notify(
 
     # 2. Достаем данные для имени файла в fallback-ветке
     created_at = app.get("created_at") or now_app()
-    custom_filename = generate_pdf_filename(full_name, position, created_at)
+    custom_filename = resolve_application_pdf_filename(
+        app,
+        full_name=full_name,
+        position=position,
+        dt=created_at,
+    )
 
     # 3. Отправляем копию пользователю через очередь (не блокируем update-loop)
     queued = await enqueue_pdf_delivery(

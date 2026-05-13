@@ -47,6 +47,43 @@ def files_keyboard(attachment_names: list[str] | None = None) -> InlineKeyboardM
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def files_keyboard_with_main_pdf(
+    attachment_names: list[str] | None = None,
+    *,
+    has_main_pdf: bool = False,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if has_main_pdf:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔁 Заменить основной PDF", callback_data="main_pdf_replace"
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить основной PDF", callback_data="main_pdf_delete"
+                ),
+            ]
+        )
+    for idx, name in enumerate(attachment_names or []):
+        label = (name or f"Файл {idx + 1}").strip() or f"Файл {idx + 1}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"🗑 Удалить: {label}"[:64],
+                    callback_data=f"files_del_{idx}",
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
+        ]
+    )
+    rows.append([_cancel_button()[0]])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def approve_reject_keyboard(app_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -164,6 +201,24 @@ def restart_or_continue_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🆕 Начать заново", callback_data="restart_draft"
                 ),
+            ],
+            [_cancel_button()[0]],
+        ]
+    )
+
+
+def start_creation_path_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🧩 Заполнить в боте", callback_data="start_flow_fill"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📄 Загрузить готовый PDF", callback_data="start_flow_pdf"
+                )
             ],
             [_cancel_button()[0]],
         ]

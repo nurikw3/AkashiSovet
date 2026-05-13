@@ -109,6 +109,16 @@ async def clear_pdf_reference(app_id: int) -> None:
     await db.set_pdf_file_id(app_id, None)
 
 
+async def set_main_pdf(app_id: int, s3_key: str, filename: str) -> None:
+    """Фиксирует загруженный пользователем основной PDF заявки."""
+    await db.set_main_pdf(app_id, s3_key, filename)
+
+
+async def clear_main_pdf(app_id: int) -> None:
+    """Удаляет ссылку на пользовательский основной PDF у заявки."""
+    await db.clear_main_pdf(app_id)
+
+
 async def approve(app_id: int) -> Application | None:
     """Согласование заявки."""
     await db.update_status(app_id, "approved")

@@ -113,6 +113,11 @@ def pdf_key(user_id: int, app_id: int) -> str:
     return f"pdf/{user_id}/{app_id}.pdf"
 
 
+def uploaded_main_pdf_key(user_id: int, app_id: int, filename: str) -> str:
+    safe = PurePosixPath(filename).name
+    return f"pdf-uploaded/{user_id}/{app_id}/{safe}"
+
+
 def attachment_key(user_id: int, app_id: int, filename: str) -> str:
     safe = PurePosixPath(filename).name
     return f"attachments/{user_id}/{app_id}/{safe}"

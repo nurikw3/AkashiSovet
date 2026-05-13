@@ -68,6 +68,55 @@ async def _is_user_allowed_for_restricted_commands(user_id: int) -> bool:
     return await db.is_user_allowed(user_id)
 
 
+async def _prompt_creation_path(message: Message | CallbackQuery, state: FSMContext, app_id: int):
+    user_id = message.from_user.id if isinstance(message, Message) else message.from_user.id
+    mode = await db.get_user_mode(user_id)
+    mode_name = (
+        "свободный ввод"
+        if mode == "free"
+        else "пошаговое заполнение"
+    )
+    send_fn = message.answer if isinstance(message, Message) else message.message.answer
+    await state.set_state(BotStates.START_CHOICE)
+    await state.update_data(app_id=app_id)
+    await send_fn(
+        "Выберите, как создать заявку:\n\n"
+        f"• Текущий режим заполнения в боте: <b>{mode_name}</b>\n"
+        "• Или загрузите уже готовый PDF-документ.",
+        parse_mode="HTML",
+        reply_markup=kb.start_creation_path_keyboard(),
+    )
+
+
+async def _enter_fill_flow(target: Message | CallbackQuery, state: FSMContext, app_id: int):
+    user_id = target.from_user.id if isinstance(target, Message) else target.from_user.id
+    mode = await db.get_user_mode(user_id)
+    send_fn = target.answer if isinstance(target, Message) else target.message.answer
+
+    if mode == "free":
+        await state.set_state(BotStates.FREE_FORM)
+        await state.update_data(app_id=app_id)
+        await send_fn(
+            "Вы в режиме <b>Свободного ввода</b>.\n\n"
+            "Напишите всю суть вашей заявки в одном или нескольких сообщениях.\n"
+            "Я проанализирую текст и задам уточняющие вопросы, если чего-то будет не хватать.",
+            parse_mode="HTML",
+        )
+    else:
+        tpl = await get_template()
+        first = tpl.blocks[0]
+        await state.set_state(BotStates.FILLING)
+        await state.update_data(
+            app_id=app_id, current_block=first.id, mode="input"
+        )
+        await send_fn(
+            "Добрый день! Заполним служебную записку на Правление.\n\n"
+            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
+            f"{first.question}",
+            parse_mode="HTML",
+        )
+
+
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     if not await _is_user_allowed_for_restricted_commands(message.from_user.id):
@@ -94,7 +143,13 @@ async def cmd_start(message: Message, state: FSMContext):
         return
 
     current_state = await state.get_state()
-    if current_state in (BotStates.FILLING, BotStates.REWORK, BotStates.FREE_FORM):
+    if current_state in (
+        BotStates.START_CHOICE,
+        BotStates.WAITING_MAIN_PDF,
+        BotStates.FILLING,
+        BotStates.REWORK,
+        BotStates.FREE_FORM,
+    ):
         await message.answer(
             "У вас есть незавершённая заявка. Что сделать?",
             reply_markup=kb.restart_or_continue_keyboard(),
@@ -105,30 +160,7 @@ async def cmd_start(message: Message, state: FSMContext):
     app_id = await application_service.get_or_create_draft(user_id, username)
     await application_service.clear_application_chat_history(app_id)
     await application_service.mark_application_started(app_id)
-    mode = await db.get_user_mode(user_id)
-
-    if mode == "free":
-        await state.set_state(BotStates.FREE_FORM)
-        await state.update_data(app_id=app_id)
-        await message.answer(
-            "Вы в режиме <b>Свободного ввода</b>.\n\n"
-            "Напишите всю суть вашей заявки в одном или нескольких сообщениях.\n"
-            "Я проанализирую текст и задам уточняющие вопросы, если чего-то будет не хватать.",
-            parse_mode="HTML",
-        )
-    else:
-        tpl = await get_template()
-        first = tpl.blocks[0]
-        await state.set_state(BotStates.FILLING)
-        await state.update_data(
-            app_id=app_id, current_block=first.id, mode="input"
-        )
-        await message.answer(
-            "Добрый день! Заполним служебную записку на Правление.\n\n"
-            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
-            f"{first.question}",
-            parse_mode="HTML",
-        )
+    await _prompt_creation_path(message, state, app_id)
 
 
 @router.message(Command("mode"))
@@ -271,25 +303,31 @@ async def on_restart_draft(callback: CallbackQuery, state: FSMContext):
     app_id = await application_service.get_or_create_draft(user_id, username)
     await application_service.reset_draft_for_new_session(app_id)
     await application_service.mark_application_started(app_id)
-    mode = await db.get_user_mode(user_id)
+    await _prompt_creation_path(callback, state, app_id)
 
-    if mode == "free":
-        await state.set_state(BotStates.FREE_FORM)
-        await state.update_data(app_id=app_id)
-        await callback.message.answer(
-            "Вы в режиме <b>Свободного ввода</b>.\n\n"
-            "Опишите вашу заявку в свободной форме. Я задам вопросы, если что-то будет непонятно.",
-            parse_mode="HTML",
-        )
-    else:
-        tpl = await get_template()
-        first = tpl.blocks[0]
-        await state.set_state(BotStates.FILLING)
-        await state.update_data(
-            app_id=app_id, current_block=first.id, mode="input"
-        )
-        await callback.message.answer(
-            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
-            f"{first.question}",
-            parse_mode="HTML",
-        )
+
+@router.callback_query(BotStates.START_CHOICE, F.data == "start_flow_fill")
+async def on_start_flow_fill(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Черновик не найден.", show_alert=True)
+        return
+    await callback.answer()
+    await _enter_fill_flow(callback, state, app_id)
+
+
+@router.callback_query(BotStates.START_CHOICE, F.data == "start_flow_pdf")
+async def on_start_flow_pdf(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Черновик не найден.", show_alert=True)
+        return
+    await callback.answer()
+    await state.set_state(BotStates.WAITING_MAIN_PDF)
+    await state.update_data(app_id=app_id)
+    await callback.message.answer(
+        "📄 Отправьте готовый PDF заявки одним сообщением.\n\n"
+        "После загрузки можно будет добавить приложения и отправить заявку.",
+    )

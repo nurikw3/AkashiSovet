@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
-from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
 from stdlib.telegram_summary import INTRO_FALLBACK_NO_PDF_HTML, chunk_blocks_summary_html
@@ -42,7 +42,12 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         position = await db.get_user_position(user_id)
         created_at = app.get("created_at") or now_app()
 
-        custom_filename = generate_pdf_filename(full_name, position, created_at)
+        custom_filename = resolve_application_pdf_filename(
+            app,
+            full_name=full_name,
+            position=position,
+            dt=created_at,
+        )
 
         # Отправляем документ
         t1 = perf_counter()

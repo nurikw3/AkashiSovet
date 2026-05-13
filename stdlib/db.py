@@ -32,6 +32,8 @@ async def init_db() -> None:
                 attachments   TEXT    DEFAULT '[]',
                 feedback      TEXT,
                 pdf_file_id   TEXT,
+                main_pdf_s3_key TEXT,
+                main_pdf_filename TEXT,
                 chat_history  TEXT    DEFAULT '[]',
                 t_start       TIMESTAMPTZ,
                 t_submit      TIMESTAMPTZ,
@@ -57,6 +59,18 @@ async def init_db() -> None:
                 created_at  TIMESTAMPTZ DEFAULT NOW()
             );
         """)
+        await conn.execute(
+            """
+            ALTER TABLE applications
+                ADD COLUMN IF NOT EXISTS main_pdf_s3_key TEXT;
+            """
+        )
+        await conn.execute(
+            """
+            ALTER TABLE applications
+                ADD COLUMN IF NOT EXISTS main_pdf_filename TEXT;
+            """
+        )
     logger.info("Database initialized: {}", config.DATABASE_URL)
 
 
@@ -143,6 +157,8 @@ async def reset_draft_content(app_id: int) -> None:
             """UPDATE applications
                SET blocks = '{}',
                    attachments = '[]',
+                   main_pdf_s3_key = NULL,
+                   main_pdf_filename = NULL,
                    chat_history = '[]',
                    updated_at = NOW()
                WHERE id = $1 AND status = 'draft'""",
@@ -230,6 +246,36 @@ async def set_pdf_file_id(app_id: int, pdf_file_id: str | None) -> None:
         await conn.execute(
             "UPDATE applications SET pdf_file_id = $1 WHERE id = $2",
             pdf_file_id,
+            app_id,
+        )
+
+
+async def set_main_pdf(app_id: int, s3_key: str, filename: str) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """
+            UPDATE applications
+            SET main_pdf_s3_key = $1,
+                main_pdf_filename = $2,
+                updated_at = NOW()
+            WHERE id = $3
+            """,
+            s3_key,
+            filename,
+            app_id,
+        )
+
+
+async def clear_main_pdf(app_id: int) -> None:
+    async with _pool_conn() as conn:
+        await conn.execute(
+            """
+            UPDATE applications
+            SET main_pdf_s3_key = NULL,
+                main_pdf_filename = NULL,
+                updated_at = NOW()
+            WHERE id = $1
+            """,
             app_id,
         )
 

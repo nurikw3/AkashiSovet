@@ -536,6 +536,23 @@ def generate_pdf_filename(
     return f"{time_str}_{safe_name}_{safe_pos}.pdf"
 
 
+def resolve_application_pdf_filename(
+    app_row: dict,
+    *,
+    full_name: str | None,
+    position: str | None,
+    dt: datetime | None,
+) -> str:
+    preferred = str(app_row.get("main_pdf_filename") or "").strip()
+    if preferred:
+        safe = Path(preferred).name
+        if safe.lower().endswith(".pdf"):
+            return safe
+        return f"{safe}.pdf"
+    base_dt = dt or datetime.now()
+    return generate_pdf_filename(full_name, position, base_dt)
+
+
 async def invalidate_pdf_cache(app_id: int, *, user_id: int | None = None) -> None:
     """Backwards-compatible alias for full content cache invalidation."""
     await invalidate_pdf_content_cache(app_id, user_id=user_id)
@@ -584,6 +601,29 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     app_raw = await db.get_app(app_id)
     if not app_raw:
         raise ValueError(f"App {app_id} not found")
+
+    uploaded_key = app_raw.get("main_pdf_s3_key")
+    if uploaded_key:
+        try:
+            uploaded_bytes = await s3.download_bytes(uploaded_key, s3.BUCKET_PDF)
+            if uploaded_bytes:
+                logger.debug(
+                    "Primary uploaded PDF used | app_id={} size_bytes={}",
+                    app_id,
+                    len(uploaded_bytes),
+                )
+                return BytesIO(uploaded_bytes)
+            logger.warning(
+                "Primary uploaded PDF key exists but object missing | app_id={} key={}",
+                app_id,
+                uploaded_key,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to load uploaded main PDF; falling back to generated | app_id={} err={}",
+                app_id,
+                e,
+            )
 
     u_id = app_raw["user_id"]
     try:

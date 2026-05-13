@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
+from bot.config import config
 from stdlib.handlers.states import BotStates
 from stdlib.template import get_template
 
@@ -61,6 +62,12 @@ async def _ensure_profile_complete(message: Message) -> bool:
     return False
 
 
+async def _is_user_allowed_to_start(user_id: int) -> bool:
+    if user_id in config.SUPERUSER_IDS:
+        return True
+    return await db.is_user_allowed(user_id)
+
+
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     txt = await _get_help_text()
@@ -74,6 +81,10 @@ async def cmd_help(message: Message):
 async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username
+
+    if not await _is_user_allowed_to_start(user_id):
+        await message.answer("⛔ У вас нет доступа к созданию заявки. Обратитесь к администратору.")
+        return
 
     if not await _ensure_profile_complete(message):
         return

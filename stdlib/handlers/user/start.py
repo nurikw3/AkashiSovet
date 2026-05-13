@@ -62,7 +62,7 @@ async def _ensure_profile_complete(message: Message) -> bool:
     return False
 
 
-async def _is_user_allowed_to_start(user_id: int) -> bool:
+async def _is_user_allowed_for_restricted_commands(user_id: int) -> bool:
     if user_id in config.SUPERUSER_IDS:
         return True
     return await db.is_user_allowed(user_id)
@@ -70,6 +70,10 @@ async def _is_user_allowed_to_start(user_id: int) -> bool:
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
+    if not await _is_user_allowed_for_restricted_commands(message.from_user.id):
+        await message.answer("⛔ У вас нет доступа к этой команде. Обратитесь к администратору.")
+        return
+
     txt = await _get_help_text()
     try:
         await message.answer(txt, parse_mode="HTML")
@@ -82,7 +86,7 @@ async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username
 
-    if not await _is_user_allowed_to_start(user_id):
+    if not await _is_user_allowed_for_restricted_commands(user_id):
         await message.answer("⛔ У вас нет доступа к созданию заявки. Обратитесь к администратору.")
         return
 

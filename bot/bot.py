@@ -78,7 +78,9 @@ async def main() -> None:
 
     redis_storage = RedisStorage(redis=fsm_redis_client)
     dp = Dispatcher(storage=redis_storage)
-    dp.update.outer_middleware(AccessControlMiddleware())
+    access_middleware = AccessControlMiddleware()
+    dp.message.outer_middleware(access_middleware)
+    dp.callback_query.outer_middleware(access_middleware)
 
     dp.include_router(user.router)
     dp.include_router(superuser.router)

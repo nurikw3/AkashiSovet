@@ -387,6 +387,25 @@ async def rework_approved_app(
     return _redirect_to_detail(app_id)
 
 
+@router.post("/delete/{app_id}")
+async def delete_application_app(
+    request: Request,
+    app_id: int,
+    admin_id=Depends(get_admin),
+):
+    app = await application_service.get_application(app_id)
+    if not app:
+        logger.warning("Admin {} tried to delete non-existent application {}", admin_id, app_id)
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+    await application_service.delete_application(app_id)
+    logger.info("Admin {} deleted application {}", admin_id, app_id)
+
+    if _is_htmx_request(request):
+        return Response(status_code=200)
+    return RedirectResponse(url="/", status_code=303)
+
+
 @router.get("/applications/{app_id}", response_class=HTMLResponse)
 async def application_detail_page(
     request: Request, app_id: int, admin_id=Depends(get_admin)

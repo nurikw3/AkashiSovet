@@ -124,6 +124,10 @@
                 'app.files_hd': 'Файлы',
                 'app.no_files': 'Вложений нет',
                 'app.pdf': 'PDF отчёт',
+                'app.delete': 'Удалить',
+                'app.delete_confirm_title': 'Удаление ПЗ',
+                'app.delete_confirm_body': 'Вы уверены, что хотите безвозвратно удалить эту ПЗ?',
+                'app.delete_confirm_yes': 'Да, удалить',
 
                 'rework.ph': 'Укажите замечания...',
                 'rework.approved.ph': 'Причина возврата на доработку...',
@@ -213,6 +217,10 @@
                 'app.files_hd': 'Files',
                 'app.no_files': 'No attachments',
                 'app.pdf': 'PDF Report',
+                'app.delete': 'Delete',
+                'app.delete_confirm_title': 'Delete application',
+                'app.delete_confirm_body': 'Are you sure you want to permanently delete this application?',
+                'app.delete_confirm_yes': 'Yes, delete',
 
                 'rework.ph': 'Enter feedback...',
                 'rework.approved.ph': 'Reason for returning to rework...',
@@ -230,6 +238,40 @@
         function confirmDeleteMeeting() {
             const t = T[getLang()] || T.ru;
             return confirm(t['meeting.delete_confirm'] || '');
+        }
+
+        let pendingDeleteForm = null;
+
+        function openDeleteApplicationModal(form) {
+            const modal = document.getElementById('delete-app-modal');
+            if (!modal || !form) return;
+            pendingDeleteForm = form;
+            const t = T[getLang()] || T.ru;
+            const titleEl = modal.querySelector('[data-delete-app-title]');
+            const bodyEl = modal.querySelector('[data-delete-app-body]');
+            const confirmEl = modal.querySelector('[data-delete-app-confirm]');
+            if (titleEl) titleEl.textContent = t['app.delete_confirm_title'] || 'Удаление ПЗ';
+            if (bodyEl) bodyEl.textContent = t['app.delete_confirm_body'] || 'Вы уверены, что хотите безвозвратно удалить эту ПЗ?';
+            if (confirmEl) confirmEl.textContent = t['app.delete_confirm_yes'] || 'Да, удалить';
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeDeleteApplicationModal() {
+            const modal = document.getElementById('delete-app-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            pendingDeleteForm = null;
+        }
+
+        function confirmDeleteApplicationModal() {
+            if (!pendingDeleteForm) return;
+            const form = pendingDeleteForm;
+            closeDeleteApplicationModal();
+            form.dataset.confirmedDelete = '1';
+            if (typeof form.requestSubmit === 'function') form.requestSubmit();
+            else form.submit();
         }
 
         function applyI18n(root) {
@@ -428,6 +470,23 @@
             document.querySelectorAll('.lang-btn').forEach(b => {
                 b.classList.toggle('lang-active', b.dataset.lang === lang);
             });
+        });
+
+        document.addEventListener('submit', e => {
+            const form = e.target.closest('form.js-confirm-delete-app');
+            if (!form) return;
+            if (form.dataset.confirmedDelete === '1') {
+                form.dataset.confirmedDelete = '0';
+                return;
+            }
+            e.preventDefault();
+            openDeleteApplicationModal(form);
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeDeleteApplicationModal();
+            }
         });
 
         /* Re-apply i18n after HTMX swaps */
@@ -1030,6 +1089,30 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+
+    <div id="delete-app-modal" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/45" onclick="closeDeleteApplicationModal()"></div>
+        <div class="relative h-full w-full flex items-center justify-center p-4">
+            <div class="w-full max-w-md rounded border border-[#DDD8CE] dark:border-[#242424] bg-white dark:bg-[#141414] p-5">
+                <p class="text-[9px] font-mono font-bold tracking-[.15em] uppercase text-ak-red mb-3" data-delete-app-title>
+                    Удаление ПЗ
+                </p>
+                <p class="text-sm text-[#111111] dark:text-[#EDE8DF] leading-relaxed mb-5" data-delete-app-body>
+                    Вы уверены, что хотите безвозвратно удалить эту ПЗ?
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button type="button"
+                        class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                        data-i18n="btn.cancel"
+                        onclick="closeDeleteApplicationModal()">Отменить</button>
+                    <button type="button"
+                        class="ak-btn-red text-[9px]"
+                        data-delete-app-confirm
+                        onclick="confirmDeleteApplicationModal()">Да, удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 

@@ -177,6 +177,17 @@
         {% else %}
         <span class="text-[9px] font-mono text-[#c0b8b0]">—</span>
         {% endif %}
+
+        <form method="post" action="/delete/{{ app.id }}"
+              class="js-confirm-delete-app mt-2 flex justify-end"
+              data-app-id="{{ app.id }}"
+              hx-post="/delete/{{ app.id }}"
+              hx-target="#row-{{ app.id }}"
+              hx-swap="delete">
+            <button type="submit"
+                class="text-[8px] font-mono tracking-widest uppercase text-ak-red/80 hover:text-ak-red dark:text-ak-red-d/80 dark:hover:text-ak-red-d transition-colors"
+                data-i18n="app.delete">Удалить</button>
+        </form>
     </td>
 
 </tr>

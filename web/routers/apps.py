@@ -8,6 +8,8 @@ from fastapi import (
     APIRouter,
     Request,
     Form,
+    File,
+    UploadFile,
     Depends,
     HTTPException,
     BackgroundTasks,
@@ -36,6 +38,7 @@ from web.templating import templates
 from web.dependencies import get_admin
 
 router = APIRouter(tags=["applications"])
+MAX_FEEDBACK_FILE_BYTES = 20 * 1024 * 1024
 
 
 def _parse_app(a: dict) -> dict:
@@ -67,6 +70,32 @@ async def _render_row(request: Request, app_id: int, *, meeting_basket: bool = F
             "meeting_basket": meeting_basket,
         },
     )
+
+
+async def _read_feedback_file_bytes(
+    upload: UploadFile | None,
+) -> tuple[str | None, bytes | None]:
+    if not upload or not upload.filename:
+        return None, None
+
+    file_name = Path(upload.filename).name.strip() or "feedback_attachment"
+    data = await upload.read()
+    await upload.close()
+    if not data:
+        return None, None
+    if len(data) > MAX_FEEDBACK_FILE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Файл слишком большой. Максимум {MAX_FEEDBACK_FILE_BYTES // (1024 * 1024)} MB.",
+        )
+    return file_name, data
+
+
+def _normalize_feedback_text(feedback: str) -> str:
+    normalized = feedback.strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Комментарий не может быть пустым.")
+    return normalized
 
 
 def _is_htmx_request(request: Request) -> bool:
@@ -264,11 +293,20 @@ async def reject_app(
     app_id: int,
     background_tasks: BackgroundTasks,
     feedback: str = Form(...),
+    feedback_file: UploadFile | None = File(default=None),
     admin_id=Depends(get_admin),
 ):
+    feedback = _normalize_feedback_text(feedback)
+    feedback_file_name, feedback_file_bytes = await _read_feedback_file_bytes(feedback_file)
     row = await application_service.send_for_rework(app_id, feedback)
     if row:
-        logger.info("Admin {} sent application {} for rework. Feedback len: {}", admin_id, app_id, len(feedback))
+        logger.info(
+            "Admin {} sent application {} for rework. Feedback len: {}, attachment: {}",
+            admin_id,
+            app_id,
+            len(feedback),
+            bool(feedback_file_bytes),
+        )
         tpl = await get_template()
         background_tasks.add_task(
             notify_user_application_rework,
@@ -278,6 +316,8 @@ async def reject_app(
             feedback,
             reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
+            feedback_file_name=feedback_file_name,
+            feedback_file_bytes=feedback_file_bytes,
         )
     else:
         logger.warning("Admin {} failed to reject application {}", admin_id, app_id)
@@ -293,25 +333,35 @@ async def rework_approved_app(
     app_id: int,
     background_tasks: BackgroundTasks,
     feedback: str = Form(...),
+    feedback_file: UploadFile | None = File(default=None),
     admin_id=Depends(get_admin),
 ):
+    feedback = _normalize_feedback_text(feedback)
+    feedback_file_name, feedback_file_bytes = await _read_feedback_file_bytes(feedback_file)
     app_row = await application_service.get_application(app_id)
     if not app_row or app_row.status != "approved":
         logger.warning("Admin {} tried to rework app {} but status was {}", admin_id, app_id, app_row.status if app_row else 'NOT_FOUND')
         raise HTTPException(status_code=409, detail="Неверный статус")
-        
-    row = await application_service.send_for_rework(app_id, feedback.strip())
+
+    row = await application_service.send_for_rework(app_id, feedback)
     if row:
-        logger.info("Admin {} returned APPROVED application {} to rework", admin_id, app_id)
+        logger.info(
+            "Admin {} returned APPROVED application {} to rework. Attachment: {}",
+            admin_id,
+            app_id,
+            bool(feedback_file_bytes),
+        )
         tpl = await get_template()
         background_tasks.add_task(
             notify_user_application_rework,
             request.app.state.tg_bot,
             row.user_id,
             app_id,
-            feedback.strip(),
+            feedback,
             reply_markup=kb.rework_keyboard(tpl, app_id),
             web_wording=True,
+            feedback_file_name=feedback_file_name,
+            feedback_file_bytes=feedback_file_bytes,
         )
 
     if _is_htmx_request(request):

@@ -284,6 +284,14 @@
             initAutoExpandTextareas(container);
         }
 
+        function onFeedbackFileSelected(input) {
+            const fileName = input?.files?.[0]?.name || '';
+            const holder = input?.parentElement?.querySelector('.feedback-file-name');
+            if (!holder) return;
+            holder.textContent = fileName;
+            holder.title = fileName;
+        }
+
         /* Reject / Rework form helpers */
         function showRejectForm(id) {
             document.getElementById('actions-' + id)?.classList.add('hidden');

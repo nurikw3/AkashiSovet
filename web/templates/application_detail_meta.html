@@ -12,11 +12,21 @@
             data-i18n="btn.rework">На доработку</button>
     </div>
     <div id="reject-form-{{ app.id }}" class="hidden w-full max-w-sm">
-        <form method="post" action="/reject/{{ app.id }}" class="flex flex-col gap-2 items-end">
+        <form method="post" action="/reject/{{ app.id }}" enctype="multipart/form-data" class="flex flex-col gap-2 items-end">
             <textarea name="feedback" required rows="2" data-auto-expand="true"
                 data-i18n-ph="rework.ph"
                 placeholder="Укажите замечания..."
                 class="ak-input w-full text-xs resize-none overflow-hidden"></textarea>
+            <div class="w-full flex items-center justify-between gap-2">
+                <label for="feedback-file-reject-detail-{{ app.id }}"
+                    class="inline-flex items-center gap-1 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-ak-red dark:hover:text-ak-red-d cursor-pointer transition-colors"
+                    title="Прикрепить файл">
+                    📎 <span>Файл</span>
+                </label>
+                <input id="feedback-file-reject-detail-{{ app.id }}" type="file" name="feedback_file" class="hidden"
+                    onchange="onFeedbackFileSelected(this)">
+                <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
+            </div>
             <div class="flex gap-2">
                 <button type="button" onclick="hideRejectForm({{ app.id }})"
                     class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
@@ -31,11 +41,21 @@
             class="ak-btn-ghost border-amber-500/30 text-amber-600 hover:border-amber-500 hover:text-amber-600 dark:text-amber-400 dark:border-amber-400/30"
             title="Вернуть на доработку">↩ Rework</button>
         <div id="rework-approved-form-{{ app.id }}" class="hidden w-full max-w-sm">
-            <form method="post" action="/rework-approved/{{ app.id }}" class="flex flex-col gap-2 items-end">
+            <form method="post" action="/rework-approved/{{ app.id }}" enctype="multipart/form-data" class="flex flex-col gap-2 items-end">
                 <textarea name="feedback" required rows="2" data-auto-expand="true"
                     data-i18n-ph="rework.approved.ph"
                     placeholder="Причина возврата на доработку..."
                     class="ak-input w-full text-xs resize-none overflow-hidden"></textarea>
+                <div class="w-full flex items-center justify-between gap-2">
+                    <label for="feedback-file-rework-approved-detail-{{ app.id }}"
+                        class="inline-flex items-center gap-1 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-ak-red dark:hover:text-ak-red-d cursor-pointer transition-colors"
+                        title="Прикрепить файл">
+                        📎 <span>Файл</span>
+                    </label>
+                    <input id="feedback-file-rework-approved-detail-{{ app.id }}" type="file" name="feedback_file" class="hidden"
+                        onchange="onFeedbackFileSelected(this)">
+                    <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
+                </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="hideReworkApprovedForm({{ app.id }})"
                         class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"

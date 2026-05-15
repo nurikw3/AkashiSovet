@@ -269,7 +269,6 @@
             if (!pendingDeleteForm) return;
             const form = pendingDeleteForm;
             closeDeleteApplicationModal();
-            form.dataset.confirmedDelete = '1';
             if (typeof form.requestSubmit === 'function') form.requestSubmit();
             else form.submit();
         }
@@ -470,17 +469,6 @@
             document.querySelectorAll('.lang-btn').forEach(b => {
                 b.classList.toggle('lang-active', b.dataset.lang === lang);
             });
-        });
-
-        document.addEventListener('submit', e => {
-            const form = e.target.closest('form.js-confirm-delete-app');
-            if (!form) return;
-            if (form.dataset.confirmedDelete === '1') {
-                form.dataset.confirmedDelete = '0';
-                return;
-            }
-            e.preventDefault();
-            openDeleteApplicationModal(form);
         });
 
         document.addEventListener('keydown', e => {

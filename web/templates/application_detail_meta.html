@@ -84,8 +84,9 @@
     <form method="post" action="/delete/{{ app.id }}"
         class="js-confirm-delete-app mt-1"
         data-app-id="{{ app.id }}">
-        <button type="submit"
+        <button type="button"
             class="text-[9px] font-mono tracking-widest uppercase text-ak-red/80 hover:text-ak-red dark:text-ak-red-d/80 dark:hover:text-ak-red-d transition-colors"
-            data-i18n="app.delete">Удалить</button>
+            data-i18n="app.delete"
+            onclick="openDeleteApplicationModal(this.form)">Удалить</button>
     </form>
 </div>

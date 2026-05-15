@@ -103,10 +103,10 @@
         <div id="reject-form-{{ app.id }}" class="hidden mt-2">
             <form method="post" action="/reject/{{ app.id }}" hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
                   class="flex flex-col gap-2 items-end">
-                <textarea name="feedback" required rows="2"
+                <textarea name="feedback" required rows="2" data-auto-expand="true"
                     data-i18n-ph="rework.ph"
                     placeholder="Укажите замечания..."
-                    class="ak-input w-60 text-xs resize-none"></textarea>
+                    class="ak-input w-60 text-xs resize-none overflow-hidden"></textarea>
                 <div class="flex gap-2">
                     <button type="button" onclick="hideRejectForm({{ app.id }})"
                         class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
@@ -127,10 +127,10 @@
             <div id="rework-approved-form-{{ app.id }}" class="hidden mt-2">
                 <form method="post" action="/rework-approved/{{ app.id }}" hx-post="/rework-approved/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
                       class="flex flex-col gap-2 items-end">
-                    <textarea name="feedback" required rows="2"
+                    <textarea name="feedback" required rows="2" data-auto-expand="true"
                         data-i18n-ph="rework.approved.ph"
                         placeholder="Причина возврата на доработку..."
-                        class="ak-input w-60 text-xs resize-none"></textarea>
+                        class="ak-input w-60 text-xs resize-none overflow-hidden"></textarea>
                     <div class="flex gap-2">
                         <button type="button" onclick="hideReworkApprovedForm({{ app.id }})"
                             class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"

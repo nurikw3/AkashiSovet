@@ -261,10 +261,34 @@
             localStorage.setItem('ak_theme', html.classList.contains('dark') ? 'dark' : 'light');
         }
 
+        function autoExpandTextarea(textarea) {
+            if (!textarea) return;
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+
+        function initAutoExpandTextareas(root) {
+            const scope = root || document;
+            scope.querySelectorAll('textarea[data-auto-expand="true"]').forEach(textarea => {
+                if (!textarea.dataset.autoExpandBound) {
+                    textarea.addEventListener('input', () => autoExpandTextarea(textarea));
+                    textarea.dataset.autoExpandBound = '1';
+                }
+                autoExpandTextarea(textarea);
+            });
+        }
+
+        function initAutoExpandByContainerId(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            initAutoExpandTextareas(container);
+        }
+
         /* Reject / Rework form helpers */
         function showRejectForm(id) {
             document.getElementById('actions-' + id)?.classList.add('hidden');
             document.getElementById('reject-form-' + id)?.classList.remove('hidden');
+            initAutoExpandByContainerId('reject-form-' + id);
         }
         function hideRejectForm(id) {
             document.getElementById('reject-form-' + id)?.classList.add('hidden');
@@ -272,6 +296,7 @@
         }
         function showReworkApprovedForm(id) {
             document.getElementById('rework-approved-form-' + id)?.classList.remove('hidden');
+            initAutoExpandByContainerId('rework-approved-form-' + id);
         }
         function hideReworkApprovedForm(id) {
             document.getElementById('rework-approved-form-' + id)?.classList.add('hidden');
@@ -287,13 +312,17 @@
             const lang = getLang();
             document.documentElement.lang = lang;
             applyI18n(document);
+            initAutoExpandTextareas(document);
             document.querySelectorAll('.lang-btn').forEach(b => {
                 b.classList.toggle('lang-active', b.dataset.lang === lang);
             });
         });
 
         /* Re-apply i18n after HTMX swaps */
-        document.addEventListener('htmx:afterSettle', e => applyI18n(e.detail.elt));
+        document.addEventListener('htmx:afterSettle', e => {
+            applyI18n(e.detail.elt);
+            initAutoExpandTextareas(e.detail.elt);
+        });
 
         async function fetchText(url) {
             const response = await fetch(url, { credentials: 'same-origin' });
@@ -332,6 +361,7 @@
             tbody.innerHTML = await response.text();
             if (window.htmx) window.htmx.process(tbody);
             applyI18n(tbody);
+            initAutoExpandTextareas(tbody);
         }
 
         async function refreshDashboardCounters() {
@@ -388,6 +418,8 @@
                     feedback.outerHTML = text;
                 }
             }
+
+            initAutoExpandTextareas(root);
         }
 
         async function handleMeetingRealtime(eventData) {

@@ -128,27 +128,28 @@ async def _send_feedback_attachment_if_present(
     user_id: int,
     app_id: int,
     *,
-    feedback_file_name: str | None,
-    feedback_file_bytes: bytes | None,
+    feedback_files: list[tuple[str, bytes]] | None,
 ) -> None:
-    if not feedback_file_bytes or not feedback_file_name:
+    if not feedback_files:
         return
-    try:
-        await bot.send_document(
-            user_id,
-            document=BufferedInputFile(
-                feedback_file_bytes,
-                filename=feedback_file_name,
-            ),
-            caption=f"📎 Файл с замечаниями к заявке #{app_id}.",
-        )
-    except Exception as e:
-        logger.warning(
-            "Failed to send feedback attachment to user {} for app {}: {}",
-            user_id,
-            app_id,
-            e,
-        )
+    for idx, (file_name, file_bytes) in enumerate(feedback_files, start=1):
+        try:
+            await bot.send_document(
+                user_id,
+                document=BufferedInputFile(
+                    file_bytes,
+                    filename=file_name,
+                ),
+                caption=f"📎 Файл {idx}/{len(feedback_files)} с замечаниями к заявке #{app_id}.",
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to send feedback attachment #{} to user {} for app {}: {}",
+                idx,
+                user_id,
+                app_id,
+                e,
+            )
 
 
 @timed_task("notify_user_application_approved")
@@ -202,8 +203,7 @@ async def notify_user_application_rework(
     *,
     reply_markup: object | None = None,
     web_wording: bool = False,
-    feedback_file_name: str | None = None,
-    feedback_file_bytes: bytes | None = None,
+    feedback_files: list[tuple[str, bytes]] | None = None,
 ) -> None:
     """Уведомляет автора о возврате на доработку."""
     app_row = await db.get_app(app_id)
@@ -215,8 +215,7 @@ async def notify_user_application_rework(
         bot,
         user_id,
         app_id,
-        feedback_file_name=feedback_file_name,
-        feedback_file_bytes=feedback_file_bytes,
+        feedback_files=feedback_files,
     )
     preview_html = await preview_task
 

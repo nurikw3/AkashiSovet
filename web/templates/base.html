@@ -285,7 +285,12 @@
         }
 
         function onFeedbackFileSelected(input) {
-            const fileName = input?.files?.[0]?.name || '';
+            const files = Array.from(input?.files || []);
+            const fileName = files.length === 0
+                ? ''
+                : files.length === 1
+                    ? files[0].name
+                    : `${files.length} файла(ов): ${files.map(f => f.name).join(', ')}`;
             const holder = input?.parentElement?.querySelector('.feedback-file-name');
             if (!holder) return;
             holder.textContent = fileName;

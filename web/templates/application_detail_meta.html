@@ -23,7 +23,7 @@
                     title="Прикрепить файл">
                     📎 <span>Файл</span>
                 </label>
-                <input id="feedback-file-reject-detail-{{ app.id }}" type="file" name="feedback_file" class="hidden"
+                <input id="feedback-file-reject-detail-{{ app.id }}" type="file" name="feedback_files" multiple class="hidden"
                     onchange="onFeedbackFileSelected(this)">
                 <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
             </div>
@@ -52,7 +52,7 @@
                         title="Прикрепить файл">
                         📎 <span>Файл</span>
                     </label>
-                    <input id="feedback-file-rework-approved-detail-{{ app.id }}" type="file" name="feedback_file" class="hidden"
+                    <input id="feedback-file-rework-approved-detail-{{ app.id }}" type="file" name="feedback_files" multiple class="hidden"
                         onchange="onFeedbackFileSelected(this)">
                     <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
                 </div>

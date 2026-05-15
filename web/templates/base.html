@@ -284,17 +284,116 @@
             initAutoExpandTextareas(container);
         }
 
+        const MAX_FEEDBACK_FILE_BYTES = 20 * 1024 * 1024;
+        const MAX_FEEDBACK_FILES_TOTAL_BYTES = 50 * 1024 * 1024;
+        const feedbackFilesState = new Map();
+
+        function _escapeHtml(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function _feedbackFileKey(file) {
+            return `${file.name}__${file.size}__${file.lastModified}`;
+        }
+
+        function _formatFileSize(size) {
+            if (size < 1024) return `${size} B`;
+            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+            return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        function _syncInputFileList(input, files) {
+            const dt = new DataTransfer();
+            files.forEach(file => dt.items.add(file));
+            input.files = dt.files;
+        }
+
+        function _updateFeedbackFilesView(input, files) {
+            const wrapper = input.closest('form');
+            const container = wrapper?.querySelector('[data-feedback-files]');
+            const clearBtn = wrapper?.querySelector('[data-feedback-clear-btn]');
+            if (!container) return;
+
+            const summaryEl = container.querySelector('.feedback-file-name');
+            const listEl = container.querySelector('.feedback-file-list');
+            const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
+
+            if (summaryEl) {
+                summaryEl.textContent = files.length
+                    ? `${files.length} файл(ов), ${_formatFileSize(totalBytes)}`
+                    : '';
+            }
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', files.length === 0);
+            }
+            if (!listEl) return;
+
+            if (!files.length) {
+                listEl.innerHTML = '';
+                return;
+            }
+
+            listEl.innerHTML = files
+                .map((file, index) => `
+                    <div class="flex items-center justify-between gap-2 text-[8px] font-mono text-[#a09890]">
+                        <span class="truncate">${_escapeHtml(file.name)} (${_formatFileSize(file.size)})</span>
+                        <button type="button" class="text-ak-red hover:underline"
+                            onclick="removeFeedbackFile('${input.id}', ${index})">убрать</button>
+                    </div>
+                `)
+                .join('');
+        }
+
         function onFeedbackFileSelected(input) {
-            const files = Array.from(input?.files || []);
-            const fileName = files.length === 0
-                ? ''
-                : files.length === 1
-                    ? files[0].name
-                    : `${files.length} файла(ов): ${files.map(f => f.name).join(', ')}`;
-            const holder = input?.parentElement?.querySelector('.feedback-file-name');
-            if (!holder) return;
-            holder.textContent = fileName;
-            holder.title = fileName;
+            if (!input?.id) return;
+            const selected = Array.from(input.files || []);
+            const state = feedbackFilesState.get(input.id) || [];
+            const byKey = new Map(state.map(file => [_feedbackFileKey(file), file]));
+
+            for (const file of selected) {
+                byKey.set(_feedbackFileKey(file), file);
+            }
+
+            const merged = Array.from(byKey.values());
+            let totalBytes = 0;
+            for (const file of merged) {
+                if (file.size > MAX_FEEDBACK_FILE_BYTES) {
+                    alert(`Файл "${file.name}" превышает лимит 20 MB.`);
+                    return;
+                }
+                totalBytes += file.size;
+            }
+            if (totalBytes > MAX_FEEDBACK_FILES_TOTAL_BYTES) {
+                alert('Суммарный размер файлов превышает 50 MB.');
+                return;
+            }
+
+            feedbackFilesState.set(input.id, merged);
+            _syncInputFileList(input, merged);
+            _updateFeedbackFilesView(input, merged);
+        }
+
+        function removeFeedbackFile(inputId, index) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const current = [...(feedbackFilesState.get(inputId) || [])];
+            current.splice(index, 1);
+            feedbackFilesState.set(inputId, current);
+            _syncInputFileList(input, current);
+            _updateFeedbackFilesView(input, current);
+        }
+
+        function clearFeedbackFiles(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            feedbackFilesState.set(inputId, []);
+            _syncInputFileList(input, []);
+            _updateFeedbackFilesView(input, []);
         }
 
         /* Reject / Rework form helpers */

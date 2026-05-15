@@ -21,11 +21,16 @@
                 <label for="feedback-file-reject-detail-{{ app.id }}"
                     class="inline-flex items-center gap-1 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-ak-red dark:hover:text-ak-red-d cursor-pointer transition-colors"
                     title="Прикрепить файл">
-                    📎 <span>Файл</span>
+                    📎 <span>Файлы</span>
                 </label>
                 <input id="feedback-file-reject-detail-{{ app.id }}" type="file" name="feedback_files" multiple class="hidden"
                     onchange="onFeedbackFileSelected(this)">
-                <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
+                <button type="button" class="text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors hidden"
+                    data-feedback-clear-btn onclick="clearFeedbackFiles('feedback-file-reject-detail-{{ app.id }}')">Очистить</button>
+            </div>
+            <div class="w-full" data-feedback-files>
+                <div class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate"></div>
+                <div class="feedback-file-list mt-1 space-y-1"></div>
             </div>
             <div class="flex gap-2">
                 <button type="button" onclick="hideRejectForm({{ app.id }})"
@@ -50,11 +55,16 @@
                     <label for="feedback-file-rework-approved-detail-{{ app.id }}"
                         class="inline-flex items-center gap-1 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-ak-red dark:hover:text-ak-red-d cursor-pointer transition-colors"
                         title="Прикрепить файл">
-                        📎 <span>Файл</span>
+                        📎 <span>Файлы</span>
                     </label>
                     <input id="feedback-file-rework-approved-detail-{{ app.id }}" type="file" name="feedback_files" multiple class="hidden"
                         onchange="onFeedbackFileSelected(this)">
-                    <span class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate max-w-[210px]"></span>
+                    <button type="button" class="text-[8px] font-mono text-[#a09890] hover:text-ak-red transition-colors hidden"
+                        data-feedback-clear-btn onclick="clearFeedbackFiles('feedback-file-rework-approved-detail-{{ app.id }}')">Очистить</button>
+                </div>
+                <div class="w-full" data-feedback-files>
+                    <div class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate"></div>
+                    <div class="feedback-file-list mt-1 space-y-1"></div>
                 </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="hideReworkApprovedForm({{ app.id }})"

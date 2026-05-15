@@ -44,7 +44,7 @@
     <div class="border border-[#DDD8CE] dark:border-[#242424] rounded bg-white dark:bg-[#141414] p-7 space-y-7">
         <div>
             <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-2" data-i18n="app.topic">Тема</p>
-            <p class="text-sm text-[#111111] dark:text-[#EDE8DF] whitespace-pre-wrap leading-relaxed">{{ app.topic }}</p>
+            <p class="text-sm text-[#111111] dark:text-[#EDE8DF] whitespace-pre-wrap break-words leading-relaxed">{{ app.topic }}</p>
         </div>
 
         {% if app_blocks %}
@@ -55,7 +55,7 @@
                     <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-2">
                         {{ t_block.title }}
                     </p>
-                    <p class="text-sm text-[#111111] dark:text-[#EDE8DF] whitespace-pre-wrap leading-relaxed">{{ answer }}</p>
+                    <p class="text-sm text-[#111111] dark:text-[#EDE8DF] whitespace-pre-wrap break-words leading-relaxed">{{ answer }}</p>
                 </div>
                 {% endif %}
             {% endfor %}

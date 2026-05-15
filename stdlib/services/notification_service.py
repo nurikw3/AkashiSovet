@@ -210,13 +210,6 @@ async def notify_user_application_rework(
     preview_task = asyncio.create_task(
         _blocks_preview_html(app_row.get("blocks") if app_row else None)
     )
-    await _send_rework_pdf_if_possible(bot, user_id, app_id, app_row)
-    await _send_feedback_attachment_if_present(
-        bot,
-        user_id,
-        app_id,
-        feedback_files=feedback_files,
-    )
     preview_html = await preview_task
 
     if web_wording:
@@ -234,6 +227,7 @@ async def notify_user_application_rework(
             "Выберите блок для редактирования:"
         )
 
+    text_sent = True
     try:
         await bot.send_message(
             user_id,
@@ -242,7 +236,20 @@ async def notify_user_application_rework(
             reply_markup=reply_markup,
         )
     except Exception as e:
+        text_sent = False
         logger.error(
             "Failed to notify user {} about rework for app {}: {}",
             user_id, app_id, e,
+        )
+
+    # По запросу UX: сначала текст, потом докидываем документы.
+    if text_sent:
+        await asyncio.gather(
+            _send_rework_pdf_if_possible(bot, user_id, app_id, app_row),
+            _send_feedback_attachment_if_present(
+                bot,
+                user_id,
+                app_id,
+                feedback_files=feedback_files,
+            ),
         )

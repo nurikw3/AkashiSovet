@@ -117,6 +117,11 @@ def _normalize_feedback_text(feedback: str) -> str:
     return normalized
 
 
+def _optional_feedback_text(feedback: str) -> str | None:
+    normalized = feedback.strip()
+    return normalized or None
+
+
 def _is_htmx_request(request: Request) -> bool:
     return "hx-request" in request.headers
 
@@ -285,18 +290,31 @@ async def approve_app(
     request: Request,
     app_id: int,
     background_tasks: BackgroundTasks,
+    feedback: str = Form(""),
+    feedback_files: list[UploadFile] | None = File(default=None),
     admin_id=Depends(get_admin),
 ):
-    row = await application_service.approve(app_id)
+    feedback_text = _optional_feedback_text(feedback)
+    feedback_files_data = await _read_feedback_files(feedback_files)
+    row = await application_service.approve(app_id, feedback=feedback_text)
     if row:
-        logger.info("Admin {} approved application {}", admin_id, app_id)
+        logger.info(
+            "Admin {} approved application {}. Feedback len: {}, attachments: {}",
+            admin_id,
+            app_id,
+            len(feedback_text or ""),
+            len(feedback_files_data),
+        )
         if row.user_id:
             background_tasks.add_task(
                 notify_user_application_approved,
                 request.app.state.tg_bot,
                 row.user_id,
                 app_id,
-                pdf_file_id=None,
+                pdf_file_id=row.pdf_file_id,
+                feedback=feedback_text,
+                feedback_files=feedback_files_data,
+                web_wording=True,
             )
     else:
         logger.warning("Admin {} tried to approve application {}, but it failed", admin_id, app_id)

@@ -119,9 +119,9 @@ async def clear_main_pdf(app_id: int) -> None:
     await db.clear_main_pdf(app_id)
 
 
-async def approve(app_id: int) -> Application | None:
+async def approve(app_id: int, feedback: str | None = None) -> Application | None:
     """Согласование заявки."""
-    await db.update_status(app_id, "approved")
+    await db.update_status(app_id, "approved", feedback=feedback)
     await db.set_t_decision(app_id)
     app = await get_application(app_id)
     await publish_application_changed(

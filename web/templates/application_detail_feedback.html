@@ -1,8 +1,15 @@
 <div id="app-detail-feedback">
     {% if app.feedback %}
+    {% if app.status == 'approved' %}
+    <div class="p-4 rounded border border-green-600/20 bg-green-600/5">
+        <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-green-700 dark:text-green-400 mb-2" data-i18n="app.comment">Комментарий</p>
+        <p class="text-sm text-green-800 dark:text-green-300 whitespace-pre-wrap break-words leading-relaxed">{{ app.feedback }}</p>
+    </div>
+    {% else %}
     <div class="p-4 rounded border border-ak-red/20 bg-ak-red/5">
         <p class="text-[8px] font-mono font-bold tracking-[.15em] uppercase text-ak-red dark:text-ak-red-d mb-2" data-i18n="app.comment">Комментарий</p>
         <p class="text-sm text-ak-red dark:text-ak-red-d whitespace-pre-wrap break-words leading-relaxed">{{ app.feedback }}</p>
     </div>
+    {% endif %}
     {% endif %}
 </div>

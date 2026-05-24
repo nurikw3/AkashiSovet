@@ -123,12 +123,13 @@ async def _send_rework_pdf_if_possible(
         )
 
 
-async def _send_feedback_attachment_if_present(
+async def _send_feedback_attachments(
     bot: Bot,
     user_id: int,
     app_id: int,
     *,
     feedback_files: list[tuple[str, bytes]] | None,
+    caption_note: str,
 ) -> None:
     if not feedback_files:
         return
@@ -140,7 +141,7 @@ async def _send_feedback_attachment_if_present(
                     file_bytes,
                     filename=file_name,
                 ),
-                caption=f"📎 Файл {idx}/{len(feedback_files)} с замечаниями к заявке #{app_id}.",
+                caption=f"📎 Файл {idx}/{len(feedback_files)} {caption_note} к заявке #{app_id}.",
             )
         except Exception as e:
             logger.warning(
@@ -159,11 +160,52 @@ async def notify_user_application_approved(
     app_id: int,
     *,
     pdf_file_id: str | None = None,
+    feedback: str | None = None,
+    feedback_files: list[tuple[str, bytes]] | None = None,
+    web_wording: bool = False,
 ) -> None:
     """
     Уведомляет автора о согласовании.
-    Если передан pdf_file_id — отправляет документ; иначе короткое HTML-сообщение.
+    Сначала текст (с опциональным комментарием), затем PDF и вложения.
     """
+    feedback_text = (feedback or "").strip()
+    has_extra = bool(feedback_text or feedback_files)
+
+    if has_extra:
+        if web_wording:
+            text = (
+                f"✅ <b>Заявка #{app_id} согласована.</b>\n\n"
+                f"<b>Комментарий:</b>\n{feedback_text or '—'}\n\n"
+                "Документ передан в дальнейшую работу."
+            )
+        else:
+            text = (
+                f"✅ Заявка #{app_id} согласована.\n\n"
+                f"<b>Комментарий:</b>\n{feedback_text or '—'}\n\n"
+                "Документ передан в дальнейшую работу."
+            )
+        text_sent = True
+        try:
+            await bot.send_message(user_id, text, parse_mode="HTML")
+        except Exception as e:
+            text_sent = False
+            logger.error(
+                "Failed to notify user {} about approval for app {}: {}",
+                user_id,
+                app_id,
+                e,
+            )
+        if text_sent:
+            await _send_approval_pdf_if_possible(bot, user_id, app_id, pdf_file_id)
+            await _send_feedback_attachments(
+                bot,
+                user_id,
+                app_id,
+                feedback_files=feedback_files,
+                caption_note="к согласованию",
+            )
+        return
+
     try:
         if pdf_file_id:
             await bot.send_document(
@@ -182,6 +224,29 @@ async def notify_user_application_approved(
         logger.error(
             "Failed to notify user {} about approval for app {}: {}",
             user_id, app_id, e,
+        )
+
+
+async def _send_approval_pdf_if_possible(
+    bot: Bot,
+    user_id: int,
+    app_id: int,
+    pdf_file_id: str | None,
+) -> None:
+    if not pdf_file_id:
+        return
+    try:
+        await bot.send_document(
+            user_id,
+            document=pdf_file_id,
+            caption=f"📄 Согласованная версия заявки #{app_id}.",
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to send approval PDF to user {} for app {}: {}",
+            user_id,
+            app_id,
+            e,
         )
 
 
@@ -246,10 +311,11 @@ async def notify_user_application_rework(
     if text_sent:
         await asyncio.gather(
             _send_rework_pdf_if_possible(bot, user_id, app_id, app_row),
-            _send_feedback_attachment_if_present(
+            _send_feedback_attachments(
                 bot,
                 user_id,
                 app_id,
                 feedback_files=feedback_files,
+                caption_note="с замечаниями",
             ),
         )

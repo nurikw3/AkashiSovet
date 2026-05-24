@@ -27,7 +27,9 @@
     <td class="px-4 py-3 max-w-xs">
         <a href="/applications/{{ app.id }}" class="text-sm text-[#444] dark:text-[#CCC8C0] truncate hover:text-ak-red dark:hover:text-ak-red-d transition-colors block" title="{{ app.topic }}">{{ app.topic }}</a>
         {% if app.feedback %}
-        <p class="text-[8px] font-mono text-ak-red mt-0.5 truncate" title="{{ app.feedback }}">↩ {{ app.feedback }}</p>
+        <p class="text-[8px] font-mono mt-0.5 truncate {% if app.status == 'approved' %}text-green-700 dark:text-green-400{% else %}text-ak-red{% endif %}" title="{{ app.feedback }}">
+            {% if app.status == 'approved' %}✓{% else %}↩{% endif %} {{ app.feedback }}
+        </p>
         {% endif %}
     </td>
 
@@ -91,14 +93,44 @@
     <td class="px-4 py-3 text-right">
         {% if app.status == 'pending' %}
         <div id="actions-{{ app.id }}" class="flex items-center justify-end gap-2">
-            <form method="post" action="/approve/{{ app.id }}" hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML">
-                <button
-                    class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
-                    data-i18n="btn.approve">Согласовать</button>
-            </form>
-            <button onclick="showRejectForm({{ app.id }})"
+            <button type="button" onclick="showApproveForm({{ app.id }})"
+                class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
+                data-i18n="btn.approve">Согласовать</button>
+            <button type="button" onclick="showRejectForm({{ app.id }})"
                 class="ak-btn-ghost border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
                 data-i18n="btn.rework">На доработку</button>
+        </div>
+        <div id="approve-form-{{ app.id }}" class="hidden mt-2">
+            <form method="post" action="/approve/{{ app.id }}" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/approve/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"
+                  class="flex flex-col gap-2 items-end">
+                <textarea name="feedback" rows="2" data-auto-expand="true"
+                    data-i18n-ph="approve.ph"
+                    placeholder="Комментарий к согласованию (необязательно)..."
+                    class="ak-input w-60 text-xs resize-none overflow-hidden"></textarea>
+                <div class="w-60 flex items-center justify-between gap-2">
+                    <label for="feedback-file-approve-{{ app.id }}"
+                        class="inline-flex items-center gap-1 text-[9px] font-mono tracking-wide uppercase text-[#706860] dark:text-[#a09890] hover:text-green-700 dark:hover:text-green-400 cursor-pointer transition-colors"
+                        title="Прикрепить файл">
+                        📎 <span>Файлы</span>
+                    </label>
+                    <input id="feedback-file-approve-{{ app.id }}" type="file" name="feedback_files" multiple class="hidden"
+                        onchange="onFeedbackFileSelected(this)">
+                    <button type="button" class="text-[8px] font-mono text-[#a09890] hover:text-green-700 transition-colors hidden"
+                        data-feedback-clear-btn onclick="clearFeedbackFiles('feedback-file-approve-{{ app.id }}')">Очистить</button>
+                </div>
+                <div class="w-60" data-feedback-files>
+                    <div class="feedback-file-name text-[8px] font-mono text-[#a09890] truncate"></div>
+                    <div class="feedback-file-list mt-1 space-y-1"></div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="hideApproveForm({{ app.id }})"
+                        class="text-[9px] font-mono text-[#a09890] hover:text-[#666] transition-colors"
+                        data-i18n="btn.cancel">Отменить</button>
+                    <button type="submit"
+                        class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400 text-[9px] h-auto py-2"
+                        data-i18n="btn.approve_confirm">Согласовать</button>
+                </div>
+            </form>
         </div>
         <div id="reject-form-{{ app.id }}" class="hidden mt-2">
             <form method="post" action="/reject/{{ app.id }}" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/reject/{{ app.id }}" hx-target="#row-{{ app.id }}" hx-swap="outerHTML"

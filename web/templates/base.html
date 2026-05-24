@@ -68,6 +68,7 @@
                 'count.total': 'Всего заявок',
 
                 'btn.approve': 'Согласовать',
+                'btn.approve_confirm': 'Согласовать',
                 'btn.rework': 'На доработку',
                 'btn.cancel': 'Отменить',
                 'btn.send': 'Отправить',
@@ -129,6 +130,7 @@
                 'app.delete_confirm_body': 'Вы уверены, что хотите безвозвратно удалить эту ПЗ?',
                 'app.delete_confirm_yes': 'Да, удалить',
 
+                'approve.ph': 'Комментарий к согласованию (необязательно)...',
                 'rework.ph': 'Укажите замечания...',
                 'rework.approved.ph': 'Причина возврата на доработку...',
             },
@@ -161,6 +163,7 @@
                 'count.total': 'Total',
 
                 'btn.approve': 'Approve',
+                'btn.approve_confirm': 'Approve',
                 'btn.rework': 'Rework',
                 'btn.cancel': 'Cancel',
                 'btn.send': 'Send',
@@ -222,6 +225,7 @@
                 'app.delete_confirm_body': 'Are you sure you want to permanently delete this application?',
                 'app.delete_confirm_yes': 'Yes, delete',
 
+                'approve.ph': 'Approval comment (optional)...',
                 'rework.ph': 'Enter feedback...',
                 'rework.approved.ph': 'Reason for returning to rework...',
             }
@@ -437,9 +441,20 @@
             _updateFeedbackFilesView(input, []);
         }
 
-        /* Reject / Rework form helpers */
+        /* Approve / Reject / Rework form helpers */
+        function showApproveForm(id) {
+            document.getElementById('actions-' + id)?.classList.add('hidden');
+            document.getElementById('reject-form-' + id)?.classList.add('hidden');
+            document.getElementById('approve-form-' + id)?.classList.remove('hidden');
+            initAutoExpandByContainerId('approve-form-' + id);
+        }
+        function hideApproveForm(id) {
+            document.getElementById('approve-form-' + id)?.classList.add('hidden');
+            document.getElementById('actions-' + id)?.classList.remove('hidden');
+        }
         function showRejectForm(id) {
             document.getElementById('actions-' + id)?.classList.add('hidden');
+            document.getElementById('approve-form-' + id)?.classList.add('hidden');
             document.getElementById('reject-form-' + id)?.classList.remove('hidden');
             initAutoExpandByContainerId('reject-form-' + id);
         }

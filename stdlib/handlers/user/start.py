@@ -91,6 +91,8 @@ async def _prompt_creation_path(message: Message | CallbackQuery, state: FSMCont
 
 
 async def _enter_fill_flow(target: Message | CallbackQuery, state: FSMContext, app_id: int):
+    from stdlib.handlers.user.filling import send_block_input_screen
+
     user_id = target.from_user.id if isinstance(target, Message) else target.from_user.id
     mode = await db.get_user_mode(user_id)
     send_fn = target.answer if isinstance(target, Message) else target.message.answer
@@ -103,19 +105,18 @@ async def _enter_fill_flow(target: Message | CallbackQuery, state: FSMContext, a
             "Напишите всю суть вашей заявки в одном или нескольких сообщениях.\n"
             "Я проанализирую текст и задам уточняющие вопросы, если чего-то будет не хватать.",
             parse_mode="HTML",
+            reply_markup=kb.free_form_keyboard(),
         )
     else:
         tpl = await get_template()
         first = tpl.blocks[0]
         await state.set_state(BotStates.FILLING)
-        await state.update_data(
-            app_id=app_id, current_block=first.id, mode="input"
-        )
-        await send_fn(
-            "Добрый день! Заполним служебную записку на Правление.\n\n"
-            f"<b>Блок 1 из {tpl.total_blocks_count} — {first.title}</b>\n\n"
-            f"{first.question}",
-            parse_mode="HTML",
+        await state.update_data(app_id=app_id, current_block=first.id, mode="input")
+        await send_block_input_screen(
+            target,
+            state,
+            first.id,
+            intro="Добрый день! Заполним служебную записку на Правление.",
         )
 
 
@@ -332,4 +333,27 @@ async def on_start_flow_pdf(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(
         "📄 Отправьте готовый PDF заявки одним сообщением.\n\n"
         "После загрузки можно будет добавить приложения и отправить заявку.",
+        reply_markup=kb.main_pdf_keyboard(),
     )
+
+
+@router.callback_query(BotStates.WAITING_MAIN_PDF, F.data == "main_pdf_back")
+async def on_main_pdf_back(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Черновик не найден.", show_alert=True)
+        return
+    await callback.answer()
+    await _prompt_creation_path(callback, state, app_id)
+
+
+@router.callback_query(BotStates.FREE_FORM, F.data == "free_form_back")
+async def on_free_form_back(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Черновик не найден.", show_alert=True)
+        return
+    await callback.answer()
+    await _prompt_creation_path(callback, state, app_id)

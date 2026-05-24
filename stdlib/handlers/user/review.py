@@ -116,39 +116,31 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
 
 @router.callback_query(BotStates.REVIEW, F.data.startswith("review_edit_"))
 async def on_review_edit(callback: CallbackQuery, state: FSMContext):
+    from stdlib.handlers.user.filling import send_block_input_screen
+
     block_num = int(callback.data.split("_")[2])
-    await state.update_data(
-        current_block=block_num, mode="input", returning_to="review"
-    )
+    await state.update_data(returning_to="review")
     await state.set_state(BotStates.FILLING)
-
-    tpl = await get_template()
-    try:
-        b = tpl.get_block(block_num)
-        title = b.title
-    except ValueError:
-        title = f"блок {block_num}"
-
-    await callback.message.answer(
-        f"<b>Редактирование: Блок {block_num} — {title}</b>\n\nВведите новый текст для этого блока:",
-        parse_mode="HTML",
-    )
     await callback.answer()
+    await send_block_input_screen(callback, state, block_num, style="review_edit")
 
 
 @router.callback_query(BotStates.REVIEW, F.data == "review_files")
 async def on_review_files(callback: CallbackQuery, state: FSMContext):
+    from stdlib.handlers.user.files import send_files_screen
+
     data = await state.get_data()
-    app = await application_service.get_application(data["app_id"])
-    attachment_names = [att.name for att in (app.attachments or [])] if app else []
-    await state.update_data(current_block="files", returning_to="review")
-    await state.set_state(BotStates.FILLING)
-    await callback.message.answer(
-        "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите.",
-        parse_mode="HTML",
-        reply_markup=kb.files_keyboard(attachment_names),
-    )
     await callback.answer()
+    await send_files_screen(callback, state, data["app_id"], returning_to="review")
+
+
+@router.callback_query(BotStates.REVIEW, F.data == "review_back")
+async def on_review_back(callback: CallbackQuery, state: FSMContext):
+    from stdlib.handlers.user.files import send_files_screen
+
+    data = await state.get_data()
+    await callback.answer()
+    await send_files_screen(callback, state, data["app_id"])
 
 
 @router.callback_query(BotStates.REVIEW, F.data == "review_submit")

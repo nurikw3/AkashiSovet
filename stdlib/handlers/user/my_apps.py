@@ -68,6 +68,50 @@ def _format_card(app: dict) -> str:
     return f"<b>#{app_id}</b> | {topic}\n📅 {date_str} | {_status_label(app.get('status'))}"
 
 
+async def send_app_card(target: Message | CallbackQuery, app_id: int) -> None:
+    """Отправляет карточку заявки новым сообщением (не редактирует текущее)."""
+    app = await application_service.get_application(app_id)
+    send_fn = target.answer if isinstance(target, Message) else target.message.answer
+    if not app:
+        await send_fn("❌ Заявка не найдена")
+        return
+
+    tpl = await get_template()
+    first_key = str(tpl.first_block_id)
+    topic = app.blocks.get(first_key, "Без темы") if app.blocks else "Без темы"
+    date_str = (
+        format_app_datetime(app.created_at, "%d.%m.%Y %H:%M")
+        if app.created_at is not None
+        else ""
+    )
+    txt = (
+        f"📄 <b>Заявка #{app_id}</b>\n"
+        f"📌 Тема: {topic}\n"
+        f"📊 Статус: {_status_label(app.status)}\n"
+        f"📅 Создана: {date_str}\n"
+    )
+
+    kb_rows = [[InlineKeyboardButton(text="📥 PDF", callback_data=f"apps_dl_{app_id}")]]
+    if app.status in ("draft", "rework", "approved", "pending"):
+        kb_rows.append(
+            [
+                InlineKeyboardButton(
+                    text="✏️ Редактировать", callback_data=f"apps_rework_{app_id}"
+                )
+            ]
+        )
+    kb_rows.append(
+        [InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"apps_del_{app_id}")]
+    )
+    kb_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="apps_back")])
+
+    await send_fn(
+        txt,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows),
+    )
+
+
 async def _safe_edit(msg, text: str, reply_markup=None, parse_mode="HTML"):
     """Универсальная функция: редактирует или отправляет новое сообщение"""
     try:
@@ -316,7 +360,7 @@ async def cb_rework_start(callback: CallbackQuery, state: FSMContext):
     tpl = await get_template()
     await state.set_state(BotStates.REWORK)
     await state.update_data(
-        app_id=app_id, rework_block=tpl.first_block_id, mode="input"
+        app_id=app_id, rework_block=tpl.first_block_id, mode="input", rework_screen="menu"
     )
     await callback.message.delete()
     await callback.message.answer(

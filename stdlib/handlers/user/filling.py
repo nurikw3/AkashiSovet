@@ -1,4 +1,6 @@
 # stdlib/handlers/user/filling.py
+from html import escape
+
 import stdlib.keyboards as kb
 from stdlib.services import application_service
 import stdlib.llm.formatter as llm
@@ -12,7 +14,7 @@ from stdlib.telegram_summary import (
     chunk_blocks_summary_html,
     INTRO_STEP_FILLED_HTML,
 )
-from stdlib.template import get_template
+from stdlib.template import ApplicationTemplate, get_template
 
 router = Router()
 
@@ -32,6 +34,14 @@ async def _block_title(block_id: int) -> str:
         return f"блок {block_id}"
 
 
+def block_show_back(
+    block_id: int, returning_to: str | None, tpl: ApplicationTemplate
+) -> bool:
+    if returning_to in ("review", "rework"):
+        return True
+    return tpl.get_prev_block_id(block_id) is not None
+
+
 async def _get_context(app_id: int, current_block: int, pending: str | None) -> dict:
     app = await application_service.get_application(app_id)
     if not app:
@@ -42,6 +52,77 @@ async def _get_context(app_id: int, current_block: int, pending: str | None) -> 
     return context_blocks
 
 
+def _answer_fn(target: Message | CallbackQuery):
+    return target.answer if isinstance(target, Message) else target.message.answer
+
+
+async def send_block_input_screen(
+    target: Message | CallbackQuery,
+    state: FSMContext,
+    block_id: int,
+    *,
+    intro: str | None = None,
+    style: str = "question",
+) -> None:
+    """Показать экран ввода блока. style: question | edit | review_edit | saved."""
+    data = await state.get_data()
+    returning_to = data.get("returning_to")
+    tpl = await get_template()
+    b = tpl.get_block(block_id)
+    idx = tpl.block_index_1based(block_id)
+    total = tpl.total_blocks_count
+    show_back = block_show_back(block_id, returning_to, tpl)
+
+    await state.update_data(
+        current_block=block_id,
+        mode="input",
+        pending_formatted=None,
+        confirm_dialog_block=None,
+    )
+
+    send_fn = _answer_fn(target)
+    markup = kb.block_input_keyboard(block_id, show_back=show_back)
+
+    if style == "edit":
+        await send_fn(
+            f"Введите исправленный текст для блока «{b.title}»:",
+            reply_markup=markup,
+        )
+        return
+
+    if style == "review_edit":
+        await send_fn(
+            f"<b>Редактирование: Блок {idx} — {b.title}</b>\n\n"
+            "Введите новый текст для этого блока:",
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+        return
+
+    lines: list[str] = []
+    if intro:
+        lines.append(intro)
+    lines.append(f"<b>Блок {idx} из {total} — {b.title}</b>")
+
+    if style == "saved":
+        app = await application_service.get_application(data.get("app_id"))
+        if app:
+            saved_raw = (app.blocks.get(str(block_id), "") or "").strip()
+            if saved_raw:
+                lines.append(
+                    f"<b>Сохранённый текст:</b>\n<pre>{escape(saved_raw)}</pre>"
+                )
+
+    lines.append(b.question)
+    await send_fn("\n\n".join(lines), parse_mode="HTML", reply_markup=markup)
+
+
+async def _confirm_show_back(block_id: int, state: FSMContext) -> bool:
+    data = await state.get_data()
+    tpl = await get_template()
+    return block_show_back(block_id, data.get("returning_to"), tpl)
+
+
 async def _send_confirm(
     message: Message, state: FSMContext, text: str, intro: str, block_id: int
 ):
@@ -50,32 +131,25 @@ async def _send_confirm(
         pending_formatted=text,
         confirm_dialog_block=block_id,
     )
+    show_back = await _confirm_show_back(block_id, state)
+    markup = kb.confirm_keyboard(block_id, show_back=show_back)
 
-    # 1. Экранируем ввод пользователя (intro), так как он может содержать спецсимволы
     safe_intro = escape_markdown_v2(intro)
-
-    # 2. Формируем блок кода.
-    # Важно: сам текст внутри блока кода НЕ нужно экранировать полностью,
-    # но тройные кавычки внутри текста могут сломать разметку.
-    # Для простоты заменим тройные кавычки внутри ответа на одинарные или экранируем их.
     safe_text = text.replace("```", "\\`\\`\\`")
-
-    # Оборачиваем в блок кода с указанием языка 'text' (чтобы не было подсветки синтаксиса, которая может глючить)
     code_block = f"```\n{safe_text}\n```"
-
     final_message = f"{safe_intro}\n\n{code_block}\n\n_Всё верно?_"
 
     try:
         await message.answer(
             final_message,
             parse_mode="MarkdownV2",
-            reply_markup=kb.confirm_keyboard(block_id),
+            reply_markup=markup,
         )
     except Exception as e:
         logger.error("MarkdownV2 send failed: {}", e)
         await message.answer(
             f"{intro}\n\n{text}\n\nВсё верно?",
-            reply_markup=kb.confirm_keyboard(block_id),
+            reply_markup=markup,
         )
 
 
@@ -90,9 +164,10 @@ async def handle_block_input(message: Message, state: FSMContext):
         bid = data.get("confirm_dialog_block")
         if not isinstance(bid, int):
             bid = data["current_block"] if isinstance(data.get("current_block"), int) else 1
+        show_back = await _confirm_show_back(bid, state)
         await message.answer(
             "Используйте кнопки под предыдущим сообщением с вариантом текста.",
-            reply_markup=kb.confirm_keyboard(bid),
+            reply_markup=kb.confirm_keyboard(bid, show_back=show_back),
         )
         return
 
@@ -199,12 +274,10 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
 
     await callback.answer()
 
-    # Сохраняем в БД по номеру блока из кнопки (не из state — он мог уже перейти к следующему)
     pending = data["pending_formatted"]
     await application_service.save_block(data["app_id"], confirmed_block, pending)
     await state.update_data(pending_formatted=None, confirm_dialog_block=None)
 
-    # Если пришли из экрана ревью — возвращаемся обратно
     if data.get("returning_to") == "review":
         from stdlib.handlers.user.review import send_review_screen
 
@@ -217,17 +290,9 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
     next_id = tpl.get_next_block_id(confirmed_block)
 
     if next_id is not None:
-        b = tpl.get_block(next_id)
-        idx = tpl.block_index_1based(next_id)
-        total = tpl.total_blocks_count
-        await state.update_data(current_block=next_id, mode="input")
-        await callback.message.answer(
-            f"<b>Блок {idx} из {total} — {b.title}</b>\n\n{b.question}",
-            parse_mode="HTML",
-        )
+        await send_block_input_screen(callback, state, next_id)
         return
 
-    # Все блоки шаблона заполнены — переходим к файлам (та же сводка, что и в free-form)
     await state.update_data(current_block="files", mode="input")
     app_row = await application_service.get_application(data["app_id"])
     tpl = await get_template()
@@ -252,13 +317,67 @@ async def on_edit(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.answer()
-    await state.update_data(
-        mode="input",
-        current_block=edit_block,
-        pending_formatted=None,
-        confirm_dialog_block=None,
-    )
-    block_title = await _block_title(edit_block)
-    await callback.message.answer(
-        f"Введите исправленный текст для блока «{block_title}»:"
-    )
+    await send_block_input_screen(callback, state, edit_block, style="edit")
+
+
+@router.callback_query(BotStates.FILLING, F.data.startswith("fcb_back_"))
+async def on_block_back(callback: CallbackQuery, state: FSMContext):
+    try:
+        back_from_block = int(callback.data.removeprefix("fcb_back_"))
+    except ValueError:
+        await callback.answer("Некорректная кнопка.", show_alert=True)
+        return
+
+    data = await state.get_data()
+    mode = data.get("mode")
+    current = data.get("current_block")
+
+    if mode == "confirm":
+        cdb = data.get("confirm_dialog_block")
+        if cdb is not None and back_from_block != cdb:
+            await callback.answer(
+                "Эта кнопка устарела — смотрите последнее сообщение бота.",
+                show_alert=True,
+            )
+            return
+    elif isinstance(current, int) and current != back_from_block:
+        await callback.answer(
+            "Эта кнопка устарела — смотрите последнее сообщение бота.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+
+    returning_to = data.get("returning_to")
+    if returning_to == "review":
+        from stdlib.handlers.user.review import send_review_screen
+
+        await state.set_state(BotStates.REVIEW)
+        await state.update_data(
+            returning_to=None,
+            pending_formatted=None,
+            confirm_dialog_block=None,
+        )
+        await send_review_screen(callback, data["app_id"])
+        return
+
+    if returning_to == "rework":
+        from stdlib.handlers.user.rework import send_rework_menu
+
+        await state.set_state(BotStates.REWORK)
+        await state.update_data(
+            returning_to=None,
+            pending_formatted=None,
+            confirm_dialog_block=None,
+        )
+        await send_rework_menu(callback, data["app_id"])
+        return
+
+    tpl = await get_template()
+    prev_id = tpl.get_prev_block_id(back_from_block)
+    if prev_id is None:
+        await callback.answer("Это первый блок.", show_alert=True)
+        return
+
+    await send_block_input_screen(callback, state, prev_id, style="saved")

@@ -48,6 +48,44 @@ def _files_keyboard_for_app(raw_app: dict, attachments: list[dict]):
     )
 
 
+async def send_files_screen(
+    target: Message | CallbackQuery,
+    state: FSMContext,
+    app_id: int,
+    *,
+    returning_to: str | None = None,
+    message_text: str | None = None,
+) -> None:
+    app_record = await application_service.get_application_record(app_id)
+    app_model = await application_service.get_application(app_id)
+    attachments = _load_attachments(app_record.get("attachments") if app_record else None)
+    names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
+    if app_model and app_model.attachments:
+        names = [att.name for att in app_model.attachments]
+
+    has_main_pdf = bool(app_record and app_record.get("main_pdf_s3_key"))
+    update_data: dict = {
+        "app_id": app_id,
+        "current_block": "files",
+        "mode": "input",
+        "returning_to": returning_to,
+    }
+    await state.set_state(BotStates.FILLING)
+    await state.update_data(**update_data)
+
+    if has_main_pdf:
+        markup = kb.files_keyboard_with_main_pdf(names, has_main_pdf=True)
+    else:
+        markup = kb.files_keyboard(names)
+
+    send_fn = target.answer if isinstance(target, Message) else target.message.answer
+    text = (
+        message_text
+        or "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите."
+    )
+    await send_fn(text, parse_mode="HTML", reply_markup=markup)
+
+
 @router.message(BotStates.FILLING, F.document | F.photo)
 async def handle_file(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -169,7 +207,8 @@ async def on_main_pdf_replace(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(BotStates.WAITING_MAIN_PDF)
     await callback.message.answer(
-        "📄 Отправьте новый PDF, чтобы заменить текущий основной документ."
+        "📄 Отправьте новый PDF, чтобы заменить текущий основной документ.",
+        reply_markup=kb.main_pdf_keyboard(),
     )
 
 
@@ -217,7 +256,7 @@ async def on_files_done(callback: CallbackQuery, state: FSMContext):
 
     if data.get("returning_to") == "rework":
         await state.set_state(BotStates.REWORK)
-        await state.update_data(returning_to=None, mode="input")
+        await state.update_data(returning_to=None, mode="input", rework_screen="menu")
         tpl = await get_template()
         await callback.message.answer(
             "Файлы обновлены. Выберите блок для правки или отправьте заявку повторно:",
@@ -229,3 +268,37 @@ async def on_files_done(callback: CallbackQuery, state: FSMContext):
     if data.get("returning_to") == "review":
         await state.update_data(returning_to=None)
     await send_review_screen(callback, app_id)
+
+
+@router.callback_query(BotStates.FILLING, F.data == "files_back")
+async def on_files_back(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("current_block") != "files":
+        await callback.answer(
+            "Эта кнопка устарела — смотрите последнее сообщение бота.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer()
+    app_id = data["app_id"]
+    returning_to = data.get("returning_to")
+
+    if returning_to == "review":
+        await state.set_state(BotStates.REVIEW)
+        await state.update_data(returning_to=None)
+        await send_review_screen(callback, app_id)
+        return
+
+    if returning_to == "rework":
+        from stdlib.handlers.user.rework import send_rework_menu
+
+        await state.set_state(BotStates.REWORK)
+        await state.update_data(returning_to=None, rework_screen="menu")
+        await send_rework_menu(callback, app_id)
+        return
+
+    from stdlib.handlers.user.filling import send_block_input_screen
+
+    tpl = await get_template()
+    await send_block_input_screen(callback, state, tpl.last_block_id, style="saved")

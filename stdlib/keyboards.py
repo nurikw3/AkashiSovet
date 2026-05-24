@@ -6,26 +6,56 @@ def _cancel_button():
     return [InlineKeyboardButton(text="❌ Отменить заявку", callback_data="cancel_app")]
 
 
-def confirm_keyboard(block_id: int) -> InlineKeyboardMarkup:
+def _back_button(callback_data: str) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text="◀️ Назад", callback_data=callback_data)
+
+
+def confirm_keyboard(block_id: int, *, show_back: bool = False) -> InlineKeyboardMarkup:
     """Кнопки привязаны к номеру блока — после перехода на следующий блок старые «Исправить» всё ещё ведут в нужный блок."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Подтвердить",
-                    callback_data=f"fcb_confirm_{block_id}",
-                ),
-                InlineKeyboardButton(
-                    text="✏️ Исправить",
-                    callback_data=f"fcb_edit_{block_id}",
-                ),
-            ],
-            [_cancel_button()[0]],
-        ]
-    )
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                text="✅ Подтвердить",
+                callback_data=f"fcb_confirm_{block_id}",
+            ),
+            InlineKeyboardButton(
+                text="✏️ Исправить",
+                callback_data=f"fcb_edit_{block_id}",
+            ),
+        ],
+    ]
+    if show_back:
+        rows.append([_back_button(f"fcb_back_{block_id}")])
+    rows.append([_cancel_button()[0]])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def files_keyboard(attachment_names: list[str] | None = None) -> InlineKeyboardMarkup:
+def block_input_keyboard(block_id: int, *, show_back: bool = False) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if show_back:
+        rows.append([_back_button(f"fcb_back_{block_id}")])
+    rows.append([_cancel_button()[0]])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _files_action_rows(*, show_back: bool = True) -> list[list[InlineKeyboardButton]]:
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
+        ],
+    ]
+    if show_back:
+        rows.append([_back_button("files_back")])
+    rows.append([_cancel_button()[0]])
+    return rows
+
+
+def files_keyboard(
+    attachment_names: list[str] | None = None,
+    *,
+    show_back: bool = True,
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for idx, name in enumerate(attachment_names or []):
         label = (name or f"Файл {idx + 1}").strip() or f"Файл {idx + 1}"
@@ -37,13 +67,7 @@ def files_keyboard(attachment_names: list[str] | None = None) -> InlineKeyboardM
                 )
             ]
         )
-    rows.append(
-        [
-            InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
-            InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
-        ]
-    )
-    rows.append([_cancel_button()[0]])
+    rows.extend(_files_action_rows(show_back=show_back))
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -51,6 +75,7 @@ def files_keyboard_with_main_pdf(
     attachment_names: list[str] | None = None,
     *,
     has_main_pdf: bool = False,
+    show_back: bool = True,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if has_main_pdf:
@@ -74,13 +99,7 @@ def files_keyboard_with_main_pdf(
                 )
             ]
         )
-    rows.append(
-        [
-            InlineKeyboardButton(text="✅ Готово", callback_data="files_done"),
-            InlineKeyboardButton(text="⏭ Пропустить", callback_data="files_skip"),
-        ]
-    )
-    rows.append([_cancel_button()[0]])
+    rows.extend(_files_action_rows(show_back=show_back))
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -147,6 +166,7 @@ def rework_keyboard(tpl: ApplicationTemplate, app_id: int | None = None) -> Inli
             ),
         ]
     )
+    buttons.append([_back_button("rework_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -174,6 +194,7 @@ def review_keyboard(tpl: ApplicationTemplate) -> InlineKeyboardMarkup:
             ),
         ]
     )
+    buttons.append([_back_button("review_back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -186,7 +207,16 @@ def confirm_rework_keyboard() -> InlineKeyboardMarkup:
                 ),
                 InlineKeyboardButton(text="✏️ Исправить", callback_data="rework_edit"),
             ],
+            [_back_button("rework_back")],
             [_cancel_button()[0]],
+        ]
+    )
+
+
+def rework_block_input_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_back_button("rework_back")],
         ]
     )
 
@@ -220,6 +250,24 @@ def start_creation_path_keyboard() -> InlineKeyboardMarkup:
                     text="📄 Загрузить готовый PDF", callback_data="start_flow_pdf"
                 )
             ],
+            [_cancel_button()[0]],
+        ]
+    )
+
+
+def main_pdf_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_back_button("main_pdf_back")],
+            [_cancel_button()[0]],
+        ]
+    )
+
+
+def free_form_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_back_button("free_form_back")],
             [_cancel_button()[0]],
         ]
     )

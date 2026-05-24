@@ -41,7 +41,10 @@ async def on_main_pdf_upload(message: Message, state: FSMContext):
 
     doc = message.document
     if not _is_pdf_document(doc):
-        await message.answer("Нужен именно PDF-файл. Отправьте документ с расширением .pdf.")
+        await message.answer(
+            "Нужен именно PDF-файл. Отправьте документ с расширением .pdf.",
+            reply_markup=kb.main_pdf_keyboard(),
+        )
         return
 
     if not s3.is_s3_configured():
@@ -96,4 +99,7 @@ async def on_main_pdf_upload(message: Message, state: FSMContext):
 
 @router.message(BotStates.WAITING_MAIN_PDF)
 async def on_main_pdf_invalid_message(message: Message):
-    await message.answer("Отправьте PDF-файл документом (не фото и не текст).")
+    await message.answer(
+        "Отправьте PDF-файл документом (не фото и не текст).",
+        reply_markup=kb.main_pdf_keyboard(),
+    )

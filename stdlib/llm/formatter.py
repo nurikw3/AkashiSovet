@@ -8,10 +8,16 @@ import json
 from bot.config import config
 from bot.logger import logger
 from stdlib.llm.client import langfuse, openai_client
-from stdlib.llm.prompts import EDITOR_SYSTEM, GENERATE_SYSTEM
-from stdlib.text_normalize import expand_numbered_newlines
+from stdlib.llm.prompts import EDITOR_SYSTEM, GENERATE_SYSTEM, NUMBERED_LIST_BLOCK_HINT
+from stdlib.text_normalize import ensure_structured_numbered_list, expand_numbered_newlines
 from stdlib.schemas import FormattedBlock, FormatResult
-from stdlib.template import get_template, ApplicationTemplate
+from stdlib.template import (
+    ApplicationTemplate,
+    BlockDefinition,
+    block_llm_instruction,
+    block_wants_numbered_list,
+    get_template,
+)
 
 from stdlib.cache import get_cached_llm_response, save_llm_response_to_cache
 
@@ -31,14 +37,30 @@ def _make_cache_key(
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _block_label(tpl: ApplicationTemplate, block_number: int | None) -> tuple[str, str]:
+def _block_label(tpl: ApplicationTemplate, block_number: int | None) -> tuple[str, str, BlockDefinition | None]:
     if not block_number:
-        return "текущий блок", "Нет описания"
+        return "текущий блок", "Нет описания", None
     try:
         b = tpl.get_block(block_number)
-        return f"блок {block_number} — «{b.title}»", b.question
+        return f"блок {block_number} — «{b.title}»", block_llm_instruction(b), b
     except ValueError:
-        return f"блок {block_number}", "Нет описания"
+        return f"блок {block_number}", "Нет описания", None
+
+
+def _format_block_output(text: str, block: BlockDefinition | None) -> str:
+    out = (text or "").strip()
+    if not out:
+        return out
+    out = expand_numbered_newlines(out)
+    if block and block_wants_numbered_list(block):
+        out = ensure_structured_numbered_list(out)
+    return out
+
+
+def _task_suffix(block: BlockDefinition | None) -> str:
+    if block and block_wants_numbered_list(block):
+        return f"\n\n{NUMBERED_LIST_BLOCK_HINT}"
+    return ""
 
 
 def _build_messages(
@@ -48,7 +70,8 @@ def _build_messages(
     generate: bool,
     tpl: ApplicationTemplate,
 ) -> list:
-    block_hint, block_question = _block_label(tpl, block_number)
+    block_hint, block_instruction, block = _block_label(tpl, block_number)
+    task_suffix = _task_suffix(block)
 
     if generate:
         return [
@@ -59,7 +82,7 @@ def _build_messages(
                     f"### КОНТЕКСТ\n{context_str}\n\n"
                     f"### ЗАДАЧА\n"
                     f"Предложи текст для {block_hint}.\n"
-                    f"Описание: {block_question}"
+                    f"Описание: {block_instruction}{task_suffix}"
                 ),
             },
         ]
@@ -69,7 +92,8 @@ def _build_messages(
         f"{context_str}\n\n"
         f"### ЗАДАЧА\n"
         f"Отредактируй ТОЛЬКО {block_hint}. "
-        f"Верни только текст этого блока, без заголовков и контекста.\n\n"
+        f"Верни только текст этого блока, без заголовков и контекста.\n"
+        f"Описание блока: {block_instruction}{task_suffix}\n\n"
         f"### ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ\n"
         f"{raw}"
     )
@@ -102,6 +126,12 @@ async def format_text(
 
     tpl = await get_template()
     messages = _build_messages(raw, context_str, block_number, generate, tpl)
+    block = None
+    if block_number:
+        try:
+            block = tpl.get_block(block_number)
+        except ValueError:
+            block = None
 
     async def _call(capture_usage: bool = False) -> FormatResult:
         cache_key = _make_cache_key(
@@ -116,11 +146,7 @@ async def format_text(
         cached = await get_cached_llm_response(cache_key)
         if cached:
             logger.info("LLM cache hit | hash={}", cache_key[:8])
-            out = (
-                expand_numbered_newlines(cached.strip())
-                if cached.strip()
-                else raw.strip()
-            )
+            out = _format_block_output(cached, block) if cached.strip() else raw.strip()
             return FormatResult(
                 text=out,
                 changed=out != raw.strip(),
@@ -174,7 +200,7 @@ async def format_text(
                 getattr(response.usage, "total_tokens", "?"),
             )
 
-            out = (parsed.text or "").strip()
+            out = _format_block_output(parsed.text or "", block)
             if not out:
                 out = raw.strip()
             return FormatResult(
@@ -186,7 +212,8 @@ async def format_text(
 
         except Exception as e:
             logger.error("format_text failed: {}. Returning raw.", e)
-            return FormatResult(text=raw, changed=False, block_number=block_number)
+            fallback = _format_block_output(raw, block)
+            return FormatResult(text=fallback, changed=False, block_number=block_number)
 
     if langfuse is None:
         return await _call()

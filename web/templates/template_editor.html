@@ -82,6 +82,11 @@
         document.body.addEventListener('htmx:beforeRequest', function (evt) {
             if (evt.detail.target && evt.detail.target.id === 'save-status') {
                 renumberAllSequential();
+                document.querySelectorAll('#block-rows .template-block-row').forEach(function (row) {
+                    var cb = row.querySelector('.js-numbered-list-cb');
+                    var hidden = row.querySelector('.js-numbered-list-hidden');
+                    if (cb && hidden) hidden.value = cb.checked ? '1' : '0';
+                });
             }
         });
 

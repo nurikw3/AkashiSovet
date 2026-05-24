@@ -119,7 +119,13 @@ async def template_editor_page(request: Request, admin_id=Depends(get_admin)):
 
 @router.get("/template/new-row", response_class=HTMLResponse)
 async def template_editor_new_row(request: Request, next_id: int, admin_id=Depends(get_admin)):
-    block = SimpleNamespace(id=next_id, title="", question="", description_for_llm=None)
+    block = SimpleNamespace(
+        id=next_id,
+        title="",
+        question="",
+        description_for_llm=None,
+        format_as_numbered_list=False,
+    )
     return templates.TemplateResponse(request=request, name="template_block_row.html", context={"block": block})
 
 @router.delete("/template/ui-row")
@@ -133,6 +139,7 @@ async def template_editor_save(
     block_title: list[str] = Form(...),
     block_question: list[str] = Form(...),
     block_desc: list[str] | None = Form(None),
+    block_numbered_list: list[str] | None = Form(None),
 ):
     n = len(block_id)
     if n == 0:
@@ -143,6 +150,10 @@ async def template_editor_save(
     while len(desc_list) < n:
         desc_list.append("")
 
+    numbered_list = block_numbered_list or []
+    while len(numbered_list) < n:
+        numbered_list.append("0")
+
     rows = []
     for i in range(n):
         rows.append({
@@ -150,6 +161,7 @@ async def template_editor_save(
             "title": (block_title[i] or "").strip(),
             "question": (block_question[i] or "").strip(),
             "description_for_llm": (desc_list[i] or "").strip() or None,
+            "format_as_numbered_list": numbered_list[i] in ("1", "true", "yes", "on"),
         })
 
     try:

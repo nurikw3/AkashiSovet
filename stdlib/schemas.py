@@ -5,8 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator, model_validator
 
-from stdlib.template import ApplicationTemplate
-from stdlib.text_normalize import expand_numbered_newlines
+from stdlib.template import ApplicationTemplate, block_llm_instruction, block_wants_numbered_list
+from stdlib.text_normalize import ensure_structured_numbered_list, expand_numbered_newlines
 
 
 def _strip_md(v: str) -> str:
@@ -24,12 +24,18 @@ def build_submit_memo_model(tpl: ApplicationTemplate) -> type[BaseModel]:
     field_defs: dict[str, Any] = {}
     for b in tpl.blocks:
         name = f"field_{b.id}"
+        desc = block_llm_instruction(b)
+        if block_wants_numbered_list(b):
+            desc = (
+                f"{desc}. Несколько вариантов, решений или поручений — "
+                "нумерованный список (1) … 2) …), каждый пункт с новой строки, не сплошным абзацем."
+            )
         field_defs[name] = (
             str,
             Field(
                 default="",
                 alias=str(b.id),
-                description=f"{b.title}. {b.question}",
+                description=desc,
             ),
         )
     return create_model(
@@ -40,12 +46,20 @@ def build_submit_memo_model(tpl: ApplicationTemplate) -> type[BaseModel]:
     )
 
 
-def strip_submit_memo_args(raw: dict[str, Any]) -> dict[str, Any]:
+def strip_submit_memo_args(raw: dict[str, Any], tpl: ApplicationTemplate | None = None) -> dict[str, Any]:
     """Очистка markdown и склеенных нумерованных списков перед model_validate."""
+    blocks_by_id: dict[str, Any] = {}
+    if tpl is not None:
+        blocks_by_id = {str(b.id): b for b in tpl.blocks}
+
     out: dict[str, Any] = {}
     for k, v in raw.items():
         if isinstance(v, str):
-            out[k] = expand_numbered_newlines(_strip_md(v))
+            cleaned = expand_numbered_newlines(_strip_md(v))
+            block = blocks_by_id.get(str(k))
+            if block and block_wants_numbered_list(block):
+                cleaned = ensure_structured_numbered_list(cleaned)
+            out[k] = cleaned
         else:
             out[k] = v
     return out
@@ -56,8 +70,11 @@ def strip_submit_memo_args(raw: dict[str, Any]) -> dict[str, Any]:
 
 class FormattedBlock(BaseModel):
     text: str = Field(
-        description="Текст блока в деловом стиле. Несколько пунктов — каждый с новой строки (1) 2) 3)), "
-        "не одной строкой через точку с запятой."
+        description=(
+            "Текст блока в деловом стиле. Несколько вариантов решений, поручений или мер — "
+            "структурированный нумерованный список, каждый пункт с новой строки (1) 2) 3)), "
+            "не одним сплошным абзацем и не одной строкой через точку с запятой."
+        )
     )
 
     @field_validator("text", mode="before")

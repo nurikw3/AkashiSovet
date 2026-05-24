@@ -38,5 +38,22 @@
             <label class="block text-[8px] font-mono font-bold tracking-[.15em] uppercase text-[#a09890] mb-1.5">Описание для LLM (опционально)</label>
             <textarea name="block_desc" rows="2" class="ak-input resize-y" placeholder="Контекст для модели…">{{ block.description_for_llm or '' }}</textarea>
         </div>
+        <div class="flex items-start gap-3 pt-1">
+            <input type="hidden"
+                   name="block_numbered_list"
+                   value="{{ '1' if block.format_as_numbered_list | default(false) else '0' }}"
+                   class="js-numbered-list-hidden" />
+            <input type="checkbox"
+                   class="js-numbered-list-cb mt-0.5 accent-[#C93528]"
+                   {% if block.format_as_numbered_list | default(false) %}checked{% endif %} />
+            <div>
+                <span class="block text-[10px] font-mono text-[#111111] dark:text-[#EDE8DF] select-none">
+                    Нумерованный список
+                </span>
+                <p class="text-[9px] font-mono text-[#a09890] mt-1 leading-relaxed">
+                    Если инициатор перечисляет несколько пунктов — LLM оформит их списком (1) 2) …), а не сплошным абзацем.
+                </p>
+            </div>
+        </div>
     </div>
 </div>

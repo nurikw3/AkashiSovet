@@ -22,6 +22,10 @@ class BlockDefinition(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     question: str = Field(min_length=1, max_length=50000)
     description_for_llm: str | None = Field(default=None, max_length=10000)
+    format_as_numbered_list: bool = Field(
+        default=False,
+        description="LLM оформляет несколько пунктов нумерованным списком, а не сплошным абзацем.",
+    )
 
     @field_validator("title", "question", mode="before")
     @classmethod
@@ -37,6 +41,18 @@ class BlockDefinition(BaseModel):
             return None
         s = str(v).strip()
         return s if s else None
+
+    @field_validator("format_as_numbered_list", mode="before")
+    @classmethod
+    def _coerce_numbered_list_flag(cls, v: Any) -> bool:
+        if v is None:
+            return False
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        s = str(v).strip().lower()
+        return s in ("1", "true", "yes", "on")
 
 
 class ApplicationTemplate(BaseModel):
@@ -94,6 +110,11 @@ class ApplicationTemplate(BaseModel):
             if b.id == block_id:
                 return i
         raise ValueError(f"Block id {block_id} not in template")
+
+
+def block_wants_numbered_list(block: BlockDefinition) -> bool:
+    """Явная настройка в шаблоне: оформлять блок нумерованным списком."""
+    return block.format_as_numbered_list
 
 
 def block_llm_instruction(block: BlockDefinition) -> str:

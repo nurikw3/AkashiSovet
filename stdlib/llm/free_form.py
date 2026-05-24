@@ -72,7 +72,7 @@ async def process_free_form_chat(
             )
 
         if tc.function.name == "submit_memo":
-            clean = strip_submit_memo_args(args)
+            clean = strip_submit_memo_args(args, tpl)
             blocks_dict = submit_model.model_validate(clean).model_dump(by_alias=True)
             return LLMComplete(status="complete", blocks=blocks_dict)
 

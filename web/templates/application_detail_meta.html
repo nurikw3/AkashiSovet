@@ -1,13 +1,19 @@
-<div id="app-detail-meta" class="flex flex-col items-end gap-2">
-    <span class="s-badge s-{{ app.status }}">{{ app.status }}</span>
+<div id="app-detail-meta" class="flex flex-col items-stretch gap-2 min-w-[9.5rem]">
+    <span class="s-badge s-{{ app.status }} self-end">{{ app.status }}</span>
     {% if app.status == 'pending' %}
-    <div id="actions-{{ app.id }}" class="flex items-center gap-2">
+    <div id="actions-{{ app.id }}" class="flex flex-col items-stretch gap-2">
         <button type="button" onclick="showApproveForm({{ app.id }})"
-            class="ak-btn-ghost border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
-            data-i18n="btn.approve">Согласовать</button>
+            class="ak-btn-ghost gap-1.5 border-green-600/40 text-green-700 hover:border-green-600 hover:text-green-600 dark:text-green-400 dark:border-green-400/30 dark:hover:border-green-400"
+            data-i18n="btn.approve">
+            <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            Согласовать
+        </button>
         <button type="button" onclick="showRejectForm({{ app.id }})"
-            class="ak-btn-ghost border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
-            data-i18n="btn.rework">На доработку</button>
+            class="ak-btn-ghost gap-1.5 border-ak-red/30 text-ak-red hover:border-ak-red dark:border-ak-red-d/30 dark:text-ak-red-d"
+            data-i18n="btn.rework">
+            <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15 4 9m0 0 5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+            На доработку
+        </button>
     </div>
     <div id="approve-form-{{ app.id }}" class="hidden w-full max-w-sm">
         <form method="post" action="/approve/{{ app.id }}" enctype="multipart/form-data" class="flex flex-col gap-2 items-end">
@@ -70,10 +76,13 @@
         </form>
     </div>
     {% elif app.status == 'approved' %}
-    <div id="actions-approved-{{ app.id }}" class="flex flex-col items-end gap-2">
+    <div id="actions-approved-{{ app.id }}" class="flex flex-col items-stretch gap-2">
         <button type="button" onclick="showReworkApprovedForm({{ app.id }})"
-            class="ak-btn-ghost border-amber-500/30 text-amber-600 hover:border-amber-500 hover:text-amber-600 dark:text-amber-400 dark:border-amber-400/30"
-            title="Вернуть на доработку">↩ Rework</button>
+            class="ak-btn-ghost gap-1.5 border-amber-500/30 text-amber-600 hover:border-amber-500 hover:text-amber-600 dark:text-amber-400 dark:border-amber-400/30"
+            title="Вернуть на доработку">
+            <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15 4 9m0 0 5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+            Rework
+        </button>
         <div id="rework-approved-form-{{ app.id }}" class="hidden w-full max-w-sm">
             <form method="post" action="/rework-approved/{{ app.id }}" enctype="multipart/form-data" class="flex flex-col gap-2 items-end">
                 <textarea name="feedback" required rows="2" data-auto-expand="true"
@@ -111,11 +120,14 @@
     {% endif %}
 
     <form method="post" action="/delete/{{ app.id }}"
-        class="js-confirm-delete-app mt-1"
+        class="js-confirm-delete-app w-full"
         data-app-id="{{ app.id }}">
         <button type="button"
-            class="text-[9px] font-mono tracking-widest uppercase text-ak-red/80 hover:text-ak-red dark:text-ak-red-d/80 dark:hover:text-ak-red-d transition-colors"
+            class="ak-btn-ghost gap-1.5 w-full border-ak-red/30 text-ak-red hover:border-ak-red hover:text-ak-red dark:text-ak-red-d dark:border-ak-red-d/30 dark:hover:border-ak-red-d"
             data-i18n="app.delete"
-            onclick="openDeleteApplicationModal(this.form)">Удалить</button>
+            onclick="openDeleteApplicationModal(this.form)">
+            <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            Удалить
+        </button>
     </form>
 </div>

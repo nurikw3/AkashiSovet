@@ -119,7 +119,7 @@ async def _enter_fill_flow(target: Message | CallbackQuery, state: FSMContext, a
             target,
             state,
             first.id,
-            intro="Добрый день! Заполним служебную записку на Правление.",
+            intro="Добрый день! Заполним пояснительную записку на Правление.",
         )
 
 

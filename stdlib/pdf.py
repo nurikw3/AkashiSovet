@@ -79,6 +79,14 @@ FOOTER_PATH = (
     else ASSETS_DIR / "image2.png"
 )
 
+# Стандартные поля Word: верх/низ 2 см, слева 3 см, справа 1.5 см
+_MARGIN_TOP = 2 * cm
+_MARGIN_BOTTOM = 2 * cm
+_MARGIN_LEFT = 3 * cm
+_MARGIN_RIGHT = 1.5 * cm
+# Высота декоративного футера внизу страницы (в пределах нижнего поля)
+_FOOTER_BAND_HEIGHT = _MARGIN_BOTTOM
+
 
 PDF_CACHE_KEY_FMT = "pdf_cache:{app_id}"
 PDF_CACHE_TTL_SEC = 7 * 24 * 3600
@@ -139,7 +147,7 @@ def _styles() -> dict:
             fontName=_FONT_BOLD_NAME,
             fontSize=14,
             alignment=TA_CENTER,
-            spaceBefore=20,
+            spaceBefore=10,
             spaceAfter=4,
         ),
         "subtitle": ParagraphStyle(
@@ -147,15 +155,15 @@ def _styles() -> dict:
             fontName=_FONT_NAME,
             fontSize=12,
             alignment=TA_CENTER,
-            spaceAfter=14,
+            spaceAfter=10,
             fontStyle="italic",
         ),
         "section_title": ParagraphStyle(
             "section_title",
             fontName=_FONT_BOLD_NAME,
             fontSize=12,
-            spaceBefore=14,
-            spaceAfter=6,
+            spaceBefore=8,
+            spaceAfter=4,
         ),
         "body": ParagraphStyle(
             "body",
@@ -294,7 +302,7 @@ def draw_last_page(canvas, doc, *, include_logo: bool = True):
             mask="auto",
         )
     if FOOTER_PATH.exists():
-        footer_h = 100
+        footer_h = _FOOTER_BAND_HEIGHT
         canvas.drawImage(
             str(FOOTER_PATH),
             0,
@@ -373,10 +381,10 @@ def _generate_pdf_sync(
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        leftMargin=3 * cm,
-        rightMargin=2.5 * cm,
-        topMargin=4.5 * cm,
-        bottomMargin=5.0 * cm,
+        leftMargin=_MARGIN_LEFT,
+        rightMargin=_MARGIN_RIGHT,
+        topMargin=_MARGIN_TOP,
+        bottomMargin=_MARGIN_BOTTOM,
     )
 
     s = _styles()
@@ -387,7 +395,7 @@ def _generate_pdf_sync(
     story.append(Paragraph("ПК «AKASHI Data Center PLC»", s["header"]))
 
     # ── Заголовок ──
-    story.append(Paragraph("СЛУЖЕБНАЯ ЗАПИСКА", s["title"]))
+    story.append(Paragraph("ПОЯСНИТЕЛЬНАЯ ЗАПИСКА", s["title"]))
     if tpl is not None and blocks_map is not None and tpl.blocks:
         topic = blocks_map.get(str(tpl.blocks[0].id), "") or "Без темы"
     else:
@@ -450,13 +458,7 @@ def _generate_pdf_sync(
     else:
         attach_story.append(Paragraph("(приложения не прикреплены)", s["body"]))
 
-    # Склеиваем блок "Приложения", чтобы он не разрывался на страницы
-    story.append(KeepTogether(attach_story))
-
     # ── Подвал (подпись) ──
-    story.append(Spacer(1, 40))
-    
-    # Собираем блок подписи целиком, чтобы он не отрывался от имени и даты
     signature_story = []
 
     username = _normalize_pdf_user_text(
@@ -493,7 +495,9 @@ def _generate_pdf_sync(
     signature_story.append(Spacer(1, 10))
     signature_story.append(Paragraph(f"<b>Дата:</b> {date}", s["body"]))
 
-    story.append(KeepTogether(signature_story))
+    # Приложения + подпись держим вместе — меньше ложных переносов на 2-ю страницу
+    closing_story = attach_story + [Spacer(1, 16)] + signature_story
+    story.append(KeepTogether(closing_story))
 
     doc.build(story, canvasmaker=_LastPageCanvas)
 

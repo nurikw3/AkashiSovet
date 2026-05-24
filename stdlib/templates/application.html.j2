@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <style>
+  /* A4, поля Word: верх/низ 2 см, слева 3 см, справа 1.5 см */
   @page {
     size: A4;
-    margin: 2.5cm 2.5cm 2.5cm 3cm;
+    margin: 2cm 1.5cm 2cm 3cm;
   }
 
   body {
@@ -17,7 +18,7 @@
 
   .header-block {
     text-align: right;
-    margin-bottom: 2em;
+    margin-bottom: 1.2em;
     font-size: 11pt;
   }
 
@@ -31,18 +32,18 @@
     font-size: 13pt;
     font-weight: bold;
     text-transform: uppercase;
-    margin: 1.5em 0 0.3em;
+    margin: 0.8em 0 0.2em;
     letter-spacing: 1px;
   }
 
   .subtitle {
     text-align: center;
     font-size: 12pt;
-    margin-bottom: 1.8em;
+    margin-bottom: 1em;
   }
 
   .section {
-    margin-bottom: 1.2em;
+    margin-bottom: 0.8em;
   }
 
   .section-title {
@@ -65,10 +66,10 @@
   }
 
   .footer {
-    margin-top: 2.5em;
+    margin-top: 1.2em;
     font-size: 11pt;
     border-top: 1px solid #000;
-    padding-top: 0.8em;
+    padding-top: 0.5em;
   }
 
   .footer-row {
@@ -85,7 +86,7 @@
     <p>ПК «AKASHI Data Center PLC»</p>
   </div>
 
-  <h1>Служебная записка</h1>
+  <h1>Пояснительная записка</h1>
   <p class="subtitle">по вопросу «{{ topic }}»</p>
 
   <div class="section">

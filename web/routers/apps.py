@@ -49,6 +49,12 @@ MAX_FEEDBACK_FILE_BYTES = 20 * 1024 * 1024
 MAX_FEEDBACK_FILES_TOTAL_BYTES = 50 * 1024 * 1024
 
 
+def _telegram_dm_url(user_id: int, username: str | None) -> str:
+    if username:
+        return f"https://t.me/{username.lstrip('@')}"
+    return f"tg://user?id={user_id}"
+
+
 def _parse_app(a: dict) -> dict:
     m = Application.model_validate(a)
     parsed = [
@@ -58,6 +64,7 @@ def _parse_app(a: dict) -> dict:
     out = {**a}
     out["topic"] = m.blocks.get("1", "Без темы")
     out["display_name"] = m.full_name or m.username or f"ID: {m.user_id}"
+    out["telegram_url"] = _telegram_dm_url(m.user_id, m.username)
     out["parsed_attachments"] = parsed
     return out
 

@@ -25,6 +25,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.fonts import addMapping
+from reportlab.lib.utils import ImageReader
 from datetime import datetime
 
 from bot.logger import logger
@@ -84,8 +85,16 @@ _MARGIN_TOP = 2 * cm
 _MARGIN_BOTTOM = 2 * cm
 _MARGIN_LEFT = 3 * cm
 _MARGIN_RIGHT = 1.5 * cm
-# Высота декоративного футера внизу страницы (в пределах нижнего поля)
-_FOOTER_BAND_HEIGHT = _MARGIN_BOTTOM
+
+
+def _footer_draw_height(page_width: float) -> float:
+    """Высота футера при растяжении на всю ширину страницы (без искажений)."""
+    if not FOOTER_PATH.exists():
+        return 100
+    iw, ih = ImageReader(str(FOOTER_PATH)).getSize()
+    if iw <= 0:
+        return 100
+    return page_width * ih / iw
 
 
 PDF_CACHE_KEY_FMT = "pdf_cache:{app_id}"
@@ -302,14 +311,15 @@ def draw_last_page(canvas, doc, *, include_logo: bool = True):
             mask="auto",
         )
     if FOOTER_PATH.exists():
-        footer_h = _FOOTER_BAND_HEIGHT
+        footer_h = _footer_draw_height(width)
         canvas.drawImage(
             str(FOOTER_PATH),
             0,
             0,
             width=width,
             height=footer_h,
-            preserveAspectRatio=False,
+            preserveAspectRatio=True,
+            anchor="sw",
             mask="auto",
         )
     canvas.restoreState()

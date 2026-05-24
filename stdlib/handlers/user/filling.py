@@ -171,6 +171,10 @@ async def handle_block_input(message: Message, state: FSMContext):
 
     current_block = data["current_block"]
     if current_block == "files":
+        if data.get("mode") == "rename_attachment":
+            from stdlib.handlers.user.files import apply_attachment_rename
+
+            await apply_attachment_rename(message, state)
         return
 
     raw_text = message.text.strip()

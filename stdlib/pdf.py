@@ -35,7 +35,7 @@ from stdlib.template import (
     PDF_TEMPLATE_REVISION_KEY,
     get_template,
 )
-from stdlib.text_normalize import expand_numbered_newlines
+from stdlib.text_normalize import attachment_name_for_pdf, expand_numbered_newlines
 from stdlib.timezone_util import ensure_app_tz, format_app_date_only
 import stdlib.redis_client as redis_client_module
 
@@ -432,7 +432,12 @@ def _generate_pdf_sync(
 
     if attachments and isinstance(attachments, list) and len(attachments) > 0:
         items = [
-            ListItem(Paragraph(_normalize_pdf_user_text(str(name)), s["body"]))
+            ListItem(
+                Paragraph(
+                    _normalize_pdf_user_text(attachment_name_for_pdf(str(name))),
+                    s["body"],
+                )
+            )
             for name in attachments
             if str(name).strip()
         ]
@@ -671,9 +676,10 @@ async def get_app_pdf_buffer(app_id: int) -> BytesIO:
     if isinstance(parsed_atts, list):
         for f in parsed_atts:
             if isinstance(f, dict):
-                clean_atts.append(f.get("name") or f.get("file_name") or "Файл")
+                raw_name = f.get("name") or f.get("file_name") or "Файл"
+                clean_atts.append(attachment_name_for_pdf(str(raw_name)))
             else:
-                clean_atts.append(str(f))
+                clean_atts.append(attachment_name_for_pdf(str(f)))
 
     pdf_data = {
         "app_id": app_id,

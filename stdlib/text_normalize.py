@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import PurePosixPath
 
 _MARKERS = re.compile(r"(?:^|\s)\d{1,2}[\)\.]\s+")
 _ALSO_SPLIT = re.compile(r"\s+(?:а\s+также|также|во-?вторых|в\s+дополнение)\s+", re.I)
@@ -60,3 +61,13 @@ def _expand_one_line_numbering(line: str) -> str:
         "\n",
         t2,
     )
+
+
+def attachment_name_for_pdf(name: str) -> str:
+    """Имя для раздела «Приложения» в PDF: без расширения файла."""
+    raw = (name or "").strip()
+    if not raw:
+        return "Файл"
+    base = PurePosixPath(raw).name
+    stem = PurePosixPath(base).stem
+    return stem.strip() or raw

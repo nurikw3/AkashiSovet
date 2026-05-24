@@ -1,5 +1,6 @@
 import json
 import mimetypes
+from html import escape
 
 import stdlib.keyboards as kb
 import stdlib.s3 as s3
@@ -16,8 +17,19 @@ from stdlib.template import get_template
 
 router = Router()
 
+ATTACHMENT_NAME_MAX_LEN = 200
+
 DEFAULT_FILES_TEXT = (
-    "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите."
+    "Прикрепите дополнительные файлы.\n"
+    "Для каждого файла можно нажать <b>✏️ Название</b> и указать, "
+    "как документ должен называться в служебной записке "
+    "(в PDF расширение файла не отображается).\n"
+    "Нажмите <b>Готово</b>, когда закончите."
+)
+
+RENAME_ATTACHMENT_PROMPT = (
+    "Введите название документа для служебной записки "
+    "(как в разделе «Приложения»). Расширение файла в PDF не отобразится."
 )
 
 
@@ -38,6 +50,61 @@ def _load_attachments(raw_att) -> list[dict]:
 
 def _attachment_name(att: dict, idx: int) -> str:
     return str(att.get("name") or att.get("file_name") or f"Файл {idx + 1}")
+
+
+def _validate_attachment_display_name(raw: str) -> str | None:
+    """Возвращает нормализованное имя или None при ошибке валидации."""
+    name = (raw or "").replace("\n", " ").replace("\r", " ").strip()
+    if not name:
+        return None
+    if len(name) > ATTACHMENT_NAME_MAX_LEN:
+        return None
+    return name
+
+
+async def _clear_rename_mode(state: FSMContext) -> None:
+    await state.update_data(mode="input", renaming_attachment_idx=None)
+
+
+async def apply_attachment_rename(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    app_id = data.get("app_id")
+    idx = data.get("renaming_attachment_idx")
+    if not app_id or idx is None:
+        await _clear_rename_mode(state)
+        return
+
+    new_name = _validate_attachment_display_name(message.text or "")
+    if not new_name:
+        await message.answer(
+            f"Укажите непустое название (до {ATTACHMENT_NAME_MAX_LEN} символов, без переносов строк)."
+        )
+        return
+
+    app = await application_service.get_application_record(app_id)
+    if not app:
+        await message.answer("Заявка не найдена.")
+        await _clear_rename_mode(state)
+        return
+
+    attachments = _load_attachments(app.get("attachments"))
+    if idx < 0 or idx >= len(attachments):
+        await message.answer("Файл уже удалён или список устарел.")
+        await _clear_rename_mode(state)
+        return
+
+    attachments[idx]["name"] = new_name
+    await application_service.save_attachments_payload(
+        app_id, attachments, user_id=app.get("user_id")
+    )
+    await _clear_rename_mode(state)
+    await refresh_files_nav(
+        message.bot,
+        state,
+        app_id,
+        message.chat.id,
+        status_line="✅ Название обновлено.",
+    )
 
 
 def _files_markup_for_app(raw_app: dict, attachments: list[dict]) -> InlineKeyboardMarkup:
@@ -124,6 +191,11 @@ async def handle_file(message: Message, state: FSMContext):
     data = await state.get_data()
     if data.get("current_block") != "files":
         return
+    if data.get("mode") == "rename_attachment":
+        await message.answer(
+            "Сначала введите название документа или нажмите «Назад» на экране приложений."
+        )
+        return
 
     app = await application_service.get_application_record(data["app_id"])
     if not app:
@@ -206,6 +278,49 @@ async def handle_file(message: Message, state: FSMContext):
     )
 
 
+@router.callback_query(BotStates.FILLING, F.data.startswith("files_rename_"))
+async def on_file_rename_start(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if data.get("current_block") != "files":
+        await callback.answer("Доступно только на шаге приложений.", show_alert=True)
+        return
+
+    app_id = data.get("app_id")
+    if not app_id:
+        await callback.answer("Заявка не найдена.", show_alert=True)
+        return
+
+    try:
+        rename_idx = int(callback.data.rsplit("_", 1)[1])
+    except Exception:
+        await callback.answer("Некорректная кнопка.", show_alert=True)
+        return
+
+    app = await application_service.get_application_record(app_id)
+    if not app:
+        await callback.answer("Заявка не найдена.", show_alert=True)
+        return
+
+    attachments = _load_attachments(app.get("attachments"))
+    if rename_idx < 0 or rename_idx >= len(attachments):
+        await callback.answer("Файл уже удалён или список устарел.", show_alert=True)
+        return
+
+    await callback.answer()
+    await state.update_data(
+        mode="rename_attachment",
+        renaming_attachment_idx=rename_idx,
+    )
+    current = escape(_attachment_name(attachments[rename_idx], rename_idx))
+    await render_nav_screen(
+        callback,
+        state,
+        f"{RENAME_ATTACHMENT_PROMPT}\n\nТекущее название: <i>{current}</i>",
+        _files_markup_for_app_id(app, [_attachment_name(a, i) for i, a in enumerate(attachments)]),
+        parse_mode="HTML",
+    )
+
+
 @router.callback_query(BotStates.FILLING, F.data.startswith("files_del_"))
 async def on_file_delete(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -237,6 +352,7 @@ async def on_file_delete(callback: CallbackQuery, state: FSMContext):
     await application_service.save_attachments_payload(
         app_id, attachments, user_id=app.get("user_id")
     )
+    await _clear_rename_mode(state)
     await callback.answer("Файл удалён.")
     text, markup = await _build_files_screen(
         app_id,
@@ -305,9 +421,15 @@ async def on_main_pdf_delete(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(BotStates.FILLING, F.data.in_({"files_done", "files_skip"}))
 async def on_files_done(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
     data = await state.get_data()
+    if data.get("mode") == "rename_attachment":
+        await callback.answer(
+            "Сначала введите название или нажмите «Назад».", show_alert=True
+        )
+        return
+    await callback.answer()
     app_id = data["app_id"]
+    await _clear_rename_mode(state)
 
     if data.get("returning_to") == "rework":
         await state.set_state(BotStates.REWORK)
@@ -337,6 +459,9 @@ async def on_files_back(callback: CallbackQuery, state: FSMContext):
             show_alert=True,
         )
         return
+
+    if data.get("mode") == "rename_attachment":
+        await _clear_rename_mode(state)
 
     await callback.answer()
     app_id = data["app_id"]

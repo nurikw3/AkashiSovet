@@ -59,12 +59,17 @@ def files_keyboard(
     rows: list[list[InlineKeyboardButton]] = []
     for idx, name in enumerate(attachment_names or []):
         label = (name or f"Файл {idx + 1}").strip() or f"Файл {idx + 1}"
+        short = label if len(label) <= 28 else f"{label[:25]}…"
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"🗑 Удалить: {label}"[:64],
+                    text="✏️ Название",
+                    callback_data=f"files_rename_{idx}",
+                ),
+                InlineKeyboardButton(
+                    text=f"🗑 {short}"[:64],
                     callback_data=f"files_del_{idx}",
-                )
+                ),
             ]
         )
     rows.extend(_files_action_rows(show_back=show_back))
@@ -91,12 +96,17 @@ def files_keyboard_with_main_pdf(
         )
     for idx, name in enumerate(attachment_names or []):
         label = (name or f"Файл {idx + 1}").strip() or f"Файл {idx + 1}"
+        short = label if len(label) <= 28 else f"{label[:25]}…"
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"🗑 Удалить: {label}"[:64],
+                    text="✏️ Название",
+                    callback_data=f"files_rename_{idx}",
+                ),
+                InlineKeyboardButton(
+                    text=f"🗑 {short}"[:64],
                     callback_data=f"files_del_{idx}",
-                )
+                ),
             ]
         )
     rows.extend(_files_action_rows(show_back=show_back))

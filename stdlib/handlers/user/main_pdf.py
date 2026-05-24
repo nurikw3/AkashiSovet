@@ -9,8 +9,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
+from stdlib.handlers.user.files import send_files_screen
 from stdlib.pdf import invalidate_pdf_delivery_cache
 from stdlib.services import application_service, file_service
+from stdlib.telegram_ui import edit_nav_anchor
 
 router = Router()
 
@@ -41,9 +43,13 @@ async def on_main_pdf_upload(message: Message, state: FSMContext):
 
     doc = message.document
     if not _is_pdf_document(doc):
-        await message.answer(
+        await edit_nav_anchor(
+            message.bot,
+            state,
             "Нужен именно PDF-файл. Отправьте документ с расширением .pdf.",
-            reply_markup=kb.main_pdf_keyboard(),
+            kb.main_pdf_keyboard(),
+            parse_mode="HTML",
+            fallback_chat_id=message.chat.id,
         )
         return
 
@@ -83,23 +89,24 @@ async def on_main_pdf_upload(message: Message, state: FSMContext):
         await message.answer("❌ Не удалось сохранить PDF. Попробуйте ещё раз.")
         return
 
-    app_after = await application_service.get_application(app_id)
-    attachment_names = [att.name for att in (app_after.attachments or [])] if app_after else []
-    await state.set_state(BotStates.FILLING)
-    await state.update_data(app_id=app_id, current_block="files", mode="input")
-    await message.answer(
-        "✅ Основной PDF сохранён.\n\n"
-        "Теперь можете прикрепить дополнительные приложения или нажать «Пропустить».",
-        reply_markup=kb.files_keyboard_with_main_pdf(
-            attachment_names,
-            has_main_pdf=True,
+    await send_files_screen(
+        message,
+        state,
+        app_id,
+        message_text=(
+            "✅ Основной PDF сохранён.\n\n"
+            "Теперь можете прикрепить дополнительные приложения или нажать «Пропустить»."
         ),
     )
 
 
 @router.message(BotStates.WAITING_MAIN_PDF)
-async def on_main_pdf_invalid_message(message: Message):
-    await message.answer(
+async def on_main_pdf_invalid_message(message: Message, state: FSMContext):
+    await edit_nav_anchor(
+        message.bot,
+        state,
         "Отправьте PDF-файл документом (не фото и не текст).",
-        reply_markup=kb.main_pdf_keyboard(),
+        kb.main_pdf_keyboard(),
+        parse_mode="HTML",
+        fallback_chat_id=message.chat.id,
     )

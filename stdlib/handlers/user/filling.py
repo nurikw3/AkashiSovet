@@ -14,6 +14,7 @@ from stdlib.telegram_summary import (
     chunk_blocks_summary_html,
     INTRO_STEP_FILLED_HTML,
 )
+from stdlib.telegram_ui import edit_nav_anchor, render_nav_screen
 from stdlib.template import ApplicationTemplate, get_template
 
 router = Router()
@@ -52,10 +53,6 @@ async def _get_context(app_id: int, current_block: int, pending: str | None) -> 
     return context_blocks
 
 
-def _answer_fn(target: Message | CallbackQuery):
-    return target.answer if isinstance(target, Message) else target.message.answer
-
-
 async def send_block_input_screen(
     target: Message | CallbackQuery,
     state: FSMContext,
@@ -63,6 +60,7 @@ async def send_block_input_screen(
     *,
     intro: str | None = None,
     style: str = "question",
+    force_new: bool = False,
 ) -> None:
     """Показать экран ввода блока. style: question | edit | review_edit | saved."""
     data = await state.get_data()
@@ -80,41 +78,34 @@ async def send_block_input_screen(
         confirm_dialog_block=None,
     )
 
-    send_fn = _answer_fn(target)
     markup = kb.block_input_keyboard(block_id, show_back=show_back)
 
     if style == "edit":
-        await send_fn(
-            f"Введите исправленный текст для блока «{b.title}»:",
-            reply_markup=markup,
-        )
-        return
-
-    if style == "review_edit":
-        await send_fn(
+        text = f"Введите исправленный текст для блока «{b.title}»:"
+    elif style == "review_edit":
+        text = (
             f"<b>Редактирование: Блок {idx} — {b.title}</b>\n\n"
-            "Введите новый текст для этого блока:",
-            parse_mode="HTML",
-            reply_markup=markup,
+            "Введите новый текст для этого блока:"
         )
-        return
+    else:
+        lines: list[str] = []
+        if intro:
+            lines.append(intro)
+        lines.append(f"<b>Блок {idx} из {total} — {b.title}</b>")
+        if style == "saved":
+            app = await application_service.get_application(data.get("app_id"))
+            if app:
+                saved_raw = (app.blocks.get(str(block_id), "") or "").strip()
+                if saved_raw:
+                    lines.append(
+                        f"<b>Сохранённый текст:</b>\n<pre>{escape(saved_raw)}</pre>"
+                    )
+        lines.append(b.question)
+        text = "\n\n".join(lines)
 
-    lines: list[str] = []
-    if intro:
-        lines.append(intro)
-    lines.append(f"<b>Блок {idx} из {total} — {b.title}</b>")
-
-    if style == "saved":
-        app = await application_service.get_application(data.get("app_id"))
-        if app:
-            saved_raw = (app.blocks.get(str(block_id), "") or "").strip()
-            if saved_raw:
-                lines.append(
-                    f"<b>Сохранённый текст:</b>\n<pre>{escape(saved_raw)}</pre>"
-                )
-
-    lines.append(b.question)
-    await send_fn("\n\n".join(lines), parse_mode="HTML", reply_markup=markup)
+    await render_nav_screen(
+        target, state, text, markup, parse_mode="HTML", force_new=force_new
+    )
 
 
 async def _confirm_show_back(block_id: int, state: FSMContext) -> bool:
@@ -140,16 +131,23 @@ async def _send_confirm(
     final_message = f"{safe_intro}\n\n{code_block}\n\n_Всё верно?_"
 
     try:
-        await message.answer(
+        await edit_nav_anchor(
+            message.bot,
+            state,
             final_message,
+            markup,
             parse_mode="MarkdownV2",
-            reply_markup=markup,
+            fallback_chat_id=message.chat.id,
         )
     except Exception as e:
-        logger.error("MarkdownV2 send failed: {}", e)
-        await message.answer(
+        logger.error("MarkdownV2 confirm edit failed: {}", e)
+        await edit_nav_anchor(
+            message.bot,
+            state,
             f"{intro}\n\n{text}\n\nВсё верно?",
-            reply_markup=markup,
+            markup,
+            parse_mode="HTML",
+            fallback_chat_id=message.chat.id,
         )
 
 
@@ -192,7 +190,6 @@ async def handle_block_input(message: Message, state: FSMContext):
 async def _handle_format(
     message: Message, state: FSMContext, data: dict, raw_text: str
 ):
-    """Обычный флоу — редактируем то что написал юзер."""
     context_blocks = await _get_context(
         data["app_id"],
         data["current_block"],
@@ -214,7 +211,6 @@ async def _handle_format(
 
 
 async def _handle_delegation(message: Message, state: FSMContext, data: dict):
-    """Делегирование — генерируем текст блока из контекста."""
     current_block = data["current_block"]
     context_blocks = await _get_context(
         data["app_id"],
@@ -283,7 +279,7 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
 
         await state.set_state(BotStates.REVIEW)
         await state.update_data(returning_to=None)
-        await send_review_screen(callback, data["app_id"])
+        await send_review_screen(callback, state, data["app_id"], force_new=True)
         return
 
     tpl = await get_template()
@@ -297,15 +293,18 @@ async def on_confirm(callback: CallbackQuery, state: FSMContext):
     app_row = await application_service.get_application(data["app_id"])
     tpl = await get_template()
     blocks = app_row.blocks if app_row else {}
-    for idx, html in enumerate(
-        chunk_blocks_summary_html(tpl, blocks, INTRO_STEP_FILLED_HTML)
-    ):
-        sent = await callback.message.answer(
-            html,
+    chunks = list(chunk_blocks_summary_html(tpl, blocks, INTRO_STEP_FILLED_HTML))
+    if chunks:
+        await render_nav_screen(
+            callback,
+            state,
+            chunks[0],
+            kb.files_keyboard(),
             parse_mode="HTML",
-            reply_markup=kb.files_keyboard() if idx == 0 else None,
         )
-        await _remember_cleanup_message(state, sent.message_id)
+        for html in chunks[1:]:
+            sent = await callback.message.answer(html, parse_mode="HTML")
+            await _remember_cleanup_message(state, sent.message_id)
 
 
 @router.callback_query(BotStates.FILLING, F.data.startswith("fcb_edit_"))
@@ -359,7 +358,7 @@ async def on_block_back(callback: CallbackQuery, state: FSMContext):
             pending_formatted=None,
             confirm_dialog_block=None,
         )
-        await send_review_screen(callback, data["app_id"])
+        await send_review_screen(callback, state, data["app_id"], force_new=True)
         return
 
     if returning_to == "rework":
@@ -371,7 +370,7 @@ async def on_block_back(callback: CallbackQuery, state: FSMContext):
             pending_formatted=None,
             confirm_dialog_block=None,
         )
-        await send_rework_menu(callback, data["app_id"])
+        await send_rework_menu(callback, state, data["app_id"])
         return
 
     tpl = await get_template()

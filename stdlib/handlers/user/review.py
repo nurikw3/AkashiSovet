@@ -14,12 +14,19 @@ from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
 from stdlib.telegram_summary import INTRO_FALLBACK_NO_PDF_HTML, chunk_blocks_summary_html
+from stdlib.telegram_ui import render_nav_screen
 from stdlib.template import get_template
 
 router = Router()
 
 
-async def send_review_screen(message: Message | CallbackQuery, app_id: int):
+async def send_review_screen(
+    message: Message | CallbackQuery,
+    state: FSMContext,
+    app_id: int,
+    *,
+    force_new: bool = False,
+):
     app = await application_service.get_application_record(app_id)
     if not app:
         return
@@ -31,13 +38,11 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
     )
     progress_message = await send_fn("⏳ Генерация PDF...")
 
-    # Сначала пробуем получить PDF-буфер через общую функцию
     try:
         t0 = perf_counter()
         pdf_buf = await get_app_pdf_buffer(app_id)
         t_pdf = (perf_counter() - t0) * 1000
 
-        # Достаем данные для правильного имени файла
         full_name = await db.get_user_full_name(user_id)
         position = await db.get_user_position(user_id)
         created_at = app.get("created_at") or now_app()
@@ -49,7 +54,6 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             dt=created_at,
         )
 
-        # Отправляем документ
         t1 = perf_counter()
         target_message = message if isinstance(message, Message) else message.message
         await send_pdf_with_cache(
@@ -73,7 +77,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             await progress_message.delete()
         except Exception:
             pass
-        return  # ВАЖНО: Выходим, чтобы не отправлять текстовый фоллбек!
+        return
 
     except Exception as e:
         logger.warning("PDF fallback: {}", e)
@@ -81,9 +85,7 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
             await progress_message.delete()
         except Exception:
             pass
-        # Если что-то пошло не так — текстом тем же форматом, что и сводка к файлам
 
-    # --- ФОЛЛБЕК: PDF недоступен ---
     app_model = await application_service.get_application(app_id)
     blocks = app_model.blocks if app_model else {}
 
@@ -98,20 +100,31 @@ async def send_review_screen(message: Message | CallbackQuery, app_id: int):
         attachments = []
 
     foot = f"<i>Приложений в заявке: {len(attachments)}</i>"
-    for idx, html in enumerate(
+    chunks = list(
         chunk_blocks_summary_html(
             tpl,
             blocks,
             INTRO_FALLBACK_NO_PDF_HTML,
             attachments_footer=foot,
         )
-    ):
-        await send_fn(
-            html,
-            parse_mode="HTML",
-            reply_markup=kb.review_keyboard(tpl) if idx == 0 else None,
-            disable_web_page_preview=True,
+    )
+    if not chunks:
+        return
+
+    await render_nav_screen(
+        message,
+        state,
+        chunks[0],
+        kb.review_keyboard(tpl),
+        parse_mode="HTML",
+        force_new=force_new,
+    )
+    if len(chunks) > 1:
+        send_fn = (
+            message.answer if isinstance(message, Message) else message.message.answer
         )
+        for html in chunks[1:]:
+            await send_fn(html, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.callback_query(BotStates.REVIEW, F.data.startswith("review_edit_"))
@@ -140,7 +153,7 @@ async def on_review_back(callback: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
     await callback.answer()
-    await send_files_screen(callback, state, data["app_id"])
+    await send_files_screen(callback, state, data["app_id"], force_new=True)
 
 
 @router.callback_query(BotStates.REVIEW, F.data == "review_submit")

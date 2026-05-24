@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from stdlib.handlers.states import BotStates
 from stdlib.intent import is_delegation
+from stdlib.telegram_ui import edit_nav_anchor, render_nav_screen
 from stdlib.template import get_template
 
 router = Router()
@@ -16,19 +17,19 @@ def _attachment_names(app) -> list[str]:
     return [att.name for att in (app.attachments or [])]
 
 
-def _answer_fn(target: Message | CallbackQuery):
-    return target.answer if isinstance(target, Message) else target.message.answer
-
-
 async def send_rework_menu(
-    target: Message | CallbackQuery, app_id: int | None = None
+    target: Message | CallbackQuery,
+    state: FSMContext,
+    app_id: int | None = None,
+    *,
+    message_text: str | None = None,
+    force_new: bool = False,
 ) -> None:
     tpl = await get_template()
-    send_fn = _answer_fn(target)
-    await send_fn(
-        "✏️ <b>Режим доработки</b>\n\nВыберите блок:",
-        reply_markup=kb.rework_keyboard(tpl, app_id),
-        parse_mode="HTML",
+    text = message_text or "✏️ <b>Режим доработки</b>\n\nВыберите блок:"
+    markup = kb.rework_keyboard(tpl, app_id)
+    await render_nav_screen(
+        target, state, text, markup, parse_mode="HTML", force_new=force_new
     )
 
 
@@ -53,13 +54,17 @@ async def _send_rework_block_input(
         mode="input",
         rework_screen="block",
     )
-    send_fn = _answer_fn(target)
-    await send_fn(
+    text = (
         f"<b>Текущий текст блока «{block_title}»:</b>\n\n"
         f"<pre>{current_text}</pre>\n\n"
-        "Введите исправленный вариант:",
+        "Введите исправленный вариант:"
+    )
+    await render_nav_screen(
+        target,
+        state,
+        text,
+        kb.rework_block_input_keyboard(),
         parse_mode="HTML",
-        reply_markup=kb.rework_block_input_keyboard(),
     )
 
 
@@ -119,10 +124,14 @@ async def on_rework_input(message: Message, state: FSMContext):
     await application_service.save_block(data["app_id"], data["rework_block"], result.text)
 
     await state.update_data(mode="confirm")
-    await message.answer(
-        f"{result.intro}\n\n<i>{result.text}</i>\n\nВсё верно?",
+    text = f"{result.intro}\n\n<i>{result.text}</i>\n\nВсё верно?"
+    await edit_nav_anchor(
+        message.bot,
+        state,
+        text,
+        kb.confirm_rework_keyboard(),
         parse_mode="HTML",
-        reply_markup=kb.confirm_rework_keyboard(),
+        fallback_chat_id=message.chat.id,
     )
 
 
@@ -130,11 +139,12 @@ async def on_rework_input(message: Message, state: FSMContext):
 async def on_rework_confirmed(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.update_data(mode="input", rework_screen="menu")
-    tpl = await get_template()
     data = await state.get_data()
-    await callback.message.answer(
-        "Выберите другой блок для правки или отправьте заявку повторно:",
-        reply_markup=kb.rework_keyboard(tpl, data.get("app_id")),
+    await send_rework_menu(
+        callback,
+        state,
+        data.get("app_id"),
+        message_text="Выберите другой блок для правки или отправьте заявку повторно:",
     )
 
 
@@ -166,7 +176,7 @@ async def on_rework_back(callback: CallbackQuery, state: FSMContext):
 
     if data.get("rework_screen") == "block":
         await state.update_data(mode="input", rework_screen="menu")
-        await send_rework_menu(callback, data.get("app_id"))
+        await send_rework_menu(callback, state, data.get("app_id"))
         return
 
     from stdlib.handlers.user.my_apps import send_app_card

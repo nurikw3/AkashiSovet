@@ -7,13 +7,18 @@ from stdlib.pdf import invalidate_pdf_delivery_cache
 from stdlib.services import application_service, file_service
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 from bot.logger import logger
 from stdlib.handlers.states import BotStates
 from stdlib.handlers.user.review import send_review_screen
+from stdlib.telegram_ui import edit_nav_anchor, render_nav_screen
 from stdlib.template import get_template
 
 router = Router()
+
+DEFAULT_FILES_TEXT = (
+    "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите."
+)
 
 
 def _load_attachments(raw_att) -> list[dict]:
@@ -35,16 +40,58 @@ def _attachment_name(att: dict, idx: int) -> str:
     return str(att.get("name") or att.get("file_name") or f"Файл {idx + 1}")
 
 
-def _files_keyboard_for(attachments: list[dict]):
-    names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
-    return kb.files_keyboard_with_main_pdf(names)
-
-
-def _files_keyboard_for_app(raw_app: dict, attachments: list[dict]):
+def _files_markup_for_app(raw_app: dict, attachments: list[dict]) -> InlineKeyboardMarkup:
     names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
     return kb.files_keyboard_with_main_pdf(
         names,
         has_main_pdf=bool(raw_app.get("main_pdf_s3_key")),
+    )
+
+
+def _files_markup_for_app_id(app_record: dict | None, names: list[str]) -> InlineKeyboardMarkup:
+    has_main_pdf = bool(app_record and app_record.get("main_pdf_s3_key"))
+    if has_main_pdf:
+        return kb.files_keyboard_with_main_pdf(names, has_main_pdf=True)
+    return kb.files_keyboard(names)
+
+
+async def _build_files_screen(
+    app_id: int,
+    *,
+    status_line: str | None = None,
+    message_text: str | None = None,
+) -> tuple[str, InlineKeyboardMarkup]:
+    app_record = await application_service.get_application_record(app_id)
+    app_model = await application_service.get_application(app_id)
+    attachments = _load_attachments(app_record.get("attachments") if app_record else None)
+    names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
+    if app_model and app_model.attachments:
+        names = [att.name for att in app_model.attachments]
+
+    text = message_text or DEFAULT_FILES_TEXT
+    if status_line:
+        text = f"{status_line}\n\n{text}"
+
+    markup = _files_markup_for_app_id(app_record, names)
+    return text, markup
+
+
+async def refresh_files_nav(
+    bot,
+    state: FSMContext,
+    app_id: int,
+    chat_id: int,
+    *,
+    status_line: str | None = None,
+) -> None:
+    text, markup = await _build_files_screen(app_id, status_line=status_line)
+    await edit_nav_anchor(
+        bot,
+        state,
+        text,
+        markup,
+        parse_mode="HTML",
+        fallback_chat_id=chat_id,
     )
 
 
@@ -55,15 +102,8 @@ async def send_files_screen(
     *,
     returning_to: str | None = None,
     message_text: str | None = None,
+    force_new: bool = False,
 ) -> None:
-    app_record = await application_service.get_application_record(app_id)
-    app_model = await application_service.get_application(app_id)
-    attachments = _load_attachments(app_record.get("attachments") if app_record else None)
-    names = [_attachment_name(att, i) for i, att in enumerate(attachments)]
-    if app_model and app_model.attachments:
-        names = [att.name for att in app_model.attachments]
-
-    has_main_pdf = bool(app_record and app_record.get("main_pdf_s3_key"))
     update_data: dict = {
         "app_id": app_id,
         "current_block": "files",
@@ -73,17 +113,10 @@ async def send_files_screen(
     await state.set_state(BotStates.FILLING)
     await state.update_data(**update_data)
 
-    if has_main_pdf:
-        markup = kb.files_keyboard_with_main_pdf(names, has_main_pdf=True)
-    else:
-        markup = kb.files_keyboard(names)
-
-    send_fn = target.answer if isinstance(target, Message) else target.message.answer
-    text = (
-        message_text
-        or "Прикрепите дополнительные файлы. Нажмите <b>Готово</b>, когда закончите."
+    text, markup = await _build_files_screen(app_id, message_text=message_text)
+    await render_nav_screen(
+        target, state, text, markup, parse_mode="HTML", force_new=force_new
     )
-    await send_fn(text, parse_mode="HTML", reply_markup=markup)
 
 
 @router.message(BotStates.FILLING, F.document | F.photo)
@@ -100,10 +133,15 @@ async def handle_file(message: Message, state: FSMContext):
     attachments = _load_attachments(raw_att)
 
     if not s3.is_s3_configured():
-        await message.answer(
-            "❌ Загрузка файлов недоступна: не настроено объектное хранилище (S3). "
-            "Обратитесь к администратору.",
-            reply_markup=_files_keyboard_for_app(app, attachments),
+        await refresh_files_nav(
+            message.bot,
+            state,
+            data["app_id"],
+            message.chat.id,
+            status_line=(
+                "❌ Загрузка файлов недоступна: не настроено объектное хранилище (S3). "
+                "Обратитесь к администратору."
+            ),
         )
         return
 
@@ -135,16 +173,22 @@ async def handle_file(message: Message, state: FSMContext):
         attachments.append(att.model_dump(mode="json", exclude_none=True))
     except RuntimeError as e:
         logger.error("S3 upload failed | app_id={} err={}", app_id, e)
-        await message.answer(
-            "❌ Не удалось сохранить файл в хранилище. Попробуйте позже или обратитесь к администратору.",
-            reply_markup=_files_keyboard_for_app(app, attachments),
+        await refresh_files_nav(
+            message.bot,
+            state,
+            app_id,
+            message.chat.id,
+            status_line="❌ Не удалось сохранить файл в хранилище. Попробуйте позже.",
         )
         return
-    except Exception as e:
+    except Exception:
         logger.exception("Attachment upload failed | app_id={}", app_id)
-        await message.answer(
-            "❌ Ошибка при загрузке файла. Попробуйте ещё раз.",
-            reply_markup=_files_keyboard_for_app(app, attachments),
+        await refresh_files_nav(
+            message.bot,
+            state,
+            app_id,
+            message.chat.id,
+            status_line="❌ Ошибка при загрузке файла. Попробуйте ещё раз.",
         )
         return
 
@@ -153,9 +197,12 @@ async def handle_file(message: Message, state: FSMContext):
     )
     logger.info("File attached to S3 | app_id={} total={}", app_id, len(attachments))
 
-    await message.answer(
-        f"✅ Файл принят. Всего приложений: {len(attachments)}",
-        reply_markup=_files_keyboard_for_app(app, attachments),
+    await refresh_files_nav(
+        message.bot,
+        state,
+        app_id,
+        message.chat.id,
+        status_line=f"✅ Файл принят. Всего приложений: {len(attachments)}",
     )
 
 
@@ -191,11 +238,14 @@ async def on_file_delete(callback: CallbackQuery, state: FSMContext):
         app_id, attachments, user_id=app.get("user_id")
     )
     await callback.answer("Файл удалён.")
-    await callback.message.answer(
-        f"🗑 Удалён файл: {_attachment_name(removed, del_idx)}\n"
-        f"Осталось приложений: {len(attachments)}",
-        reply_markup=_files_keyboard_for_app(app, attachments),
+    text, markup = await _build_files_screen(
+        app_id,
+        status_line=(
+            f"🗑 Удалён файл: {_attachment_name(removed, del_idx)}\n"
+            f"Осталось приложений: {len(attachments)}"
+        ),
     )
+    await render_nav_screen(callback, state, text, markup, parse_mode="HTML")
 
 
 @router.callback_query(BotStates.FILLING, F.data == "main_pdf_replace")
@@ -206,9 +256,12 @@ async def on_main_pdf_replace(callback: CallbackQuery, state: FSMContext):
         return
     await callback.answer()
     await state.set_state(BotStates.WAITING_MAIN_PDF)
-    await callback.message.answer(
+    await render_nav_screen(
+        callback,
+        state,
         "📄 Отправьте новый PDF, чтобы заменить текущий основной документ.",
-        reply_markup=kb.main_pdf_keyboard(),
+        kb.main_pdf_keyboard(),
+        parse_mode="HTML",
     )
 
 
@@ -236,20 +289,22 @@ async def on_main_pdf_delete(callback: CallbackQuery, state: FSMContext):
         try:
             await s3.delete_object(old_key, s3.BUCKET_PDF)
         except Exception:
-            logger.warning("Failed to delete uploaded main PDF | app_id={} key={}", app_id, old_key)
+            logger.warning(
+                "Failed to delete uploaded main PDF | app_id={} key={}", app_id, old_key
+            )
 
-    refreshed = await application_service.get_application_record(app_id)
-    attachments = _load_attachments((refreshed or app).get("attachments"))
     await callback.answer("Основной PDF удалён.")
-    await callback.message.answer(
-        "🗑 Основной PDF удалён. Можно добавить новый PDF или продолжить с приложениями.",
-        reply_markup=_files_keyboard_for_app((refreshed or app), attachments),
+    text, markup = await _build_files_screen(
+        app_id,
+        status_line=(
+            "🗑 Основной PDF удалён. Можно добавить новый PDF или продолжить с приложениями."
+        ),
     )
+    await render_nav_screen(callback, state, text, markup, parse_mode="HTML")
 
 
 @router.callback_query(BotStates.FILLING, F.data.in_({"files_done", "files_skip"}))
 async def on_files_done(callback: CallbackQuery, state: FSMContext):
-
     await callback.answer()
     data = await state.get_data()
     app_id = data["app_id"]
@@ -257,17 +312,20 @@ async def on_files_done(callback: CallbackQuery, state: FSMContext):
     if data.get("returning_to") == "rework":
         await state.set_state(BotStates.REWORK)
         await state.update_data(returning_to=None, mode="input", rework_screen="menu")
-        tpl = await get_template()
-        await callback.message.answer(
-            "Файлы обновлены. Выберите блок для правки или отправьте заявку повторно:",
-            reply_markup=kb.rework_keyboard(tpl, app_id),
+        from stdlib.handlers.user.rework import send_rework_menu
+
+        await send_rework_menu(
+            callback,
+            state,
+            app_id,
+            message_text="Файлы обновлены. Выберите блок для правки или отправьте заявку повторно:",
         )
         return
 
     await state.set_state(BotStates.REVIEW)
     if data.get("returning_to") == "review":
         await state.update_data(returning_to=None)
-    await send_review_screen(callback, app_id)
+    await send_review_screen(callback, state, app_id, force_new=True)
 
 
 @router.callback_query(BotStates.FILLING, F.data == "files_back")
@@ -287,7 +345,7 @@ async def on_files_back(callback: CallbackQuery, state: FSMContext):
     if returning_to == "review":
         await state.set_state(BotStates.REVIEW)
         await state.update_data(returning_to=None)
-        await send_review_screen(callback, app_id)
+        await send_review_screen(callback, state, app_id, force_new=True)
         return
 
     if returning_to == "rework":
@@ -295,10 +353,11 @@ async def on_files_back(callback: CallbackQuery, state: FSMContext):
 
         await state.set_state(BotStates.REWORK)
         await state.update_data(returning_to=None, rework_screen="menu")
-        await send_rework_menu(callback, app_id)
+        await send_rework_menu(callback, state, app_id)
         return
 
     from stdlib.handlers.user.filling import send_block_input_screen
 
     tpl = await get_template()
     await send_block_input_screen(callback, state, tpl.last_block_id, style="saved")
+

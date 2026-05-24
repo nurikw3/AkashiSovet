@@ -10,6 +10,7 @@ from stdlib.telegram_summary import (
     chunk_blocks_summary_html,
     INTRO_FREE_FORM_HTML,
 )
+from stdlib.telegram_ui import edit_nav_anchor
 from stdlib.template import get_template
 
 router = Router()
@@ -42,7 +43,14 @@ async def handle_free_form_input(message: Message, state: FSMContext):
         reply_text = result.reply or "Пожалуйста, уточните детали."
         history.append({"role": "assistant", "content": reply_text})
         await application_service.save_chat_history(app_id, history)
-        await message.answer(reply_text)
+        await edit_nav_anchor(
+            message.bot,
+            state,
+            reply_text,
+            kb.free_form_keyboard(),
+            parse_mode="HTML",
+            fallback_chat_id=message.chat.id,
+        )
 
     elif isinstance(result, LLMComplete):
         blocks = result.blocks
@@ -53,15 +61,19 @@ async def handle_free_form_input(message: Message, state: FSMContext):
         await state.set_state(BotStates.FILLING)
 
         tpl = await get_template()
-        for idx, html in enumerate(
-            chunk_blocks_summary_html(tpl, blocks, INTRO_FREE_FORM_HTML)
-        ):
-            sent = await message.answer(
-                html,
+        chunks = list(chunk_blocks_summary_html(tpl, blocks, INTRO_FREE_FORM_HTML))
+        if chunks:
+            await edit_nav_anchor(
+                message.bot,
+                state,
+                chunks[0],
+                kb.files_keyboard(),
                 parse_mode="HTML",
-                reply_markup=kb.files_keyboard() if idx == 0 else None,
+                fallback_chat_id=message.chat.id,
             )
-            await _remember_cleanup_message(state, sent.message_id)
+            for html in chunks[1:]:
+                sent = await message.answer(html, parse_mode="HTML")
+                await _remember_cleanup_message(state, sent.message_id)
     elif isinstance(result, LLMError):
         await message.answer(result.reply)
     else:

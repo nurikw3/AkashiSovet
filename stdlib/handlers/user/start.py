@@ -10,6 +10,7 @@ from aiogram.types import Message, CallbackQuery
 from bot.config import config
 from stdlib.handlers.states import BotStates
 from stdlib.template import get_template
+from stdlib.telegram_ui import render_nav_screen
 from bot.logger import logger
 router = Router()
 
@@ -78,15 +79,16 @@ async def _prompt_creation_path(message: Message | CallbackQuery, state: FSMCont
         if mode == "free"
         else "пошаговое заполнение"
     )
-    send_fn = message.answer if isinstance(message, Message) else message.message.answer
     await state.set_state(BotStates.START_CHOICE)
     await state.update_data(app_id=app_id)
-    await send_fn(
+    await render_nav_screen(
+        message,
+        state,
         "Выберите, как создать заявку:\n\n"
         f"• Текущий режим заполнения в боте: <b>{mode_name}</b>\n"
         "• Или загрузите уже готовый PDF-документ.",
+        kb.start_creation_path_keyboard(),
         parse_mode="HTML",
-        reply_markup=kb.start_creation_path_keyboard(),
     )
 
 
@@ -95,17 +97,18 @@ async def _enter_fill_flow(target: Message | CallbackQuery, state: FSMContext, a
 
     user_id = target.from_user.id if isinstance(target, Message) else target.from_user.id
     mode = await db.get_user_mode(user_id)
-    send_fn = target.answer if isinstance(target, Message) else target.message.answer
 
     if mode == "free":
         await state.set_state(BotStates.FREE_FORM)
         await state.update_data(app_id=app_id)
-        await send_fn(
+        await render_nav_screen(
+            target,
+            state,
             "Вы в режиме <b>Свободного ввода</b>.\n\n"
             "Напишите всю суть вашей заявки в одном или нескольких сообщениях.\n"
             "Я проанализирую текст и задам уточняющие вопросы, если чего-то будет не хватать.",
+            kb.free_form_keyboard(),
             parse_mode="HTML",
-            reply_markup=kb.free_form_keyboard(),
         )
     else:
         tpl = await get_template()
@@ -330,10 +333,13 @@ async def on_start_flow_pdf(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(BotStates.WAITING_MAIN_PDF)
     await state.update_data(app_id=app_id)
-    await callback.message.answer(
+    await render_nav_screen(
+        callback,
+        state,
         "📄 Отправьте готовый PDF заявки одним сообщением.\n\n"
         "После загрузки можно будет добавить приложения и отправить заявку.",
-        reply_markup=kb.main_pdf_keyboard(),
+        kb.main_pdf_keyboard(),
+        parse_mode="HTML",
     )
 
 

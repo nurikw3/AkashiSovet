@@ -17,6 +17,7 @@ from bot.logger import logger
 from stdlib.services import application_service
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import format_app_datetime
+from stdlib.telegram_ui import safe_edit_or_send as _safe_edit
 
 router = Router()
 ITEMS_PER_PAGE = 5
@@ -110,35 +111,6 @@ async def send_app_card(target: Message | CallbackQuery, app_id: int) -> None:
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows),
     )
-
-
-async def _safe_edit(msg, text: str, reply_markup=None, parse_mode="HTML"):
-    """Универсальная функция: редактирует или отправляет новое сообщение"""
-    try:
-        await msg.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
-        return
-    except TelegramBadRequest as e:
-        if "message is not modified" in e.message:
-            return
-        if (
-            "message can't be edited" in e.message
-            or "message to edit not found" in e.message
-        ):
-            # 🔥 Фоллбэк: отправляем новое сообщение
-            try:
-                await msg.delete()
-            except Exception:
-                pass
-            await msg.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
-            return
-        logger.warning("Msg edit failed: {}", e)
-    except Exception as e:
-        logger.warning("Unexpected send/edit failed: {}", e)
-        # Фоллбэк на отправку нового
-        try:
-            await msg.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
-        except Exception:
-            pass
 
 
 async def _render_list(source, state, user_id: int, page: int):
@@ -362,12 +334,13 @@ async def cb_rework_start(callback: CallbackQuery, state: FSMContext):
     await state.update_data(
         app_id=app_id, rework_block=tpl.first_block_id, mode="input", rework_screen="menu"
     )
-    await callback.message.delete()
-    await callback.message.answer(
-        "✏️ <b>Режим доработки</b>\n\nВыберите блок:",
-        reply_markup=kb.rework_keyboard(tpl, app_id),
-        parse_mode="HTML",
-    )
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    from stdlib.handlers.user.rework import send_rework_menu
+
+    await send_rework_menu(callback, state, app_id, force_new=True)
 
 
 @router.callback_query(F.data == "apps_back")

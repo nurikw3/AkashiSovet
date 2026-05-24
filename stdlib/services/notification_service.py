@@ -63,36 +63,37 @@ async def _send_rework_pdf_if_possible(
     app_id: int,
     app_row: dict | None,
 ) -> None:
-    """Пытается отправить пользователю актуальный PDF по заявке."""
+    """Пытается отправить пользователю актуальный документ по заявке."""
     if not app_row:
         return
 
     try:
-        # 1) Есть живой file_id — отправляем мгновенно
-        if app_row.get("pdf_file_id"):
+        preferred_name = str(app_row.get("main_pdf_filename") or "").strip()
+        wants_docx = not preferred_name.lower().endswith(".pdf")
+
+        # 1) Есть живой file_id — отправляем мгновенно (только если не ждём DOCX после миграции)
+        if app_row.get("pdf_file_id") and not wants_docx:
             try:
                 await bot.send_document(
                     user_id,
                     document=app_row["pdf_file_id"],
                     caption=f"📄 Актуальная версия заявки #{app_id}.",
                 )
-                logger.debug("Rework PDF source=file_id app_id={}", app_id)
+                logger.debug("Rework document source=file_id app_id={}", app_id)
                 return
             except Exception:
-                # file_id протух — идём на S3
                 logger.debug("file_id expired for app {}, falling back to S3", app_id)
 
-        # 2) file_id нет или протух — S3 + данные пользователя параллельно
-        pdf_bytes, full_name, position = await asyncio.gather(
-            s3.download_bytes(s3.pdf_key(user_id, app_id), s3.BUCKET_PDF),
+        # 2) file_id нет или протух — S3 DOCX + данные пользователя параллельно
+        docx_bytes, full_name, position = await asyncio.gather(
+            s3.download_bytes(s3.docx_key(user_id, app_id), s3.BUCKET_PDF),
             db.get_user_full_name(user_id),
             db.get_user_position(user_id),
         )
 
-        # S3 есть — используем, нет — генерируем
         source = "s3"
-        pdf_buf = io.BytesIO(pdf_bytes) if pdf_bytes else await get_app_pdf_buffer(app_id)
-        if not pdf_bytes:
+        pdf_buf = io.BytesIO(docx_bytes) if docx_bytes else await get_app_pdf_buffer(app_id)
+        if not docx_bytes:
             source = "generated"
         created_at = app_row.get("created_at") or now_app()
         custom_filename = resolve_application_pdf_filename(
@@ -110,7 +111,7 @@ async def _send_rework_pdf_if_possible(
             ),
             caption=f"📄 Актуальная версия заявки #{app_id}.",
         )
-        logger.debug("Rework PDF source={} app_id={}", source, app_id)
+        logger.debug("Rework document source={} app_id={}", source, app_id)
 
         # сохраняем свежий file_id для следующего раза
         if sent.document:

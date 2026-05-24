@@ -106,7 +106,7 @@ async def finalize_and_notify(
             logger.warning("User PDF too big for Telegram | app_id={} err={}", app_id, e)
             await callback.message.answer(
                 "📤 Заявка отправлена на согласование.\n\n"
-                "⚠️ Копию PDF не удалось отправить в чат: файл слишком большой для Telegram."
+                "⚠️ Копию документа не удалось отправить в чат: файл слишком большой для Telegram."
             )
 
     done_msg = await callback.message.answer(

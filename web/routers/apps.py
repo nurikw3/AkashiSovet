@@ -29,7 +29,14 @@ from stdlib.services.notification_service import (
     notify_user_application_approved,
     notify_user_application_rework,
 )
-from stdlib.pdf import get_app_pdf_buffer, resolve_application_pdf_filename
+from stdlib.document import (
+    get_app_docx_buffer,
+    media_type_for_filename,
+    resolve_application_docx_filename,
+)
+
+get_app_pdf_buffer = get_app_docx_buffer
+resolve_application_pdf_filename = resolve_application_docx_filename
 from bot.config import config
 from bot.logger import logger
 from web.auth_session import parse_admin_session
@@ -469,10 +476,10 @@ async def download_report(app_id: int, admin_id=Depends(get_admin)):
         dt=app_row.created_at,
     )
     
-    logger.info("Admin {} downloaded PDF report for application {}", admin_id, app_id)
+    logger.info("Admin {} downloaded document for application {}", admin_id, app_id)
     return StreamingResponse(
         pdf_buf,
-        media_type="application/pdf",
+        media_type=media_type_for_filename(custom_filename),
         headers={
             "Content-Disposition": f"inline; filename*=utf-8''{quote(custom_filename)}"
         },
@@ -535,7 +542,7 @@ async def download_archive(app_id: int, request: Request, admin_id=Depends(get_a
             )
             return file_name, None
 
-    # все запросы параллельно: PDF + имя + должность + все вложения
+    # все запросы параллельно: документ + имя + должность + все вложения
     results = await asyncio.gather(
         get_app_pdf_buffer(app_id),
         db.get_user_full_name(app_row.user_id),
@@ -562,7 +569,7 @@ async def download_archive(app_id: int, request: Request, admin_id=Depends(get_a
 
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(
-            Path(pdf_name).name or f"application_{app_id}.pdf",
+            Path(pdf_name).name or f"application_{app_id}.docx",
             pdf_buf.getvalue(),
         )
         for file_name, data in att_results:

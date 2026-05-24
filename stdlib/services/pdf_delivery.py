@@ -37,13 +37,13 @@ async def _send_document_throttled(*, bot: Bot, **kwargs) -> Message:
                 wait_sec += random.uniform(0.0, jitter_sec)
             if attempt >= max_retries:
                 logger.warning(
-                    "PDF send rate-limited; retries exhausted | attempts={} wait_sec={:.2f}",
+                    "Document send rate-limited; retries exhausted | attempts={} wait_sec={:.2f}",
                     attempt,
                     wait_sec,
                 )
                 raise
             logger.warning(
-                "PDF send rate-limited; retrying | attempt={}/{} wait_sec={:.2f}",
+                "Document send rate-limited; retrying | attempt={}/{} wait_sec={:.2f}",
                 attempt,
                 max_retries,
                 wait_sec,
@@ -51,7 +51,7 @@ async def _send_document_throttled(*, bot: Bot, **kwargs) -> Message:
             await asyncio.sleep(wait_sec)
 
 
-async def send_pdf_with_cache(
+async def send_document_with_cache(
     *,
     bot: Bot,
     chat_id: int,
@@ -62,6 +62,12 @@ async def send_pdf_with_cache(
     caption: str,
     reply_markup: object | None = None,
 ) -> Message:
+    wants_docx = filename.lower().endswith(".docx")
+    if pdf_file_id and wants_docx:
+        # Старый Telegram file_id мог указывать на PDF до миграции на DOCX.
+        await application_service.clear_pdf_reference(app_id)
+        pdf_file_id = None
+
     if pdf_file_id:
         try:
             started_at = perf_counter()
@@ -73,7 +79,7 @@ async def send_pdf_with_cache(
                 reply_markup=reply_markup,
             )
             logger.info(
-                "PDF send via file_id | app_id={} chat_id={} send_ms={:.0f}",
+                "Document send via file_id | app_id={} chat_id={} send_ms={:.0f}",
                 app_id,
                 chat_id,
                 (perf_counter() - started_at) * 1000,
@@ -81,7 +87,7 @@ async def send_pdf_with_cache(
             return message
         except TelegramBadRequest as exc:
             logger.warning(
-                "PDF file_id send failed, fallback to bytes | app_id={} chat_id={} err={}",
+                "Document file_id send failed, fallback to bytes | app_id={} chat_id={} err={}",
                 app_id,
                 chat_id,
                 exc,
@@ -103,7 +109,7 @@ async def send_pdf_with_cache(
             app_id, message.document.file_id
         )
     logger.info(
-        "PDF send via bytes | app_id={} chat_id={} size_bytes={} size_kb={:.1f} send_ms={:.0f} stored_file_id={}",
+        "Document send via bytes | app_id={} chat_id={} size_bytes={} size_kb={:.1f} send_ms={:.0f} stored_file_id={}",
         app_id,
         chat_id,
         len(payload),
@@ -112,3 +118,6 @@ async def send_pdf_with_cache(
         bool(message.document and message.document.file_id),
     )
     return message
+
+
+send_pdf_with_cache = send_document_with_cache

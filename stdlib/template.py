@@ -13,8 +13,9 @@ from stdlib.resources import get_redis
 APP_TEMPLATE_KEY = "app_template"
 REDIS_TEMPLATE_CACHE_KEY = "settings:app_template"
 TEMPLATE_CACHE_TTL_SEC = 300
-# Инкремент при сохранении шаблона — попадает в токен кэша PDF (stdlib/pdf.py).
-PDF_TEMPLATE_REVISION_KEY = "pdf:template_revision"
+# Инкремент при сохранении шаблона — попадает в токен кэша документа (stdlib/docx_gen.py).
+DOCX_TEMPLATE_REVISION_KEY = "docx:template_revision"
+PDF_TEMPLATE_REVISION_KEY = DOCX_TEMPLATE_REVISION_KEY  # обратная совместимость
 
 
 class BlockDefinition(BaseModel):
@@ -184,14 +185,18 @@ async def invalidate_template_cache() -> None:
         logger.warning("invalidate_template_cache: {}", e)
 
 
-async def _bump_pdf_template_revision() -> None:
+async def _bump_docx_template_revision() -> None:
     r = get_redis()
     if not r:
         return
     try:
-        await r.incr(PDF_TEMPLATE_REVISION_KEY)
+        await r.incr(DOCX_TEMPLATE_REVISION_KEY)
     except Exception as e:
-        logger.warning("bump pdf template revision: {}", e)
+        logger.warning("bump docx template revision: {}", e)
+
+
+async def _bump_pdf_template_revision() -> None:
+    await _bump_docx_template_revision()
 
 
 async def persist_template(template: ApplicationTemplate) -> None:

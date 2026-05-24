@@ -36,7 +36,7 @@ async def send_review_screen(
     send_fn = (
         message.answer if isinstance(message, Message) else message.message.answer
     )
-    progress_message = await send_fn("⏳ Генерация PDF...")
+    progress_message = await send_fn("⏳ Генерация документа...")
 
     try:
         t0 = perf_counter()
@@ -63,7 +63,7 @@ async def send_review_screen(
             pdf_file_id=app.get("pdf_file_id"),
             pdf_buffer=pdf_buf,
             filename=custom_filename,
-            caption="📝 Проверьте PDF перед отправкой заявки.",
+            caption="📝 Проверьте документ перед отправкой заявки.",
             reply_markup=kb.review_keyboard(tpl),
         )
         t_send = (perf_counter() - t1) * 1000

@@ -23,13 +23,13 @@ DEFAULT_FILES_TEXT = (
     "Прикрепите дополнительные файлы.\n"
     "Для каждого файла можно нажать <b>✏️ Название</b> и указать, "
     "как документ должен называться в пояснительной записке "
-    "(в PDF расширение файла не отображается).\n"
+    "(в документе расширение файла не отображается).\n"
     "Нажмите <b>Готово</b>, когда закончите."
 )
 
 RENAME_ATTACHMENT_PROMPT = (
     "Введите название документа для пояснительной записки "
-    "(как в разделе «Приложения»). Расширение файла в PDF не отобразится."
+    "(как в разделе «Приложения»). Расширение файла в документе не отобразится."
 )
 
 
@@ -375,7 +375,7 @@ async def on_main_pdf_replace(callback: CallbackQuery, state: FSMContext):
     await render_nav_screen(
         callback,
         state,
-        "📄 Отправьте новый PDF, чтобы заменить текущий основной документ.",
+        "📄 Отправьте новый PDF или DOCX, чтобы заменить текущий основной документ.",
         kb.main_pdf_keyboard(),
         parse_mode="HTML",
     )
@@ -395,7 +395,7 @@ async def on_main_pdf_delete(callback: CallbackQuery, state: FSMContext):
 
     app = await application_service.get_application_record(app_id)
     if not app or not app.get("main_pdf_s3_key"):
-        await callback.answer("Основной PDF уже удалён.", show_alert=True)
+        await callback.answer("Основной документ уже удалён.", show_alert=True)
         return
 
     old_key = app.get("main_pdf_s3_key")
@@ -409,11 +409,11 @@ async def on_main_pdf_delete(callback: CallbackQuery, state: FSMContext):
                 "Failed to delete uploaded main PDF | app_id={} key={}", app_id, old_key
             )
 
-    await callback.answer("Основной PDF удалён.")
+    await callback.answer("Основной документ удалён.")
     text, markup = await _build_files_screen(
         app_id,
         status_line=(
-            "🗑 Основной PDF удалён. Можно добавить новый PDF или продолжить с приложениями."
+            "🗑 Основной документ удалён. Можно добавить новый PDF/DOCX или продолжить с приложениями."
         ),
     )
     await render_nav_screen(callback, state, text, markup, parse_mode="HTML")

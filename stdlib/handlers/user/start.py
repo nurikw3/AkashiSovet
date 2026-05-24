@@ -86,7 +86,7 @@ async def _prompt_creation_path(message: Message | CallbackQuery, state: FSMCont
         state,
         "Выберите, как создать заявку:\n\n"
         f"• Текущий режим заполнения в боте: <b>{mode_name}</b>\n"
-        "• Или загрузите уже готовый PDF-документ.",
+        "• Или загрузите уже готовый PDF или DOCX.",
         kb.start_creation_path_keyboard(),
         parse_mode="HTML",
     )
@@ -255,7 +255,7 @@ async def process_position(message: Message, state: FSMContext):
     await db.set_user_position(message.from_user.id, position)
     await state.clear()
     await message.answer(
-        f"✅ Должность успешно сохранена: <b>{position}</b>\n\nТеперь она будет подставляться в подпись PDF.",
+        f"✅ Должность успешно сохранена: <b>{position}</b>\n\nТеперь она будет подставляться в подпись документа.",
         parse_mode="HTML",
     )
 
@@ -266,7 +266,7 @@ async def cmd_sign(message: Message, state: FSMContext):
     await message.answer(
         "🖋️ <b>Загрузка подписи</b>\n\n"
         "Отправьте фото (1:1 , белый фон) подписи одним сообщением. \n"
-        "Бот сохранит её в базу и будет автоматически подставлять в PDF.",
+        "Бот сохранит её в базу и будет автоматически подставлять в документ Word.",
         parse_mode="HTML",
     )
 
@@ -285,7 +285,7 @@ async def save_signature(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "✅ <b>Подпись сохранена в базу!</b>\n\n"
-        "Теперь при генерации PDF она появится вместо строки для ручной подписи.",
+        "Теперь при генерации документа она появится вместо строки для ручной подписи.",
         parse_mode="HTML",
     )
 
@@ -336,7 +336,7 @@ async def on_start_flow_pdf(callback: CallbackQuery, state: FSMContext):
     await render_nav_screen(
         callback,
         state,
-        "📄 Отправьте готовый PDF заявки одним сообщением.\n\n"
+        "📄 Отправьте готовый PDF или DOCX заявки одним сообщением.\n\n"
         "После загрузки можно будет добавить приложения и отправить заявку.",
         kb.main_pdf_keyboard(),
         parse_mode="HTML",

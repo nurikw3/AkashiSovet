@@ -53,15 +53,26 @@ async def upload_signature_image(
     return key
 
 
+def _main_document_content_type(filename: str) -> str:
+    if filename.lower().endswith(".docx"):
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return "application/pdf"
+
+
 async def upload_main_pdf(
     user_id: int, app_id: int, pdf_bytes: bytes, filename: str
 ) -> tuple[str, str]:
-    """Загружает пользовательский основной PDF и возвращает (s3_key, display_name)."""
-    display = PurePosixPath(filename).name.strip() or "application.pdf"
+    """Загружает пользовательский основной документ (PDF или DOCX)."""
+    display = PurePosixPath(filename).name.strip() or "application.docx"
     key = s3.uploaded_main_pdf_key(
         user_id, app_id, _object_key_component(display)
     )
-    await s3.upload_bytes(pdf_bytes, key, s3.BUCKET_PDF, "application/pdf")
+    await s3.upload_bytes(
+        pdf_bytes,
+        key,
+        s3.BUCKET_PDF,
+        content_type=_main_document_content_type(display),
+    )
     return key, display
 
 

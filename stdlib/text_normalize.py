@@ -63,11 +63,16 @@ def _expand_one_line_numbering(line: str) -> str:
     )
 
 
-def attachment_name_for_pdf(name: str) -> str:
-    """Имя для раздела «Приложения» в PDF: без расширения файла."""
+def attachment_name_for_document(name: str) -> str:
+    """Имя для раздела «Приложения» в документе: без расширения файла."""
     raw = (name or "").strip()
     if not raw:
         return "Файл"
     base = PurePosixPath(raw).name
     stem = PurePosixPath(base).stem
     return stem.strip() or raw
+
+
+def attachment_name_for_pdf(name: str) -> str:
+    """Алиас для обратной совместимости."""
+    return attachment_name_for_document(name)

@@ -92,7 +92,7 @@ async def send_app_card(target: Message | CallbackQuery, app_id: int) -> None:
         f"📅 Создана: {date_str}\n"
     )
 
-    kb_rows = [[InlineKeyboardButton(text="📥 PDF", callback_data=f"apps_dl_{app_id}")]]
+    kb_rows = [[InlineKeyboardButton(text="📥 Документ", callback_data=f"apps_dl_{app_id}")]]
     if app.status in ("draft", "rework", "approved", "pending"):
         kb_rows.append(
             [
@@ -206,7 +206,7 @@ async def cb_view(callback: CallbackQuery, state: FSMContext):
         f"📅 Создана: {date_str}\n"
     )
 
-    kb_rows = [[InlineKeyboardButton(text="📥 PDF", callback_data=f"apps_dl_{app_id}")]]
+    kb_rows = [[InlineKeyboardButton(text="📥 Документ", callback_data=f"apps_dl_{app_id}")]]
     if status in ("draft", "rework", "approved", "pending"):
         kb_rows.append(
             [
@@ -257,14 +257,14 @@ async def cb_dl(callback: CallbackQuery):
         if "file is too big" in str(e).lower():
             logger.warning("My apps PDF too big for Telegram | app_id={} err={}", app_id, e)
             await callback.message.answer(
-                "⚠️ PDF слишком большой для отправки через Telegram."
+                "⚠️ Документ слишком большой для отправки через Telegram."
             )
             return
         logger.error("PDF telegram err: {}", e)
-        await callback.message.answer("❌ Ошибка отправки PDF")
+        await callback.message.answer("❌ Ошибка отправки документа")
     except Exception as e:
-        logger.error("PDF err: {}", e)
-        await callback.message.answer("❌ Ошибка генерации PDF")
+        logger.error("Document err: {}", e)
+        await callback.message.answer("❌ Ошибка генерации документа")
 
 
 @router.callback_query(F.data.startswith("apps_del_ok_"))

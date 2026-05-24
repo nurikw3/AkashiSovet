@@ -11,7 +11,10 @@ from bot.config import config
 from bot.logger import logger
 import stdlib.db as db
 import stdlib.redis_client as redis_client_module
-from stdlib.pdf import get_app_pdf_buffer, generate_pdf_filename
+from stdlib.document import generate_docx_filename, get_app_docx_buffer
+
+get_app_pdf_buffer = get_app_docx_buffer
+generate_pdf_filename = generate_docx_filename
 from stdlib.services import application_service
 from stdlib.services.pdf_delivery import send_pdf_with_cache
 from stdlib.timezone_util import now_app
@@ -47,7 +50,7 @@ async def enqueue_pdf_delivery(
 async def _process_pdf_delivery_task(bot: Bot, payload: dict) -> None:
     app_id = int(payload["app_id"])
     chat_id = int(payload["chat_id"])
-    caption = str(payload.get("caption") or "📄 PDF")
+    caption = str(payload.get("caption") or "📄 Документ")
     filename = payload.get("filename")
 
     app = await application_service.get_application_record(app_id)
@@ -88,7 +91,7 @@ async def _process_pdf_delivery_task(bot: Bot, payload: dict) -> None:
             logger.warning("PDF queue: file too big | app_id={} err={}", app_id, exc)
             await bot.send_message(
                 chat_id=chat_id,
-                text="⚠️ PDF слишком большой для отправки через Telegram.",
+                text="⚠️ Документ слишком большой для отправки через Telegram.",
             )
             return
         raise

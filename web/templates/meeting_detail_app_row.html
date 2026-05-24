@@ -14,7 +14,7 @@
         <span class="s-badge s-{{ app.status }} block mb-2">{{ app.status }}</span>
         <a href="/download/{{ app.id }}" target="_blank"
             class="inline-block text-[8px] font-mono font-bold tracking-widest uppercase text-ak-red dark:text-ak-red-d hover:underline">📄
-            PDF</a>
+            <span data-i18n="app.document">Документ</span></a>
         <form method="post" action="/meetings/{{ meeting.id }}/remove_app/{{ app.id }}"
             onsubmit="return confirmRemoveFromMeeting({{ app.id }})" class="mt-2">
             <button type="submit"

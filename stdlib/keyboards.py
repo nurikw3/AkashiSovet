@@ -87,10 +87,10 @@ def files_keyboard_with_main_pdf(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="🔁 Заменить основной PDF", callback_data="main_pdf_replace"
+                    text="🔁 Заменить основной документ", callback_data="main_pdf_replace"
                 ),
                 InlineKeyboardButton(
-                    text="🗑 Удалить основной PDF", callback_data="main_pdf_delete"
+                    text="🗑 Удалить основной документ", callback_data="main_pdf_delete"
                 ),
             ]
         )
@@ -257,7 +257,7 @@ def start_creation_path_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="📄 Загрузить готовый PDF", callback_data="start_flow_pdf"
+                    text="📄 Загрузить готовый PDF/DOCX", callback_data="start_flow_pdf"
                 )
             ],
             [_cancel_button()[0]],

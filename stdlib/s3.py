@@ -2,7 +2,8 @@
 Async S3-клиент для MinIO через aiobotocore.
 Структура ключей:
   attachments/{user_id}/{app_id}/{filename}
-  pdf/{user_id}/{app_id}.pdf
+  docx/{user_id}/{app_id}.docx
+  pdf/{user_id}/{app_id}.pdf  (legacy cache)
   signatures/{user_id}/signature.png
 """
 
@@ -109,7 +110,12 @@ async def _s3_client():
 
 # ── Ключи ─────────────────────────────────────────────────────────────────────
 
+def docx_key(user_id: int, app_id: int) -> str:
+    return f"docx/{user_id}/{app_id}.docx"
+
+
 def pdf_key(user_id: int, app_id: int) -> str:
+    """Legacy-ключ сгенерированного PDF (прод до миграции на DOCX)."""
     return f"pdf/{user_id}/{app_id}.pdf"
 
 
@@ -234,12 +240,18 @@ async def delete_app_files(user_id: int, app_id: int) -> None:
     await _delete_by_prefix(
         _app_attachments_prefix(user_id, app_id), BUCKET_ATTACHMENTS
     )
+    await delete_object(docx_key(user_id, app_id), BUCKET_PDF)
     await delete_object(pdf_key(user_id, app_id), BUCKET_PDF)
     logger.info("S3: deleted all files for user_id={} app_id={}", user_id, app_id)
 
 
+def _user_docx_prefix(user_id: int) -> str:
+    return f"docx/{user_id}/"
+
+
 async def delete_user_files(user_id: int) -> None:
     await _delete_by_prefix(_user_pdf_prefix(user_id), BUCKET_PDF)
+    await _delete_by_prefix(_user_docx_prefix(user_id), BUCKET_PDF)
     await _delete_by_prefix(_user_attachments_prefix(user_id), BUCKET_ATTACHMENTS)
     await delete_object(signature_key(user_id), BUCKET_SIGNATURES)
     logger.info("S3: deleted ALL files for user_id={}", user_id)

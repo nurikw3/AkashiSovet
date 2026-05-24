@@ -21,9 +21,9 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.1.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.14.0",
+    "python-docx>=1.1.2",
     "python-multipart>=0.0.27",
     "redis>=7.4.0",
-    "reportlab>=4.4.10",
     "slowapi>=0.1.9",
     "uvicorn[standard]>=0.46.0",
 ]

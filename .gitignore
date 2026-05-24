@@ -230,3 +230,4 @@ test.pdf
 *.pdf
 test_pdf.py
 graphify-out/
+node_modules/

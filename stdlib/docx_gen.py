@@ -9,7 +9,6 @@ import json
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -39,14 +38,25 @@ from stdlib.timezone_util import ensure_app_tz, format_app_date_only
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 TEMPLATE_PATH = ASSETS_DIR / "board_memo_template.docx"
-# Футер в колонтитуле шаблона: word/media/image2.png (копия image2_updated.png).
-FOOTER_IMAGE_PATH = ASSETS_DIR / "image2_updated.png"
 
 DOCX_CACHE_KEY_FMT = "docx_cache:{app_id}"
 DOCX_CACHE_TTL_SEC = 7 * 24 * 3600
 
 _FONT_NAME = "Times New Roman"
 _FONT_SIZE = Pt(12)
+
+_TEMPLATE_DIGEST: str | None = None
+
+
+def _template_digest() -> str:
+    """SHA256 префикс бинарника шаблона (футер уже вшит через scripts/bake_docx_template.py)."""
+    global _TEMPLATE_DIGEST
+    if _TEMPLATE_DIGEST is None:
+        if TEMPLATE_PATH.exists():
+            _TEMPLATE_DIGEST = hashlib.sha256(TEMPLATE_PATH.read_bytes()).hexdigest()[:16]
+        else:
+            _TEMPLATE_DIGEST = "0"
+    return _TEMPLATE_DIGEST
 
 
 def _docx_cache_token(
@@ -64,9 +74,6 @@ def _docx_cache_token(
         sort_keys=True,
         ensure_ascii=False,
     )
-    footer_rev = ""
-    if FOOTER_IMAGE_PATH.exists():
-        footer_rev = hashlib.sha256(FOOTER_IMAGE_PATH.read_bytes()).hexdigest()[:16]
     parts = [
         str(blocks),
         str(attachments),
@@ -75,8 +82,8 @@ def _docx_cache_token(
         sig_ref or "",
         tpl_json,
         template_revision,
-        footer_rev,
-        "docx-v4",
+        _template_digest(),
+        "docx-v5",
     ]
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
@@ -90,38 +97,6 @@ async def _get_docx_template_revision() -> str:
         return v if v is not None else "0"
     except Exception:
         return "0"
-
-
-_TEMPLATE_FOOTER_MEDIA = "word/media/image2.png"
-_template_footer_digest: str | None = None
-
-
-def _ensure_template_footer_image() -> None:
-    """Встраивает image2_updated.png в колонтитул шаблона, если файл изменился."""
-    global _template_footer_digest
-    if not FOOTER_IMAGE_PATH.exists() or not TEMPLATE_PATH.exists():
-        return
-    source_digest = hashlib.sha256(FOOTER_IMAGE_PATH.read_bytes()).hexdigest()
-    if _template_footer_digest == source_digest:
-        return
-    with ZipFile(TEMPLATE_PATH, "r") as zin:
-        try:
-            embedded = zin.read(_TEMPLATE_FOOTER_MEDIA)
-        except KeyError:
-            embedded = b""
-        if hashlib.sha256(embedded).hexdigest() == source_digest:
-            _template_footer_digest = source_digest
-            return
-        buf = io.BytesIO()
-        with ZipFile(buf, "w", ZIP_DEFLATED) as zout:
-            for item in zin.infolist():
-                data = zin.read(item.filename)
-                if item.filename == _TEMPLATE_FOOTER_MEDIA:
-                    data = FOOTER_IMAGE_PATH.read_bytes()
-                zout.writestr(item, data)
-    TEMPLATE_PATH.write_bytes(buf.getvalue())
-    _template_footer_digest = source_digest
-    logger.debug("DOCX template footer synced from {}", FOOTER_IMAGE_PATH.name)
 
 
 def _clear_body_keep_sectpr(doc: Document) -> None:
@@ -194,7 +169,6 @@ def _generate_docx_sync(
     if not TEMPLATE_PATH.exists():
         raise FileNotFoundError(f"DOCX template not found: {TEMPLATE_PATH}")
 
-    _ensure_template_footer_image()
     doc = Document(str(TEMPLATE_PATH))
     _clear_body_keep_sectpr(doc)
 

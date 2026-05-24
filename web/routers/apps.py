@@ -273,13 +273,16 @@ async def dashboard(
 
     status_filter = _valid_status_filter(status)
     search_query = (q or "").strip()
-    raw_apps = await application_service.list_applications(status_filter, search_query)
+    raw_apps, counts = await asyncio.gather(
+        application_service.list_applications(status_filter, search_query),
+        application_service.get_status_counts(),
+    )
 
     ctx = {
         "request": request,
         "apps": [_parse_app(a) for a in raw_apps],
         "status_filter": status_filter,
-        "counts": await application_service.get_status_counts(),
+        "counts": counts,
         "meeting_basket": status_filter == "approved",
         "search_query": search_query,
     }

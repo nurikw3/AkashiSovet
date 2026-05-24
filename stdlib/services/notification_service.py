@@ -18,6 +18,9 @@ from stdlib.template import get_template
 from stdlib.timezone_util import now_app
 from stdlib.timing import timed_task
 
+# Параллельная отправка вложений (лимит Telegram на чат обычно не достигается).
+_FEEDBACK_ATTACHMENTS_CONCURRENCY = 5
+
 
 async def _blocks_preview_html(blocks_raw, limit: int = 2600) -> str:
     """Короткий HTML-превью текста заявки для уведомления о доработке."""
@@ -123,6 +126,38 @@ async def _send_rework_pdf_if_possible(
         )
 
 
+async def _send_one_feedback_attachment(
+    bot: Bot,
+    user_id: int,
+    app_id: int,
+    *,
+    idx: int,
+    total: int,
+    file_name: str,
+    file_bytes: bytes,
+    caption_note: str,
+    sem: asyncio.Semaphore,
+) -> None:
+    async with sem:
+        try:
+            await bot.send_document(
+                user_id,
+                document=BufferedInputFile(
+                    file_bytes,
+                    filename=file_name,
+                ),
+                caption=f"📎 Файл {idx}/{total} {caption_note} к заявке #{app_id}.",
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to send feedback attachment #{} to user {} for app {}: {}",
+                idx,
+                user_id,
+                app_id,
+                e,
+            )
+
+
 async def _send_feedback_attachments(
     bot: Bot,
     user_id: int,
@@ -133,24 +168,24 @@ async def _send_feedback_attachments(
 ) -> None:
     if not feedback_files:
         return
-    for idx, (file_name, file_bytes) in enumerate(feedback_files, start=1):
-        try:
-            await bot.send_document(
-                user_id,
-                document=BufferedInputFile(
-                    file_bytes,
-                    filename=file_name,
-                ),
-                caption=f"📎 Файл {idx}/{len(feedback_files)} {caption_note} к заявке #{app_id}.",
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to send feedback attachment #{} to user {} for app {}: {}",
-                idx,
+    total = len(feedback_files)
+    sem = asyncio.Semaphore(_FEEDBACK_ATTACHMENTS_CONCURRENCY)
+    await asyncio.gather(
+        *[
+            _send_one_feedback_attachment(
+                bot,
                 user_id,
                 app_id,
-                e,
+                idx=idx,
+                total=total,
+                file_name=file_name,
+                file_bytes=file_bytes,
+                caption_note=caption_note,
+                sem=sem,
             )
+            for idx, (file_name, file_bytes) in enumerate(feedback_files, start=1)
+        ]
+    )
 
 
 @timed_task("notify_user_application_approved")
@@ -196,13 +231,15 @@ async def notify_user_application_approved(
                 e,
             )
         if text_sent:
-            await _send_approval_pdf_if_possible(bot, user_id, app_id, pdf_file_id)
-            await _send_feedback_attachments(
-                bot,
-                user_id,
-                app_id,
-                feedback_files=feedback_files,
-                caption_note="к согласованию",
+            await asyncio.gather(
+                _send_approval_pdf_if_possible(bot, user_id, app_id, pdf_file_id),
+                _send_feedback_attachments(
+                    bot,
+                    user_id,
+                    app_id,
+                    feedback_files=feedback_files,
+                    caption_note="к согласованию",
+                ),
             )
         return
 

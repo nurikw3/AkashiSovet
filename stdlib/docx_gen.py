@@ -48,6 +48,15 @@ DOCX_CACHE_TTL_SEC = 7 * 24 * 3600
 _FONT_NAME = "Times New Roman"
 _FONT_SIZE = Pt(12)
 
+# Поля как в прежнем PDF-генераторе (ReportLab).
+_MARGIN_TOP = Cm(2)
+_MARGIN_BOTTOM = Cm(2)
+_MARGIN_LEFT = Cm(3)
+_MARGIN_RIGHT = Cm(1.5)
+_BODY_FIRST_LINE = Cm(1.25)
+_LIST_LEFT = Cm(1.25)
+_LIST_HANGING = Cm(0.63)
+
 
 def _docx_cache_token(
     app_raw: dict,
@@ -76,7 +85,7 @@ def _docx_cache_token(
         tpl_json,
         template_revision,
         footer_rev,
-        "docx-v2",
+        "docx-v3",
     ]
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
@@ -131,6 +140,14 @@ def _clear_body_keep_sectpr(doc: Document) -> None:
             body.remove(element)
 
 
+def _apply_page_margins(doc: Document) -> None:
+    for section in doc.sections:
+        section.top_margin = _MARGIN_TOP
+        section.bottom_margin = _MARGIN_BOTTOM
+        section.left_margin = _MARGIN_LEFT
+        section.right_margin = _MARGIN_RIGHT
+
+
 def _apply_run_font(run, *, bold: bool = False, italic: bool = False) -> None:
     run.font.name = _FONT_NAME
     run.font.size = _FONT_SIZE
@@ -161,8 +178,14 @@ def _add_styled_paragraph(
 
 def _add_body_paragraph(doc: Document, text: str, *, bullet: bool = False) -> None:
     p = doc.add_paragraph()
-    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.space_after = Pt(6)
+    pf = p.paragraph_format
+    pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    pf.space_after = Pt(6)
+    if bullet:
+        pf.left_indent = _LIST_LEFT
+        pf.first_line_indent = -_LIST_HANGING
+    else:
+        pf.first_line_indent = _BODY_FIRST_LINE
     prefix = "• " if bullet else ""
     run = p.add_run(f"{prefix}{text}")
     _apply_run_font(run)
@@ -197,6 +220,7 @@ def _generate_docx_sync(
     _ensure_template_footer_image()
     doc = Document(str(TEMPLATE_PATH))
     _clear_body_keep_sectpr(doc)
+    _apply_page_margins(doc)
 
     _add_styled_paragraph(
         doc, "Членам Правления", align=WD_ALIGN_PARAGRAPH.RIGHT, bold=True
